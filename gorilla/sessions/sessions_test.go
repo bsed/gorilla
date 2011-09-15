@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -255,6 +256,7 @@ func TestLoadSaveSession(t *testing.T) {
 	// Change all values.
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
 	req.Header.Add("Cookie", cookies[0])
+	req.Cookie = readCookies(req.Header)
 	rsp = NewRecorder()
 	if session, err = Session(req); err == nil {
 		for k, v := range sessionValues1 {
@@ -279,6 +281,7 @@ func TestLoadSaveSession(t *testing.T) {
 	// Remove all values; set a new value.
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
 	req.Header.Add("Cookie", cookies[0])
+	req.Cookie = readCookies(req.Header)
 	rsp = NewRecorder()
 	if session, err = Session(req); err == nil {
 		for k, v := range sessionValues2 {
@@ -311,6 +314,7 @@ func TestLoadSaveSession(t *testing.T) {
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
 	req.Header.Add("Cookie", cookies[0])
 	req.Header.Add("Cookie", cookies[1])
+	req.Cookie = readCookies(req.Header)
 	rsp = NewRecorder()
 	if session, err = Session(req); err == nil {
 		if len(session) != 1 {
@@ -386,13 +390,13 @@ func TestFlashes(t *testing.T) {
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
 	req.Header.Add("Cookie", cookies[0])
 	req.Header.Add("Cookie", cookies[1])
+	req.Cookie = readCookies(req.Header)
 	rsp = NewRecorder()
 
 	// Check all saved values.
 	if flashes, err = Flashes(req); err != nil || len(flashes) != 2 {
 		t.Errorf("Expected flashes; Got %v", flashes)
-	}
-	if flashes[0] != "foo" || flashes[1] != "bar" {
+	} else if flashes[0] != "foo" || flashes[1] != "bar" {
 		t.Errorf("Expected foo,bar; Got %v", flashes)
 	}
 	if flashes, err = Flashes(req); err == nil {
@@ -455,6 +459,7 @@ func TestKeyRotation(t *testing.T) {
 
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
 	req.Header.Add("Cookie", cookies[0])
+	req.Cookie = readCookies(req.Header)
 	rsp = NewRecorder()
 	if session, err = Session(req); err == nil {
 		if len(session) > 0 {
@@ -476,6 +481,7 @@ func TestKeyRotation(t *testing.T) {
 
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
 	req.Header.Add("Cookie", cookies[0])
+	req.Cookie = readCookies(req.Header)
 	rsp = NewRecorder()
 	if session, err = Session(req); err == nil {
 		if len(session) != 1 || session["a"] != "1" {
@@ -487,3 +493,129 @@ func TestKeyRotation(t *testing.T) {
 }
 
 // TODO test Config()
+
+// ----------------------------------------------------------------------------
+// r58 compatibility
+// ----------------------------------------------------------------------------
+// Several functions extracted/adapted from Go source for r58 compatibility.
+//
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// readCookies parses all "Cookie" values from
+// the header h, removes the successfully parsed values from the
+// "Cookie" key in h and returns the parsed Cookies.
+func readCookies(h http.Header) []*http.Cookie {
+	cookies := []*http.Cookie{}
+	lines, ok := h["Cookie"]
+	if !ok {
+		return cookies
+	}
+	unparsedLines := []string{}
+	for _, line := range lines {
+		parts := strings.Split(strings.TrimSpace(line), ";", -1)
+		if len(parts) == 1 && parts[0] == "" {
+			continue
+		}
+		// Per-line attributes
+		parsedPairs := 0
+		for i := 0; i < len(parts); i++ {
+			parts[i] = strings.TrimSpace(parts[i])
+			if len(parts[i]) == 0 {
+				continue
+			}
+			attr, val := parts[i], ""
+			if j := strings.Index(attr, "="); j >= 0 {
+				attr, val = attr[:j], attr[j+1:]
+			}
+			if !isCookieNameValid(attr) {
+				continue
+			}
+			val, success := parseCookieValue(val)
+			if !success {
+				continue
+			}
+			cookies = append(cookies, &http.Cookie{Name: attr, Value: val})
+			parsedPairs++
+		}
+		if parsedPairs == 0 {
+			unparsedLines = append(unparsedLines, line)
+		}
+	}
+	h["Cookie"] = unparsedLines, len(unparsedLines) > 0
+	return cookies
+}
+
+func unquoteCookieValue(v string) string {
+	if len(v) > 1 && v[0] == '"' && v[len(v)-1] == '"' {
+		return v[1 : len(v)-1]
+	}
+	return v
+}
+
+func isCookieByte(c byte) bool {
+	switch {
+	case c == 0x21, 0x23 <= c && c <= 0x2b, 0x2d <= c && c <= 0x3a,
+		0x3c <= c && c <= 0x5b, 0x5d <= c && c <= 0x7e:
+		return true
+	}
+	return false
+}
+
+func isCookieExpiresByte(c byte) (ok bool) {
+	return isCookieByte(c) || c == ',' || c == ' '
+}
+
+func parseCookieValue(raw string) (string, bool) {
+	return parseCookieValueUsing(raw, isCookieByte)
+}
+
+func parseCookieExpiresValue(raw string) (string, bool) {
+	return parseCookieValueUsing(raw, isCookieExpiresByte)
+}
+
+func parseCookieValueUsing(raw string, validByte func(byte) bool) (string, bool) {
+	raw = unquoteCookieValue(raw)
+	for i := 0; i < len(raw); i++ {
+		if !validByte(raw[i]) {
+			return "", false
+		}
+	}
+	return raw, true
+}
+
+func isCookieNameValid(raw string) bool {
+	for _, c := range raw {
+		if !isToken(byte(c)) {
+			return false
+		}
+	}
+	return true
+}
+
+func isSeparator(c byte) bool {
+	switch c {
+	case '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '[', ']', '?', '=', '{', '}', ' ', '\t':
+		return true
+	}
+	return false
+}
+
+func isSpace(c byte) bool {
+	switch c {
+	case ' ', '\t', '\r', '\n':
+		return true
+	}
+	return false
+}
+
+func isCtl(c byte) bool { return (0 <= c && c <= 31) || c == 127 }
+
+func isChar(c byte) bool { return 0 <= c && c <= 127 }
+
+func isAnyText(c byte) bool { return !isCtl(c) }
+
+func isQdText(c byte) bool { return isAnyText(c) && c != '"' }
+
+func isToken(c byte) bool { return isChar(c) && !isCtl(c) && !isSeparator(c) }
