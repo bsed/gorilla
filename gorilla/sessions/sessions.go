@@ -112,6 +112,33 @@ func Save(r *http.Request, w http.ResponseWriter) []os.Error {
 	return DefaultSessionFactory.Save(r, w)
 }
 
+// Store returns a session store for the given key.
+func Store(key string) (SessionStore, os.Error) {
+	return DefaultSessionFactory.Store(key)
+}
+
+// SetStore registers a session store for the given key.
+func SetStore(key string, store SessionStore) {
+	DefaultSessionFactory.SetStore(key, store)
+}
+
+// SetStoreKeys defines authentication and encryption keys for the given store.
+//
+// See SessionFactory.SetStoreKeys.
+func SetStoreKeys(key string, pairs ...[]byte) (bool, os.Error) {
+	return DefaultSessionFactory.SetStoreKeys(key, pairs...)
+}
+
+// DefaultConfig returns the default session configuration used by the factory.
+func DefaultConfig() *SessionConfig {
+	return DefaultSessionFactory.DefaultConfig()
+}
+
+// SetDefaultConfig sets the default session configuration used by the factory.
+func SetDefaultConfig(config *SessionConfig) {
+	DefaultSessionFactory.SetDefaultConfig(config)
+}
+
 // ----------------------------------------------------------------------------
 // SessionFactory
 // ----------------------------------------------------------------------------
@@ -277,8 +304,8 @@ func (f *SessionFactory) DefaultConfig() *SessionConfig {
 }
 
 // SetDefaultConfig sets the default session configuration used by the factory.
-func (f *SessionFactory) SetDefaultConfig(config SessionConfig) {
-	f.defaultConfig = &config
+func (f *SessionFactory) SetDefaultConfig(config *SessionConfig) {
+	f.defaultConfig = config
 }
 
 // defaultConfigValue returns a copy of the default configuration.
@@ -605,29 +632,37 @@ type Encoder struct {
 //
 // It serializes, optionally encrypts, creates a message authentication code
 // and finally encodes the value in a format suitable for cookie transmition.
-func (s *Encoder) Encode(key string, value SessionData) (string, os.Error) {
+func (s *Encoder) Encode(key string, value SessionData) (rv string, err os.Error) {
 	// Hash is required.
 	if s.Hash == nil {
-		return "", ErrMissingHash
+		err = ErrMissingHash
+		return
 	}
+	var b []byte
 
 	// 1. Serialize.
-	rv, err := serialize(value)
+	b, err = serialize(value)
 	if err != nil {
-		return "", err
+		return
 	}
 
 	// 2. Encrypt (optional).
 	if s.Block != nil {
-		// Encrypt and encode, because pipes would break HMAC verification.
-		rv = encode(encrypt(s.Block, rv))
+		b, err = encrypt(s.Block, b)
+		if err != nil {
+			return
+		}
+		// Encode because pipes would break HMAC verification.
+		b = encode(b)
+
 	}
 
 	// 3. Create hash.
-	rv = createHmac(s.Hash, key, rv, s.timestamp())
+	b = createHmac(s.Hash, key, b, s.timestamp())
 
 	// 4. Encode.
-	return string(encode(rv)), nil
+	rv = string(encode(b))
+	return
 }
 
 // Decode decodes a session value.
@@ -716,34 +751,49 @@ func deserialize(value []byte) (SessionData, os.Error) {
 
 // encrypt encrypts a value using the given Block in CTR mode.
 //
-// A random initialization vector (IV) is generated and later prepended to the
-// resulting ciphertext to be available for decryption. Also, a random salt
-// with the length of the block size is prepended to the value before
-// encryption.
-func encrypt(block cipher.Block, value []byte) []byte {
+// A random initialization vector is generated and prepended to the resulting
+// ciphertext to be available for decryption. Also, a random salt with the
+// length of the block size is prepended to the value before encryption.
+func encrypt(block cipher.Block, value []byte) (rv []byte, err os.Error) {
+	// Recover in case block has an invalid key.
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(os.Error)
+		}
+	}()
 	size := block.BlockSize()
-	// Generate an initialization vector (IV) suitable for encryption.
+	// Generate an initialization vector suitable for encryption.
 	// http://en.wikipedia.org/wiki/Block_cipher_modes_of_operation#Initialization_vector_.28IV.29
 	iv := make([]byte, size)
-	rand.Read(iv)
+	if _, err = rand.Read(iv); err != nil {
+		return
+	}
 	// Create a salt.
 	salt := make([]byte, size)
-	rand.Read(salt)
+	if _, err = rand.Read(salt); err != nil {
+		return
+	}
 	value = append(salt, value...)
 	// Encrypt it.
 	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(value, value)
 	// Return iv + ciphertext.
-	return append(iv, value...)
+	rv = append(iv, value...)
+	return
 }
 
 // decrypt decrypts a value using the given Block in CTR mode.
 //
 // The value to be decrypted must have a length greater than the block size,
-// because the initialization vector (IV) is expected to prepend it. Also,
-// a salt with the length of the block size is expected to prepend the plain
-// value.
-func decrypt(block cipher.Block, value []byte) ([]byte, os.Error) {
+// because the initialization vector is expected to prepend it. Also, a salt
+// with the length of the block size is expected to prepend the plain value.
+func decrypt(block cipher.Block, value []byte) (b []byte, err os.Error) {
+	// Recover in case block has an invalid key.
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(os.Error)
+		}
+	}()
 	size := block.BlockSize()
 	if len(value) > size {
 		// Extract iv.
@@ -755,10 +805,12 @@ func decrypt(block cipher.Block, value []byte) ([]byte, os.Error) {
 		stream.XORKeyStream(value, value)
 		if len(value) > size {
 			// Return value without the salt.
-			return value[size:], nil
+			b = value[size:]
+			return
 		}
 	}
-	return nil, ErrDecryption
+	err = ErrDecryption
+	return
 }
 
 // Authentication -------------------------------------------------------------

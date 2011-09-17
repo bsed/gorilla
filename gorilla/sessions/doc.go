@@ -47,9 +47,9 @@ They are both set calling SessionFactory.SetStoreKeys() and should be done at
 initialization time:
 
 	func init() {
-		sessions.DefaultSessionFactory.SetStoreKeys("cookie",
-													[]byte("my-hmac-key"),
-													[]byte("my-aes-key"))
+		sessions.SetStoreKeys("cookie",
+							  []byte("my-hmac-key"),
+							  []byte("my-aes-key"))
 	}
 
 The first argument is the name used to register the session store. By default
@@ -79,11 +79,11 @@ Sometimes we may want to change authentication and/or encryption keys without
 breaking existing sessions. We can do this setting multiple authentication and
 encryption keys, in pairs, to be tested in order:
 
-	sessions.DefaultSessionFactory.SetStoreKeys("cookie",
-												[]byte("my-hmac-key"),
-												[]byte("my-aes-key"),
-												[]byte("my-previous-hmac-key"),
-												[]byte("my-previous-aes-key"))
+	sessions.SetStoreKeys("cookie",
+						  []byte("my-hmac-key"),
+						  []byte("my-aes-key"),
+						  []byte("my-previous-hmac-key"),
+						  []byte("my-previous-aes-key"))
 
 New sessions will be saved using the first pair. Old sessions can still be
 read because the first pair will fail, and the second will be tested. This
@@ -118,7 +118,7 @@ MemcacheSessionStore. First we register it using the "memcache" key. This
 should be done at initialization time:
 
 	func init() {
-		DefaultSessionFactory.SetStore("memcache", new(MemcacheSessionStore))
+		sessions.SetStore("memcache", new(MemcacheSessionStore))
 	}
 
 Then to get a session using memcached, we pass a third argument to
