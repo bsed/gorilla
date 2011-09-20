@@ -25,12 +25,8 @@ their secret keys must be set before use. We can do it in a init() function:
 		sessions.SetStore("memcache", new(appengineSessions.MemcacheSessionStore))
 
 		// Set secret keys for the session stores.
-		sessions.SetStoreKeys("datastore",
-							  []byte("my-secret-key"),
-							  []byte("1234567890123456"))
-		sessions.SetStoreKeys("memcache",
-							  []byte("my-secret-key"),
-							  []byte("1234567890123456"))
+		sessions.SetStoreKeys("datastore", []byte("my-secret-key"))
+		sessions.SetStoreKeys("memcache", []byte("my-secret-key"))
 	}
 
 After this, to retrieve a session using datastore or memcache, pass a third
