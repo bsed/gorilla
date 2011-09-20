@@ -15,16 +15,6 @@ import (
 	"gorilla.googlecode.com/hg/gorilla/sessions"
 )
 
-// SetDatastoreSessionStore enables the datastore session store.
-func SetDatastoreSessionStore() {
-	sessions.SetStore("datastore", new(DatastoreSessionStore))
-}
-
-// SetMemcacheSessionStore enables the memcache session store.
-func SetMemcacheSessionStore() {
-	sessions.SetStore("memcache", new(MemcacheSessionStore))
-}
-
 // ----------------------------------------------------------------------------
 // DatastoreSessionStore
 // ----------------------------------------------------------------------------

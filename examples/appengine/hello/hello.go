@@ -18,9 +18,9 @@ func init() {
 	// Send all incoming requests to mux.DefaultRouter.
 	http.Handle("/", mux.DefaultRouter)
 
-	// Enable the datastore and memcache session stores.
-	appengineSessions.SetDatastoreSessionStore()
-	appengineSessions.SetMemcacheSessionStore()
+	// Register the datastore and memcache session stores.
+	sessions.SetStore("datastore", new(appengineSessions.DatastoreSessionStore))
+	sessions.SetStore("memcache", new(appengineSessions.MemcacheSessionStore))
 
 	// Set secret keys for the session stores.
 	sessions.SetStoreKeys("datastore",

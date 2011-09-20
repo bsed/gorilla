@@ -20,9 +20,9 @@ their secret keys must be set before use. We can do it in a init() function:
 	)
 
 	func init() {
-		// Enable the datastore and memcache session stores.
-		appengineSessions.SetDatastoreSessionStore()
-		appengineSessions.SetMemcacheSessionStore()
+		// Register the datastore and memcache session stores.
+		sessions.SetStore("datastore", new(appengineSessions.DatastoreSessionStore))
+		sessions.SetStore("memcache", new(appengineSessions.MemcacheSessionStore))
 
 		// Set secret keys for the session stores.
 		sessions.SetStoreKeys("datastore",
