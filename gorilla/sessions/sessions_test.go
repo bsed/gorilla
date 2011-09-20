@@ -79,15 +79,30 @@ var testSessionValues = []SessionData{
 
 var testStringValues = []string{"foo", "bar", "baz", "foobar", "foobarbaz"}
 
+func TestSerializeSessionData(t *testing.T) {
+	data := SessionData{"foo": "bar", "baz": "ding"}
+	b, _ := SerializeSessionData(&data)
+
+	res, _ := DeserializeSessionData(b)
+	if res["foo"] != "bar" {
+		t.Errorf("Error.")
+	}
+	if res["baz"] != "ding" {
+		t.Errorf("Error.")
+	}
+}
+
 func TestSerialization(t *testing.T) {
 	var deserialized SessionData
 
 	for _, value := range testSessionValues {
-		serialized, err := serialize(value)
+		serialized, err := serialize(&value)
 		if err != nil {
 			t.Error(err)
 		}
-		deserialized, err = deserialize(serialized)
+
+		deserialized = SessionData{}
+		err = deserialize(serialized, &deserialized)
 		if err != nil {
 			t.Error(err)
 		}

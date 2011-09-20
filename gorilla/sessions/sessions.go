@@ -72,6 +72,7 @@ type SessionConfig struct {
 
 // SessionInfo stores internal references for a given session.
 type SessionInfo struct {
+	Id     string
 	Data   SessionData
 	Store  SessionStore
 	Config SessionConfig
@@ -509,6 +510,17 @@ func GenerateSessionId(length int) (string, os.Error) {
 	return fmt.Sprintf("%x", id), nil
 }
 
+// SerializeSessionData serializes a session value using gob.
+func SerializeSessionData(session *SessionData) ([]byte, os.Error) {
+	return serialize(session)
+}
+
+// DeserializeSessionData deserializes a session value using gob.
+func DeserializeSessionData(value []byte) (data SessionData, err os.Error) {
+	err = deserialize(value, &data)
+	return
+}
+
 // GetCookie returns the contents from a session cookie.
 //
 // If the session is invalid, it will return an empty SessionData.
@@ -640,7 +652,7 @@ func (s *Encoder) Encode(key string, value SessionData) (rv string, err os.Error
 	var b []byte
 
 	// 1. Serialize.
-	b, err = serialize(value)
+	b, err = serialize(&value)
 	if err != nil {
 		return
 	}
@@ -705,8 +717,7 @@ func (s *Encoder) Decode(key, value string) (SessionData, os.Error) {
 
 	// 4. Deserialize.
 	var data SessionData
-	data, err = deserialize(rv)
-	if err != nil {
+	if err = deserialize(rv, &data); err != nil {
 		return nil, err
 	}
 	return data, nil
@@ -726,7 +737,7 @@ func (s *Encoder) timestamp() int64 {
 // Serialization --------------------------------------------------------------
 
 // serialize encodes a session value using gob.
-func serialize(session SessionData) ([]byte, os.Error) {
+func serialize(session *SessionData) ([]byte, os.Error) {
 	b := bytes.NewBuffer(nil)
 	e := gob.NewEncoder(b)
 	if err := e.Encode(session); err != nil {
@@ -736,14 +747,13 @@ func serialize(session SessionData) ([]byte, os.Error) {
 }
 
 // deserialize decodes a session value using gob.
-func deserialize(value []byte) (SessionData, os.Error) {
-	var session SessionData
+func deserialize(value []byte, session *SessionData) os.Error {
 	b := bytes.NewBuffer(value)
 	d := gob.NewDecoder(b)
-	if err := d.Decode(&session); err != nil {
-		return nil, err
+	if err := d.Decode(session); err != nil {
+		return err
 	}
-	return session, nil
+	return nil
 }
 
 // Encryption -----------------------------------------------------------------
