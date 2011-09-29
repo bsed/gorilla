@@ -48,16 +48,15 @@ const (
 // Router registers routes to be matched and dispatches a handler.
 //
 // It implements the http.Handler interface, so it can be registered to serve
-// requests. For example, using the default router:
+// requests. For example, to send all incoming requests to the default router:
 //
 //     func main() {
-//         http.ListenAndServe(":8080", mux.DefaultRouter)
+//         http.Handle("/", mux.DefaultRouter)
 //     }
 //
 // Or, for Google App Engine, register it in a init() function:
 //
 //     func init() {
-//         // Send all incoming requests to mux.DefaultRouter.
 //         http.Handle("/", mux.DefaultRouter)
 //     }
 //
