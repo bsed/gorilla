@@ -32,7 +32,10 @@ func Load(i interface{}, data map[string][]string) os.Error {
 	}
 	rv := v.Elem()
 	for path, values := range data {
-		loadValue(path, values[:], rv, strings.Split(path, ".")[:])
+		parts := strings.Split(path, ".")
+		if err := loadValue(path, values[:], rv, parts[:]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -54,11 +57,12 @@ func Load(i interface{}, data map[string][]string) os.Error {
 //
 // TODO support struct values in maps and slices at some point.
 // Currently maps and slices can be of the base types only.
-func loadValue(path string, values []string, rv reflect.Value, parts []string) {
-	spec, err := defaultStructMap.getOrLoad(rv.Type())
-	if err != nil {
-		// TODO this should not happen, but what if spec can't be loaded?
-		panic("Error loading struct spec.")
+func loadValue(path string, values []string, rv reflect.Value, parts []string) (err os.Error) {
+	spec, error := defaultStructMap.getOrLoad(rv.Type())
+	if error != nil {
+		// Struct spec could not be loaded.
+		err = error
+		return
 	}
 
 	fieldSpec, ok := spec.fields[parts[0]]
@@ -71,8 +75,7 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 	field := setIndirect(rv.FieldByName(fieldSpec.realName))
 	kind := field.Kind()
 	if (kind == reflect.Struct || kind == reflect.Map) == (len(parts) == 0) {
-		// Last part can't be a struct or map.
-		// Other parts must be a struct or map.
+		// Last part can't be a struct or map. Others must be a struct or map.
 		return
 	}
 
@@ -81,17 +84,15 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 		// Get map index.
 		idx = parts[0]
 		parts = parts[1:]
+		if len(parts) > 0 {
+			// Last part must be the map index.
+			return
+		}
 	}
 
 	if len(parts) > 0 {
-		if kind == reflect.Map || kind == reflect.Slice {
-			// Maps and slices must be last part.
-			// This may change in the future if we start to support
-			// maps or slices of structs.
-			return
-		}
 		// A struct. Move to next part.
-		loadValue(path, values[:], field, parts[:])
+		return loadValue(path, values[:], field, parts[:])
 	} else {
 		// Last part: set the value.
 		switch kind {
@@ -116,6 +117,7 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 				field.Set(slice)
 		}
 	}
+	return
 }
 
 // coerce coerces base types from a string to a reflect.Value of a given kind.
@@ -331,33 +333,33 @@ func getStructId(t reflect.Type) string {
 }
 
 // isSupportedType returns true for supported field types.
-func isSupportedType(t reflect.Type) (b bool) {
+func isSupportedType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 	if isSupportedBaseType(t) {
-		b = true
+		return true
 	} else {
 		switch t.Kind() {
 			case reflect.Slice:
 				// Only []anyOfTheBaseTypes.
-				b = isSupportedBaseType(t.Elem())
+				return isSupportedBaseType(t.Elem())
 			case reflect.Struct:
-				b = true
+				return true
 			case reflect.Map:
 				// Only map[string]anyOfTheBaseTypes.
 				if t.Key().Kind() == reflect.String && isSupportedBaseType(t.Elem()) {
-					b = true
+					return true
 				}
 		}
 	}
-	return
+	return false
 }
 
 // isSupportedBaseType returns true for supported base field types.
 //
 // Only base types can be used in maps/slices values.
-func isSupportedBaseType(t reflect.Type) (b bool) {
+func isSupportedBaseType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -367,9 +369,9 @@ func isSupportedBaseType(t reflect.Type) (b bool) {
 			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.String,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			b = true
+			return true
 	}
-	return
+	return false
 }
 
 // setIndirect resolves a pointer to value, setting it recursivelly if needed.
