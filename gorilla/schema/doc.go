@@ -71,9 +71,9 @@ an HTML form to fill a Person struct must look like this:
 		<input type="text" name="Phone.Number">
 	</form>
 
-Single values are filled using the first value of a given name. Slices are
-filled using all fields values of a given name. So to fill a Person with
-multiple Phone values, like:
+Single values are filled using the first value for a key from the source map.
+Slices are filled using all values for a key from the source map. So to fill
+a Person with multiple Phone values, like:
 
 	type Person struct {
 		Name   string
