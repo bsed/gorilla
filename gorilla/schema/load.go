@@ -57,7 +57,8 @@ func Load(i interface{}, data map[string][]string) os.Error {
 //
 // TODO support struct values in maps and slices at some point.
 // Currently maps and slices can be of the base types only.
-func loadValue(path string, values []string, rv reflect.Value, parts []string) (err os.Error) {
+func loadValue(path string, values []string, rv reflect.Value,
+	parts []string) (err os.Error) {
 	spec, error := defaultStructMap.getOrLoad(rv.Type())
 	if error != nil {
 		// Struct spec could not be loaded.
@@ -98,16 +99,19 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) (
 		switch kind {
 			case reflect.Bool,
 				reflect.Float32, reflect.Float64,
-				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
+				reflect.Int64,
 				reflect.String,
-				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
+				reflect.Uint64:
 				field.Set(coerce(values[0], kind))
 			case reflect.Map:
 				ekind := field.Type().Elem().Kind()
 				if field.IsNil() {
 					field.Set(reflect.MakeMap(field.Type()))
 				}
-				field.SetMapIndex(reflect.ValueOf(idx), coerce(values[0], ekind))
+				field.SetMapIndex(reflect.ValueOf(idx), coerce(values[0],
+					ekind))
 			case reflect.Slice:
 				ekind := field.Type().Elem().Kind()
 				slice := reflect.MakeSlice(field.Type(), 0, 0)
@@ -203,7 +207,8 @@ func (m *structMap) getByType(t reflect.Type) (spec *structSpec) {
 // getOrLoad returns a cached structSpec, loading and caching it if needed.
 //
 // It returns nil if the passed type is not a struct.
-func (m *structMap) getOrLoad(t reflect.Type) (spec *structSpec, err os.Error) {
+func (m *structMap) getOrLoad(t reflect.Type) (spec *structSpec,
+	err os.Error) {
 	if spec = m.getByType(t); spec != nil {
 		return spec, nil
 	}
@@ -229,8 +234,9 @@ func (m *structMap) getOrLoad(t reflect.Type) (spec *structSpec, err os.Error) {
 // because a write lock is required.
 //
 // The loaded argument is the list of keys to roll back in case of error.
-func (m *structMap) load(t reflect.Type, loaded *[]string) (spec *structSpec, err os.Error) {
-   defer func() {
+func (m *structMap) load(t reflect.Type, loaded *[]string) (spec *structSpec,
+	err os.Error) {
+	defer func() {
 		if r := recover(); r != nil {
 			err = r.(os.Error)
 		}
@@ -284,7 +290,8 @@ func (m *structMap) load(t reflect.Type, loaded *[]string) (spec *structSpec, er
 		// The name must be unique for the struct.
 		for _, uniqueName := range uniqueNames {
 			if name == uniqueName {
-				return nil, os.NewError("Field names and name tags in a struct must be unique.")
+				return nil, os.NewError("Field names and name tags in a " +
+										"struct must be unique.")
 			}
 		}
 		uniqueNames[i] = name
@@ -348,7 +355,8 @@ func isSupportedType(t reflect.Type) bool {
 				return true
 			case reflect.Map:
 				// Only map[string]anyOfTheBaseTypes.
-				if t.Key().Kind() == reflect.String && isSupportedBaseType(t.Elem()) {
+				stringKey := t.Key().Kind() == reflect.String
+				if stringKey &&	isSupportedBaseType(t.Elem()) {
 					return true
 				}
 		}
@@ -366,9 +374,11 @@ func isSupportedBaseType(t reflect.Type) bool {
 	switch t.Kind() {
 		case reflect.Bool,
 			reflect.Float32, reflect.Float64,
-			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
+			reflect.Int64,
 			reflect.String,
-			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
+			reflect.Uint64:
 			return true
 	}
 	return false
