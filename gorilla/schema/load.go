@@ -32,9 +32,7 @@ func Load(i interface{}, data map[string][]string) os.Error {
 	}
 	rv := v.Elem()
 	for path, values := range data {
-		if parts := strings.Split(path, "."); len(parts) > 0 {
-			loadValue(path, values[:], rv, parts[:])
-		}
+		loadValue(path, values[:], rv, strings.Split(path, ".")[:])
 	}
 	return nil
 }
@@ -80,6 +78,7 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 
 	var idx string
 	if kind == reflect.Map {
+		// Get map index.
 		idx = parts[0]
 		parts = parts[1:]
 	}
@@ -92,7 +91,7 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 			return
 		}
 		// A struct. Move to next part.
-		loadValue(path, values[:], field, parts)
+		loadValue(path, values[:], field, parts[:])
 	} else {
 		// Last part: set the value.
 		switch kind {
