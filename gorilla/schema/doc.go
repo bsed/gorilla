@@ -14,7 +14,7 @@ The basic usage is really simple. Given this struct:
 
 ...we can fill it passing a map to the Load() function:
 
-	values := map[string[]string{
+	values := map[string][]string{
 		"Name":  {"John"},
 		"Phone": {"999-999-999"},
 	}
@@ -62,17 +62,14 @@ notation for that. So for example, when filling the struct Person below:
 	}
 
 ...it will search for keys "Name", "Phone.Label" and "Phone.Number" in the
-source map. This means that an HTML form to fill a Person struct must look
-like this:
+source map. Dotted names are needed to avoid name clashes. This means that
+an HTML form to fill a Person struct must look like this:
 
 	<form>
 		<input type="text" name="Name">
 		<input type="text" name="Phone.Label">
 		<input type="text" name="Phone.Number">
 	</form>
-
-Notice that nested structs require a dotted name for each of its fields; we
-need this to avoid name clashes.
 
 Single values are filled using the first value of a given name. Slices are
 filled using all fields values of a given name. So to fill a Person with
@@ -95,8 +92,8 @@ multiple Phone values, like:
 		<input type="text" name="Phones.Number">
 	</form>
 
-Maps use a bracket notation: the keys under brackets are translated to map
-keys. So for the struct:
+Maps can only have a string as key, and use the same dotted notation. So for
+the struct:
 
 	type Person struct {
 		Name   string
@@ -107,9 +104,9 @@ keys. So for the struct:
 
 	<form>
 		<input type="text" name="Name">
-		<input type="text" name="Scores[Math]" value="7">
-		<input type="text" name="Scores[RocketScience]" value="1">
-		<input type="text" name="Scores[Go]" value="9">
+		<input type="text" name="Scores.Math" value="7">
+		<input type="text" name="Scores.RocketScience" value="1">
+		<input type="text" name="Scores.Go" value="9">
 	</form>
 
 ...and the resulting Scores map will be:
@@ -120,7 +117,6 @@ keys. So for the struct:
 		"Go":            9,
 	}
 
-Note: all indexes and path parts must have alpha-numeric characters only, plus
-underscores or dashes.
+As you see, not everybody is good at rocket science!
 */
 package schema
