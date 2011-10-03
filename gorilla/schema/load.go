@@ -7,8 +7,8 @@ package schema
 import (
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -32,7 +32,7 @@ func Load(i interface{}, data map[string][]string) os.Error {
 	}
 	rv := v.Elem()
 	for path, values := range data {
-		if parts := parseKey(path); len(parts) > 0 {
+		if parts := strings.Split(path, "."); len(parts) > 0 {
 			loadValue(path, values[:], rv, parts[:])
 		}
 	}
@@ -51,48 +51,49 @@ func Load(i interface{}, data map[string][]string) os.Error {
 //
 // - rv is the current struct being walked.
 //
-// - parts are the remaining path parts, parsed, to be walked until the last
+// - parts are the remaining path parts to be walked until the last
 // is reached, when the value is set.
 //
 // TODO support struct values in maps and slices at some point.
 // Currently maps and slices can be of the base types only.
-func loadValue(path string, values []string, rv reflect.Value, parts [][]string) {
+func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 	spec, err := defaultStructMap.getOrLoad(rv.Type())
 	if err != nil {
 		// TODO this should not happen, but what if spec can't be loaded?
 		panic("Error loading struct spec.")
 	}
 
-	key := parts[0][0]
-	fieldSpec, ok := spec.fields[key]
+	fieldSpec, ok := spec.fields[parts[0]]
 	if !ok {
 		// Field doesn't exist.
 		return
 	}
 
+	parts = parts[1:]
 	field := setIndirect(rv.FieldByName(fieldSpec.realName))
 	kind := field.Kind()
-	if (kind == reflect.Struct) == (len(parts) == 1) {
-		// Last part can't be a struct. Other parts must be a struct.
+	if (kind == reflect.Struct || kind == reflect.Map) == (len(parts) == 0) {
+		// Last part can't be a struct or map.
+		// Other parts must be a struct or map.
 		return
 	}
 
-	idx := parts[0][1]
-	if (idx == "") == (kind == reflect.Map) {
-		// Maps must have an index. Other types must not have an index.
-		return
+	var idx string
+	if kind == reflect.Map && len(parts) > 0 {
+		// Maps must have an index.
+		idx = parts[0]
+		parts = parts[1:]
 	}
 
-	if len(parts) > 1 {
+	if len(parts) > 0 {
 		if kind == reflect.Map || kind == reflect.Slice {
 			// Maps and slices must be last part.
 			// This may change in the future if we start to support
 			// maps or slices of structs.
 			return
 		}
-
 		// A struct. Move to next part.
-		loadValue(path, values[:], field, parts[1:])
+		loadValue(path, values[:], field, parts)
 	} else {
 		// Last part: set the value.
 		switch kind {
@@ -384,27 +385,4 @@ func setIndirect(v reflect.Value) reflect.Value {
 		v = reflect.Indirect(v)
 	}
 	return v
-}
-
-var regexpKeyPart = regexp.MustCompile(`\.([0-9A-Za-z_\-]+)(\[[0-9A-Za-z_\-]+\])?`)
-
-// parseKey parses a key and returns parts with name and optional index.
-func parseKey(key string) (rv [][]string) {
-	match := regexpKeyPart.FindAllStringSubmatch("." + key, -1)
-	if len(match) > 0 {
-		lenCheck := -1
-		temp := make([][]string, len(match))
-		for i, v := range match {
-			lenCheck += len(v[0])
-			index := v[2]
-			if index != "" {
-				index = index[1:len(index)-1]
-			}
-			temp[i] = []string{v[1], index}
-		}
-		if len(key) == lenCheck {
-			rv = temp
-		}
-	}
-	return
 }

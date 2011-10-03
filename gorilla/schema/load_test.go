@@ -34,8 +34,8 @@ func TestLoad(t *testing.T) {
 		"F004.F001":      {"string 2"},
 		"F005.F001":      {"string 3"},
 		"F005.F002.F001": {"string 4"},
-		"F006[foo]":      {"foo value"},
-		"F006[bar]":      {"bar value"},
+		"F006.foo":       {"foo value"},
+		"F006.bar":       {"bar value"},
 		"F007":           {"value 1", "value 2", "value 3"},
 		"F008":           {"42", "43", "44"},
 	}
