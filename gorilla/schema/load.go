@@ -79,8 +79,7 @@ func loadValue(path string, values []string, rv reflect.Value, parts []string) {
 	}
 
 	var idx string
-	if kind == reflect.Map && len(parts) > 0 {
-		// Maps must have an index.
+	if kind == reflect.Map {
 		idx = parts[0]
 		parts = parts[1:]
 	}
