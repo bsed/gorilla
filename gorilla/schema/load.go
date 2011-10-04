@@ -255,20 +255,19 @@ func (m *structMap) load(t reflect.Type, loaded *[]string) (spec *structSpec,
 	uniqueNames := make([]string, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		ft := field.Type
-		if !isSupportedType(ft) {
+		if !isSupportedType(field.Type) {
 			continue
 		}
 
 		toLoad = nil
-		switch ft.Kind() {
+		switch field.Type.Kind() {
 			case reflect.Map, reflect.Slice:
-				et := ft.Elem()
+				et := field.Type.Elem()
 				if et.Kind() == reflect.Struct {
 					toLoad = et
 				}
 			case reflect.Struct:
-				toLoad = ft
+				toLoad = field.Type
 		}
 
 		if toLoad != nil {
