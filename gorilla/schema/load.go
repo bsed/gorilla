@@ -33,7 +33,7 @@ func Load(i interface{}, data map[string][]string) os.Error {
 	rv := v.Elem()
 	for path, values := range data {
 		parts := strings.Split(path, ".")
-		if err := loadValue(path, values[:], rv, parts[:]); err != nil {
+		if err := loadValue(rv, values, parts); err != nil {
 			return err
 		}
 	}
@@ -46,19 +46,15 @@ func Load(i interface{}, data map[string][]string) os.Error {
 
 // loadValue sets the value for a path in a struct.
 //
-// - path is the ummodified key for this value, in dotted notation.
+// - rv is the current struct being walked.
 //
 // - values are the ummodified values to be set.
 //
-// - rv is the current struct being walked.
-//
-// - parts are the remaining path parts to be walked until the last
-// is reached, when the value is set.
+// - parts are the remaining path parts to be walked.
 //
 // TODO support struct values in maps and slices at some point.
 // Currently maps and slices can be of the base types only.
-func loadValue(path string, values []string, rv reflect.Value,
-	parts []string) (err os.Error) {
+func loadValue(rv reflect.Value, val []string, parts []string) (err os.Error) {
 	spec, error := defaultStructMap.getOrLoad(rv.Type())
 	if error != nil {
 		// Struct spec could not be loaded.
@@ -93,7 +89,7 @@ func loadValue(path string, values []string, rv reflect.Value,
 
 	if len(parts) > 0 {
 		// A struct. Move to next part.
-		return loadValue(path, values[:], field, parts[:])
+		return loadValue(field, val, parts)
 	} else {
 		// Last part: set the value.
 		switch kind {
@@ -104,18 +100,17 @@ func loadValue(path string, values []string, rv reflect.Value,
 				reflect.String,
 				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
 				reflect.Uint64:
-				field.Set(coerce(values[0], kind))
+				field.Set(coerce(val[0], kind))
 			case reflect.Map:
 				ekind := field.Type().Elem().Kind()
 				if field.IsNil() {
 					field.Set(reflect.MakeMap(field.Type()))
 				}
-				field.SetMapIndex(reflect.ValueOf(idx), coerce(values[0],
-					ekind))
+				field.SetMapIndex(reflect.ValueOf(idx), coerce(val[0], ekind))
 			case reflect.Slice:
 				ekind := field.Type().Elem().Kind()
 				slice := reflect.MakeSlice(field.Type(), 0, 0)
-				for _, value := range values {
+				for _, value := range val {
 					slice = reflect.Append(slice, coerce(value, ekind))
 				}
 				field.Set(slice)
