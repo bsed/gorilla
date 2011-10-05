@@ -142,10 +142,11 @@ func TestLoad(t *testing.T) {
 		"F42.c": {"56"},
 		// Nested structs.
 		"F43.F01": {"foo"},
-		"F43.F02.F01": {"foo"},
+		"F43.F02.F02.F01": {"bar"},
 	}
 
-	s2 := &TestStruct2{F01: "foo", F02: nil}
+	s21 := &TestStruct2{F01: "bar", F02: nil}
+	s22 := &TestStruct2{F01: "foo", F02: &s21}
 	e := TestStruct1{
 		// Basic types.
 		F01: true,
@@ -193,7 +194,7 @@ func TestLoad(t *testing.T) {
 		F41: map[string]uint32{"a": 51, "b": 52, "c": 53},
 		F42: map[string]uint64{"a": 54, "b": 55, "c": 56},
 		// Nested structs.
-		F43: TestStruct2{F01: "foo", F02: &s2},
+		F43: TestStruct2{F01: "foo", F02: &s22},
 	}
 
 	s := &TestStruct1{}
@@ -329,7 +330,7 @@ func TestLoad(t *testing.T) {
 		t.Errorf("F42: %v", s.F42)
 	}
 	// Nested structs.
-	if s.F43.F01 != e.F43.F01 || (*(*s.F43.F02)).F01 != (*(*e.F43.F02)).F01 {
+	if s.F43.F01 != e.F43.F01 || (*(*(*(*s.F43.F02)).F02)).F01 != (*(*(*(*e.F43.F02)).F02)).F01 {
 		t.Errorf("F43: %v", s.F43)
 	}
 }
