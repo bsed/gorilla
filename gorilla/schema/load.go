@@ -180,23 +180,28 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 			field.Set(value)
 		}
 	case reflect.Map:
-		ekind := field.Type().Elem().Kind()
+		elem := field.Type().Elem()
+		ekind := elem.Kind()
 		if field.IsNil() {
 			field.Set(reflect.MakeMap(field.Type()))
 		}
 		value = coerce(ekind, values[0], key, 0, err)
-		if value.IsValid() {
-			field.SetMapIndex(reflect.ValueOf(idx), value)
+		if !value.IsValid() {
+			// Create a zero value to not miss an index.
+			value = reflect.New(elem)
 		}
+		field.SetMapIndex(reflect.ValueOf(idx), value)
 	case reflect.Slice:
-		ekind := field.Type().Elem().Kind()
+		elem := field.Type().Elem()
+		ekind := elem.Kind()
 		slice := reflect.MakeSlice(field.Type(), 0, 0)
 		for k, v := range values {
 			value = coerce(ekind, v, key, k, err)
-			if value.IsValid() {
-				// TODO can't miss an index; must set zero value here.
-				slice = reflect.Append(slice, value)
+			if !value.IsValid() {
+				// Create a zero value to not miss an index.
+				value = reflect.New(elem)
 			}
+			slice = reflect.Append(slice, value)
 		}
 		field.Set(slice)
 	}

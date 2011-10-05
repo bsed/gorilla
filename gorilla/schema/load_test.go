@@ -58,6 +58,8 @@ type TestStruct1 struct {
 	F42 map[string]uint64
 	// Nested structs.
 	F43 TestStruct2
+	// Invalid conversion test.
+	F44 float32
 }
 
 type TestStruct2 struct {
@@ -143,6 +145,8 @@ func TestLoad(t *testing.T) {
 		// Nested structs.
 		"F43.F01": {"foo"},
 		"F43.F02.F02.F01": {"bar"},
+		// Invalid conversion test.
+		"F44": {"XXX"},
 	}
 
 	s21 := &TestStruct2{F01: "bar", F02: nil}
@@ -198,7 +202,7 @@ func TestLoad(t *testing.T) {
 	}
 
 	s := &TestStruct1{}
-	Load(s, v)
+	err := Load(s, v)
 
 	// Basic types.
 	if s.F01 != e.F01 {
@@ -332,5 +336,22 @@ func TestLoad(t *testing.T) {
 	// Nested structs.
 	if s.F43.F01 != e.F43.F01 || (*(*(*(*s.F43.F02)).F02)).F01 != (*(*(*(*e.F43.F02)).F02)).F01 {
 		t.Errorf("F43: %v", s.F43)
+	}
+	// Invalid conversion test.
+	if s.F44 != 0.0 {
+		t.Errorf("F44: %v", s.F44)
+	}
+
+	if err == nil {
+		t.Errorf("Expected error for F44: %v", s.F44)
+	} else {
+		schemaErr := err.(*SchemaError)
+		if errors := schemaErr.FieldError("F44"); errors == nil {
+			t.Errorf("Expected error for F44: %v", s.F44)
+		} else {
+			if len(errors) != 1 {
+				t.Errorf("Expected one error for F44: %v", errors)
+			}
+		}
 	}
 }
