@@ -84,13 +84,13 @@ func (e *SchemaError) String() string {
 // keys as "paths" in dotted notation.
 //
 // See the package documentation for a full explanation of the mechanics.
-func Load(i interface{}, data map[string][]string) *SchemaError {
+func Load(i interface{}, data map[string][]string) os.Error {
 	return loadAndValidate(i, data, nil, nil)
 }
 
 // not public yet, but will be once filters and validators are implemented.
 func loadAndValidate(i interface{}, data map[string][]string,
-	filters map[string]string, validators map[string]string) *SchemaError {
+	filters map[string]string, validators map[string]string) os.Error {
 	err := &SchemaError{}
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
