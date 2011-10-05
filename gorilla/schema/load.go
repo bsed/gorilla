@@ -16,6 +16,20 @@ import (
 // Public interface
 // ----------------------------------------------------------------------------
 
+// SchemaError stores global errors and validation errors for field values.
+type SchemaError struct {
+}
+
+func (e *SchemaError) SetGlobalError(msg string) {
+}
+
+func (e *SchemaError) SetFieldError(key string, index int, msg string) {
+}
+
+func (e *SchemaError) String() string {
+	return ""
+}
+
 // Load fills a struct with form values.
 //
 // The first parameter must be a pointer to a struct. The second is a map,
@@ -25,19 +39,19 @@ import (
 // keys as "paths" in dotted notation.
 //
 // See the package documentation for a full explanation of the mechanics.
-func Load(i interface{}, data map[string][]string) os.Error {
-	v := reflect.ValueOf(i)
-	for v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return os.NewError("Interface must be a pointer to struct.")
-	}
-	rv := v.Elem()
-	for path, values := range data {
-		parts := strings.Split(path, ".")
-		if err := loadValue(rv, values, parts); err != nil {
-			return err
+func Load(i interface{}, data map[string][]string) *SchemaError {
+	err := &SchemaError{}
+	val := reflect.ValueOf(i)
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+		err.SetGlobalError("Interface must be a pointer to struct.")
+	} else {
+		rv := val.Elem()
+		for path, values := range data {
+			parts := strings.Split(path, ".")
+			loadValue(rv, values, parts, path, err)
 		}
 	}
-	return nil
+	return err
 }
 
 // ----------------------------------------------------------------------------
@@ -53,12 +67,13 @@ func Load(i interface{}, data map[string][]string) os.Error {
 // - parts are the remaining path parts to be walked.
 //
 // TODO support struct values in maps and slices at some point.
-// Currently maps and slices can be of the base types only.
-func loadValue(rv reflect.Value, val []string, parts []string) (err os.Error) {
+// Currently maps and slices can be of the basic types only.
+func loadValue(rv reflect.Value, values, parts []string, key string,
+	err *SchemaError) {
 	spec, error := defaultStructMap.getOrLoad(rv.Type())
 	if error != nil {
 		// Struct spec could not be loaded.
-		err = error
+		err.SetGlobalError(error.String())
 		return
 	}
 
@@ -89,80 +104,134 @@ func loadValue(rv reflect.Value, val []string, parts []string) (err os.Error) {
 
 	if len(parts) > 0 {
 		// A struct. Move to next part.
-		return loadValue(field, val, parts)
-	} else {
-		// Last part: set the value.
-		switch kind {
-			case reflect.Bool,
-				reflect.Float32, reflect.Float64,
-				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
-				reflect.Int64,
-				reflect.String,
-				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
-				reflect.Uint64:
-				field.Set(coerce(val[0], kind))
-			case reflect.Map:
-				ekind := field.Type().Elem().Kind()
-				if field.IsNil() {
-					field.Set(reflect.MakeMap(field.Type()))
-				}
-				field.SetMapIndex(reflect.ValueOf(idx), coerce(val[0], ekind))
-			case reflect.Slice:
-				ekind := field.Type().Elem().Kind()
-				slice := reflect.MakeSlice(field.Type(), 0, 0)
-				for _, value := range val {
-					slice = reflect.Append(slice, coerce(value, ekind))
-				}
-				field.Set(slice)
+		loadValue(field, values, parts, key, err)
+		return
+	}
+
+	// Last part: set the value.
+	var value reflect.Value
+	switch kind {
+	case reflect.Bool,
+		reflect.Float32, reflect.Float64,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.String,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
+		reflect.Uint64:
+		value = coerce(kind, values[0], key, 0, err)
+		if value.IsValid() {
+			field.Set(value)
 		}
+	case reflect.Map:
+		ekind := field.Type().Elem().Kind()
+		if field.IsNil() {
+			field.Set(reflect.MakeMap(field.Type()))
+		}
+		value = coerce(ekind, values[0], key, 0, err)
+		if value.IsValid() {
+			field.SetMapIndex(reflect.ValueOf(idx), value)
+		}
+	case reflect.Slice:
+		ekind := field.Type().Elem().Kind()
+		slice := reflect.MakeSlice(field.Type(), 0, 0)
+		for k, v := range values {
+			value = coerce(ekind, v, key, k, err)
+			if value.IsValid() {
+				slice = reflect.Append(slice, value)
+			}
+		}
+		field.Set(slice)
 	}
 	return
 }
 
-// coerce coerces base types from a string to a reflect.Value of a given kind.
-func coerce(value string, kind reflect.Kind) (rv reflect.Value) {
+// coerce coerces basic types from a string to a reflect.Value of a given kind.
+func coerce(kind reflect.Kind, value, key string, index int,
+	err *SchemaError) (rv reflect.Value) {
+	var error os.Error
 	switch kind {
-		case reflect.Bool:
-			v, _ := strconv.Atob(value)
+	case reflect.Bool:
+		if v, e := strconv.Atob(value); e == nil {
 			rv = reflect.ValueOf(v)
-		case reflect.Float32:
-			v, _ := strconv.Atof32(value)
+		} else {
+			error = e
+		}
+	case reflect.Float32:
+		if v, e := strconv.Atof32(value); e == nil {
 			rv = reflect.ValueOf(v)
-		case reflect.Float64:
-			v, _ := strconv.Atof64(value)
+		} else {
+			error = e
+		}
+	case reflect.Float64:
+		if v, e := strconv.Atof64(value); e == nil {
 			rv = reflect.ValueOf(v)
-		case reflect.Int:
-			v, _ := strconv.Atoi(value)
+		} else {
+			error = e
+		}
+	case reflect.Int:
+		if v, e := strconv.Atoi(value); e == nil {
 			rv = reflect.ValueOf(v)
-		case reflect.Int8:
-			v, _ := strconv.Atoi(value)
+		} else {
+			error = e
+		}
+	case reflect.Int8:
+		if v, e := strconv.Atoi(value); e == nil {
 			rv = reflect.ValueOf(int8(v))
-		case reflect.Int16:
-			v, _ := strconv.Atoi(value)
+		} else {
+			error = e
+		}
+	case reflect.Int16:
+		if v, e := strconv.Atoi(value); e == nil {
 			rv = reflect.ValueOf(int16(v))
-		case reflect.Int32:
-			v, _ := strconv.Atoi(value)
+		} else {
+			error = e
+		}
+	case reflect.Int32:
+		if v, e := strconv.Atoi(value); e == nil {
 			rv = reflect.ValueOf(int32(v))
-		case reflect.Int64:
-			v, _ := strconv.Atoi64(value)
+		} else {
+			error = e
+		}
+	case reflect.Int64:
+		if v, e := strconv.Atoi64(value); e == nil {
 			rv = reflect.ValueOf(v)
-		case reflect.String:
-			rv = reflect.ValueOf(value)
-		case reflect.Uint:
-			v, _ := strconv.Atoui(value)
+		} else {
+			error = e
+		}
+	case reflect.String:
+		rv = reflect.ValueOf(value)
+	case reflect.Uint:
+		if v, e := strconv.Atoui(value); e == nil {
 			rv = reflect.ValueOf(v)
-		case reflect.Uint8:
-			v, _ := strconv.Atoui(value)
+		} else {
+			error = e
+		}
+	case reflect.Uint8:
+		if v, e := strconv.Atoui(value); e == nil {
 			rv = reflect.ValueOf(uint8(v))
-		case reflect.Uint16:
-			v, _ := strconv.Atoui(value)
+		} else {
+			error = e
+		}
+	case reflect.Uint16:
+		if v, e := strconv.Atoui(value); e == nil {
 			rv = reflect.ValueOf(uint16(v))
-		case reflect.Uint32:
-			v, _ := strconv.Atoui(value)
+		} else {
+			error = e
+		}
+	case reflect.Uint32:
+		if v, e := strconv.Atoui(value); e == nil {
 			rv = reflect.ValueOf(uint32(v))
-		case reflect.Uint64:
-			v, _ := strconv.Atoui64(value)
+		} else {
+			error = e
+		}
+	case reflect.Uint64:
+		if v, e := strconv.Atoui64(value); e == nil {
 			rv = reflect.ValueOf(v)
+		} else {
+			error = e
+		}
+	}
+	if error != nil {
+		err.SetFieldError(key, index, error.String())
 	}
 	return
 }
@@ -338,19 +407,19 @@ func isSupportedType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	if isSupportedBaseType(t) {
+	if isSupportedBasicType(t) {
 		return true
 	} else {
 		switch t.Kind() {
 			case reflect.Slice:
 				// Only []anyOfTheBaseTypes.
-				return isSupportedBaseType(t.Elem())
+				return isSupportedBasicType(t.Elem())
 			case reflect.Struct:
 				return true
 			case reflect.Map:
 				// Only map[string]anyOfTheBaseTypes.
 				stringKey := t.Key().Kind() == reflect.String
-				if stringKey &&	isSupportedBaseType(t.Elem()) {
+				if stringKey &&	isSupportedBasicType(t.Elem()) {
 					return true
 				}
 		}
@@ -358,10 +427,10 @@ func isSupportedType(t reflect.Type) bool {
 	return false
 }
 
-// isSupportedBaseType returns true for supported base field types.
+// isSupportedBasicType returns true for supported basic field types.
 //
-// Only base types can be used in maps/slices values.
-func isSupportedBaseType(t reflect.Type) bool {
+// Only basic types can be used in maps/slices values.
+func isSupportedBasicType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
