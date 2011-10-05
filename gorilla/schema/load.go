@@ -18,15 +18,60 @@ import (
 
 // SchemaError stores global errors and validation errors for field values.
 type SchemaError struct {
+	errors      []string
+	fieldErrors map[string][]string
 }
 
+// GlobalErrors returns all global error messages or nil if none were set.
+func (e *SchemaError) GlobalErrors() []string {
+	return e.errors
+}
+
+// SetGlobalError sets a global error message.
 func (e *SchemaError) SetGlobalError(msg string) {
+	if e.errors == nil {
+		e.errors = make([]string, 0)
+	}
+	e.errors = append(e.errors, msg)
 }
 
+// FieldErrors returns all field error messages or nil if none were set.
+func (e *SchemaError) FieldErrors() map[string][]string {
+	return e.fieldErrors
+}
+
+// FieldError returns error messages for a given key or nil if none were set.
+func (e *SchemaError) FieldError(key string) []string {
+	if e.fieldErrors != nil {
+		if values, ok := e.fieldErrors[key]; ok {
+			return values
+		}
+	}
+	return nil
+}
+
+// SetFieldError sets a field error message.
 func (e *SchemaError) SetFieldError(key string, index int, msg string) {
+	if e.fieldErrors == nil {
+		e.fieldErrors = make(map[string][]string)
+	}
+	values, ok := e.fieldErrors[key]
+	if !ok || index+1 > cap(values) {
+		newValues := make([]string, index+1)
+		if ok {
+			copy(newValues, values)
+		}
+		values = newValues
+	}
+	values[index] = msg
+	e.fieldErrors[key] = values
 }
 
+// String returns an error message or "" if there are no errors.
 func (e *SchemaError) String() string {
+	if e.errors != nil || e.fieldErrors != nil {
+		return "SchemaError: call GlobalErrors() or FieldErrors() for details."
+	}
 	return ""
 }
 
@@ -40,6 +85,12 @@ func (e *SchemaError) String() string {
 //
 // See the package documentation for a full explanation of the mechanics.
 func Load(i interface{}, data map[string][]string) *SchemaError {
+	return loadAndValidate(i, data, nil, nil)
+}
+
+// not public yet, but will be once filters and validators are implemented.
+func loadAndValidate(i interface{}, data map[string][]string,
+	filters map[string]string, validators map[string]string) *SchemaError {
 	err := &SchemaError{}
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
@@ -50,6 +101,9 @@ func Load(i interface{}, data map[string][]string) *SchemaError {
 			parts := strings.Split(path, ".")
 			loadValue(rv, values, parts, path, err)
 		}
+	}
+	if err.String() == "" {
+		return nil
 	}
 	return err
 }
@@ -65,6 +119,10 @@ func Load(i interface{}, data map[string][]string) *SchemaError {
 // - values are the ummodified values to be set.
 //
 // - parts are the remaining path parts to be walked.
+//
+// - key is the unmodified data key.
+//
+// - err is the SchemaError instance to save errors.
 //
 // TODO support struct values in maps and slices at some point.
 // Currently maps and slices can be of the basic types only.
@@ -136,6 +194,7 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 		for k, v := range values {
 			value = coerce(ekind, v, key, k, err)
 			if value.IsValid() {
+				// TODO can't miss an index; must set zero value here.
 				slice = reflect.Append(slice, value)
 			}
 		}
