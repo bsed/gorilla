@@ -13,35 +13,35 @@ import (
 )
 
 // ----------------------------------------------------------------------------
-// Public interface
+// SchemaError
 // ----------------------------------------------------------------------------
 
 // SchemaError stores global errors and validation errors for field values.
 type SchemaError struct {
-	errors      []string
-	fieldErrors map[string][]string
+	errors      []os.Error
+	fieldErrors map[string][]os.Error
 }
 
 // GlobalErrors returns all global error messages or nil if none were set.
-func (e *SchemaError) GlobalErrors() []string {
+func (e *SchemaError) GlobalErrors() []os.Error {
 	return e.errors
 }
 
 // SetGlobalError sets a global error message.
-func (e *SchemaError) SetGlobalError(msg string) {
+func (e *SchemaError) SetGlobalError(err os.Error) {
 	if e.errors == nil {
-		e.errors = make([]string, 0)
+		e.errors = make([]os.Error, 0)
 	}
-	e.errors = append(e.errors, msg)
+	e.errors = append(e.errors, err)
 }
 
 // FieldErrors returns all field error messages or nil if none were set.
-func (e *SchemaError) FieldErrors() map[string][]string {
+func (e *SchemaError) FieldErrors() map[string][]os.Error {
 	return e.fieldErrors
 }
 
 // FieldError returns error messages for a given key or nil if none were set.
-func (e *SchemaError) FieldError(key string) []string {
+func (e *SchemaError) FieldError(key string) []os.Error {
 	if e.fieldErrors != nil {
 		if values, ok := e.fieldErrors[key]; ok {
 			return values
@@ -51,19 +51,19 @@ func (e *SchemaError) FieldError(key string) []string {
 }
 
 // SetFieldError sets a field error message.
-func (e *SchemaError) SetFieldError(key string, index int, msg string) {
+func (e *SchemaError) SetFieldError(key string, index int, err os.Error) {
 	if e.fieldErrors == nil {
-		e.fieldErrors = make(map[string][]string)
+		e.fieldErrors = make(map[string][]os.Error)
 	}
 	values, ok := e.fieldErrors[key]
 	if !ok || index+1 > cap(values) {
-		newValues := make([]string, index+1)
+		newValues := make([]os.Error, index+1)
 		if ok {
 			copy(newValues, values)
 		}
 		values = newValues
 	}
-	values[index] = msg
+	values[index] = err
 	e.fieldErrors[key] = values
 }
 
@@ -74,6 +74,10 @@ func (e *SchemaError) String() string {
 	}
 	return ""
 }
+
+// ----------------------------------------------------------------------------
+// Load and variants
+// ----------------------------------------------------------------------------
 
 // Load fills a struct with form values.
 //
@@ -94,7 +98,7 @@ func loadAndValidate(i interface{}, data map[string][]string,
 	err := &SchemaError{}
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
-		err.SetGlobalError("Interface must be a pointer to struct.")
+		err.SetGlobalError(os.NewError("Interface must be a pointer to struct."))
 	} else {
 		rv := val.Elem()
 		for path, values := range data {
@@ -109,7 +113,7 @@ func loadAndValidate(i interface{}, data map[string][]string,
 }
 
 // ----------------------------------------------------------------------------
-// loader
+// Internals
 // ----------------------------------------------------------------------------
 
 // loadValue sets the value for a path in a struct.
@@ -131,7 +135,7 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 	spec, error := defaultStructMap.getOrLoad(rv.Type())
 	if error != nil {
 		// Struct spec could not be loaded.
-		err.SetGlobalError(error.String())
+		err.SetGlobalError(error)
 		return
 	}
 
@@ -295,7 +299,7 @@ func coerce(kind reflect.Kind, value, key string, index int,
 		}
 	}
 	if error != nil {
-		err.SetFieldError(key, index, error.String())
+		err.SetFieldError(key, index, error)
 	}
 	return
 }
