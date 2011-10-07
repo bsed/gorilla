@@ -5,6 +5,7 @@
 package schema
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -13,70 +14,92 @@ import (
 )
 
 // ----------------------------------------------------------------------------
+// ValueError
+// ----------------------------------------------------------------------------
+
+// ValueError stores errors for a single value.
+//
+// The same value can be validated more than once, so it can have multiple
+// errors.
+type ValueError struct {
+	err []os.Error
+}
+
+func (e *ValueError) Errors() []os.Error {
+	return e.err
+}
+
+func (e *ValueError) Add(err os.Error) {
+	if e.err == nil {
+		e.err = make([]os.Error, 0)
+	}
+	e.err = append(e.err, err)
+}
+
+func (e *ValueError) String() string {
+	if e.err == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", e.err)
+}
+
+// ----------------------------------------------------------------------------
 // SchemaError
 // ----------------------------------------------------------------------------
 
 // SchemaError stores global errors and validation errors for field values.
+//
+// Global errors are stored using an empty string key.
 type SchemaError struct {
-	errors      []os.Error
-	fieldErrors map[string][]os.Error
+	err map[string][]os.Error
 }
 
-// GlobalErrors returns all global error messages or nil if none were set.
-func (e *SchemaError) GlobalErrors() []os.Error {
-	return e.errors
+func (e *SchemaError) Errors() map[string][]os.Error {
+	return e.err
 }
 
-// SetGlobalError sets a global error message.
-func (e *SchemaError) SetGlobalError(err os.Error) {
-	if e.errors == nil {
-		e.errors = make([]os.Error, 0)
-	}
-	e.errors = append(e.errors, err)
-}
-
-// FieldErrors returns all field error messages or nil if none were set.
-func (e *SchemaError) FieldErrors() map[string][]os.Error {
-	return e.fieldErrors
-}
-
-// FieldError returns error messages for a given key or nil if none were set.
-func (e *SchemaError) FieldError(key string) []os.Error {
-	if e.fieldErrors != nil {
-		if values, ok := e.fieldErrors[key]; ok {
-			return values
+func (e *SchemaError) Error(key string) []os.Error {
+	if e.err != nil {
+		if v, ok := e.err[key]; ok {
+			return v
 		}
 	}
 	return nil
 }
 
-// SetFieldError sets a field error message.
-func (e *SchemaError) SetFieldError(key string, index int, err os.Error) {
-	if e.fieldErrors == nil {
-		e.fieldErrors = make(map[string][]os.Error)
+func (e *SchemaError) Add(err os.Error, key string, index int) {
+	if e.err == nil {
+		e.err = make(map[string][]os.Error)
 	}
-	values, ok := e.fieldErrors[key]
-	if !ok || index+1 > cap(values) {
-		newValues := make([]os.Error, index+1)
+
+	v1, ok := e.err[key]
+	if !ok || index+1 > cap(v1) {
+		newV := make([]os.Error, index+1)
 		if ok {
-			copy(newValues, values)
+			copy(newV, v1)
 		}
-		values = newValues
+		v1 = newV
 	}
-	values[index] = err
-	e.fieldErrors[key] = values
+
+	v2 := v1[index]
+	if v2 == nil {
+		v2 = &ValueError{}
+		v1[index] = v2
+	}
+
+	(v2.(*ValueError)).Add(err)
+	e.err[key] = v1
 }
 
-// String returns an error message or "" if there are no errors.
 func (e *SchemaError) String() string {
-	if e.errors != nil || e.fieldErrors != nil {
-		return "SchemaError: call GlobalErrors() or FieldErrors() for details."
+	if e.err == nil {
+		return ""
 	}
-	return ""
+	return fmt.Sprintf("%v", e.err)
 }
 
 // ----------------------------------------------------------------------------
-// Load and variants
+// Load, Validate and variants
 // ----------------------------------------------------------------------------
 
 // Load fills a struct with form values.
@@ -98,7 +121,7 @@ func loadAndValidate(i interface{}, data map[string][]string,
 	err := &SchemaError{}
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
-		err.SetGlobalError(os.NewError("Interface must be a pointer to struct."))
+		err.Add(os.NewError("Interface must be a pointer to struct."), "", 0)
 	} else {
 		rv := val.Elem()
 		for path, values := range data {
@@ -131,11 +154,11 @@ func loadAndValidate(i interface{}, data map[string][]string,
 // TODO support struct values in maps and slices at some point.
 // Currently maps and slices can be of the basic types only.
 func loadValue(rv reflect.Value, values, parts []string, key string,
-	err *SchemaError) {
-	spec, error := defaultStructMap.getOrLoad(rv.Type())
-	if error != nil {
+	se *SchemaError) {
+	spec, err := defaultStructMap.getOrLoad(rv.Type())
+	if err != nil {
 		// Struct spec could not be loaded.
-		err.SetGlobalError(error)
+		se.Add(err, "", 0)
 		return
 	}
 
@@ -166,7 +189,7 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 
 	if len(parts) > 0 {
 		// A struct. Move to next part.
-		loadValue(field, values, parts, key, err)
+		loadValue(field, values, parts, key, se)
 		return
 	}
 
@@ -179,8 +202,10 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 		reflect.String,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
 		reflect.Uint64:
-		value = coerce(kind, values[0], key, 0, err)
-		if value.IsValid() {
+		value, err = coerce(kind, values[0])
+		if err != nil {
+			se.Add(err, key, 0)
+		} else {
 			field.Set(value)
 		}
 	case reflect.Map:
@@ -189,10 +214,11 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 		if field.IsNil() {
 			field.Set(reflect.MakeMap(field.Type()))
 		}
-		value = coerce(ekind, values[0], key, 0, err)
-		if !value.IsValid() {
+		value, err = coerce(ekind, values[0])
+		if err != nil {
 			// Create a zero value to not miss an index.
 			value = reflect.New(elem)
+			se.Add(err, key, 0)
 		}
 		field.SetMapIndex(reflect.ValueOf(idx), value)
 	case reflect.Slice:
@@ -200,10 +226,11 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 		ekind := elem.Kind()
 		slice := reflect.MakeSlice(field.Type(), 0, 0)
 		for k, v := range values {
-			value = coerce(ekind, v, key, k, err)
-			if !value.IsValid() {
+			value, err = coerce(ekind, v)
+			if err != nil {
 				// Create a zero value to not miss an index.
 				value = reflect.New(elem)
+				se.Add(err, key, k)
 			}
 			slice = reflect.Append(slice, value)
 		}
@@ -213,93 +240,64 @@ func loadValue(rv reflect.Value, values, parts []string, key string,
 }
 
 // coerce coerces basic types from a string to a reflect.Value of a given kind.
-func coerce(kind reflect.Kind, value, key string, index int,
-	err *SchemaError) (rv reflect.Value) {
-	var error os.Error
+func coerce(kind reflect.Kind, value string) (rv reflect.Value, err os.Error) {
 	switch kind {
 	case reflect.Bool:
-		if v, e := strconv.Atob(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
+		var v bool
+		v, err = strconv.Atob(value)
+		rv = reflect.ValueOf(v)
 	case reflect.Float32:
-		if v, e := strconv.Atof32(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
+		var v float32
+		v, err = strconv.Atof32(value)
+		rv = reflect.ValueOf(v)
 	case reflect.Float64:
-		if v, e := strconv.Atof64(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
+		var v float64
+		v, err = strconv.Atof64(value)
+		rv = reflect.ValueOf(v)
 	case reflect.Int:
-		if v, e := strconv.Atoi(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
+		var v int
+		v, err = strconv.Atoi(value)
+		rv = reflect.ValueOf(v)
 	case reflect.Int8:
-		if v, e := strconv.Atoi(value); e == nil {
-			rv = reflect.ValueOf(int8(v))
-		} else {
-			error = e
-		}
+		var v int
+		v, err = strconv.Atoi(value)
+		rv = reflect.ValueOf(int8(v))
 	case reflect.Int16:
-		if v, e := strconv.Atoi(value); e == nil {
-			rv = reflect.ValueOf(int16(v))
-		} else {
-			error = e
-		}
+		var v int
+		v, err = strconv.Atoi(value)
+		rv = reflect.ValueOf(int16(v))
 	case reflect.Int32:
-		if v, e := strconv.Atoi(value); e == nil {
-			rv = reflect.ValueOf(int32(v))
-		} else {
-			error = e
-		}
+		var v int
+		v, err = strconv.Atoi(value)
+		rv = reflect.ValueOf(int32(v))
 	case reflect.Int64:
-		if v, e := strconv.Atoi64(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
+		var v int64
+		v, err = strconv.Atoi64(value)
+		rv = reflect.ValueOf(v)
 	case reflect.String:
 		rv = reflect.ValueOf(value)
 	case reflect.Uint:
-		if v, e := strconv.Atoui(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
+		var v uint
+		v, err = strconv.Atoui(value)
+		rv = reflect.ValueOf(v)
 	case reflect.Uint8:
-		if v, e := strconv.Atoui(value); e == nil {
-			rv = reflect.ValueOf(uint8(v))
-		} else {
-			error = e
-		}
+		var v uint
+		v, err = strconv.Atoui(value)
+		rv = reflect.ValueOf(uint8(v))
 	case reflect.Uint16:
-		if v, e := strconv.Atoui(value); e == nil {
-			rv = reflect.ValueOf(uint16(v))
-		} else {
-			error = e
-		}
+		var v uint
+		v, err = strconv.Atoui(value)
+		rv = reflect.ValueOf(uint16(v))
 	case reflect.Uint32:
-		if v, e := strconv.Atoui(value); e == nil {
-			rv = reflect.ValueOf(uint32(v))
-		} else {
-			error = e
-		}
+		var v uint
+		v, err = strconv.Atoui(value)
+		rv = reflect.ValueOf(uint32(v))
 	case reflect.Uint64:
-		if v, e := strconv.Atoui64(value); e == nil {
-			rv = reflect.ValueOf(v)
-		} else {
-			error = e
-		}
-	}
-	if error != nil {
-		err.SetFieldError(key, index, error)
+		var v uint64
+		v, err = strconv.Atoui64(value)
+		rv = reflect.ValueOf(v)
+	default:
+		err = os.NewError("Unsupported type.")
 	}
 	return
 }
@@ -427,10 +425,21 @@ func (m *structMap) load(t reflect.Type, loaded *[]string) (spec *structSpec,
 		}
 		uniqueNames[i] = name
 
+		// Set tags.
+		tags := make([]string, 0)
+		tagStrings := field.Tag.Get("schema-tags")
+		for _, tag := range strings.Split(tagStrings, " ") {
+			tag := strings.TrimSpace(tag)
+			if tag != "" {
+				tags = append(tags, tag)
+			}
+		}
+
 		// Finally, set the field.
 		spec.fields[name] = &structFieldSpec{
 			name:     name,
 			realName: field.Name,
+			tags:     tags,
 		}
 	}
 	return
@@ -459,6 +468,8 @@ type structFieldSpec struct {
 	name     string
 	// Real field name as defined in the struct.
 	realName string
+	// Tags, used to identify filters and validators.
+	tags     []string
 }
 
 // ----------------------------------------------------------------------------

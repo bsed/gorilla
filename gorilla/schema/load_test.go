@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// ----------------------------------------------------------------------------
-
 type TestStruct1 struct {
 	// Basic types.
 	F01 bool
@@ -58,8 +56,6 @@ type TestStruct1 struct {
 	F42 map[string]uint64
 	// Nested structs.
 	F43 TestStruct2
-	// Invalid conversion test.
-	F44 float32
 }
 
 type TestStruct2 struct {
@@ -145,8 +141,6 @@ func TestLoad(t *testing.T) {
 		// Nested structs.
 		"F43.F01": {"foo"},
 		"F43.F02.F02.F01": {"bar"},
-		// Invalid conversion test.
-		"F44": {"XXX"},
 	}
 
 	s21 := &TestStruct2{F01: "bar", F02: nil}
@@ -202,7 +196,7 @@ func TestLoad(t *testing.T) {
 	}
 
 	s := &TestStruct1{}
-	err := Load(s, v)
+	_ = Load(s, v)
 
 	// Basic types.
 	if s.F01 != e.F01 {
@@ -337,21 +331,32 @@ func TestLoad(t *testing.T) {
 	if s.F43.F01 != e.F43.F01 || (*(*(*(*s.F43.F02)).F02)).F01 != (*(*(*(*e.F43.F02)).F02)).F01 {
 		t.Errorf("F43: %v", s.F43)
 	}
-	// Invalid conversion test.
-	if s.F44 != 0.0 {
-		t.Errorf("F44: %v", s.F44)
+}
+
+func TestErrors(t *testing.T) {
+	values := map[string][]string{
+		"F01": {"thisisnotabool"},
+		"F02": {"thisisnotafloat"},
 	}
 
+	s := &TestStruct1{}
+	err := Load(s, values)
 	if err == nil {
-		t.Errorf("Expected error for F44: %v", s.F44)
-	} else {
-		schemaErr := err.(*SchemaError)
-		if errors := schemaErr.FieldError("F44"); errors == nil {
-			t.Errorf("Expected error for F44: %v", s.F44)
-		} else {
-			if len(errors) != 1 {
-				t.Errorf("Expected one error for F44: %v", errors)
-			}
-		}
+		t.Fatalf("Expected error, received nil")
+	}
+	schemaErr, ok := err.(*SchemaError)
+	if !ok {
+		t.Fatalf("Expecting SchemaError")
+	}
+	if len(schemaErr.Errors()) != 2 {
+		t.Fatalf("Expected 2 entries in SchemaError, got %d", len(schemaErr.Errors()))
+	}
+	f01Error := schemaErr.Error("F01")
+	if f01Error == nil {
+		t.Errorf("Expected error for 'F01'")
+	}
+	f02Error := schemaErr.Error("F02")
+	if f02Error == nil {
+		t.Errorf("Expected error for 'F02'")
 	}
 }
