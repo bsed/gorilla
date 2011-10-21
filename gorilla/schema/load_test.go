@@ -5,6 +5,7 @@
 package schema
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -360,3 +361,125 @@ func TestErrors(t *testing.T) {
 		t.Errorf("Expected error for 'F02'")
 	}
 }
+
+// ----------------------------------------------------------------------------
+
+type TestStruct3 struct {
+	F01 string `schema-name:"custom-name-01"`
+	F02 []int  `schema-name:"custom-name-02"`
+}
+
+func TestCustomNames(t *testing.T) {
+	values := map[string][]string{
+		"custom-name-01": {"foo"},
+		"custom-name-02": {"42", "43", "44"},
+	}
+
+	s := &TestStruct3{}
+	_ = Load(s, values)
+
+	if s.F01 != "foo" {
+		t.Errorf("F01: %v", s.F01)
+	}
+
+	if len(s.F02) != 3 || s.F02[0] != 42 || s.F02[1] != 43 || s.F02[2] != 44 {
+		t.Errorf("F02: %v", s.F02)
+	}
+}
+
+// ----------------------------------------------------------------------------
+
+type stringType string
+
+type TestStruct4 struct {
+	F01 stringType
+	F02 []stringType
+	F03 map[string]stringType
+}
+
+func convStringType(v reflect.Value) reflect.Value {
+	return reflect.ValueOf(stringType(v.String()))
+}
+
+func TestCompositeType(t *testing.T) {
+	v := map[string][]string{
+		"F01":     {"foo"},
+		"F02":     {"foo", "bar", "baz"},
+		"F03.foo": {"bar"},
+		"F03.baz": {"ding"},
+	}
+
+	target := new(TestStruct4)
+
+	AddTypeConverter(reflect.TypeOf(stringType("")), convStringType)
+
+	err := Load(target, v)
+
+	if err != nil {
+		t.Errorf("TestComposite. Error: %v", err)
+	}
+
+	if target.F01 != stringType(v["F01"][0]) {
+		t.Errorf("Expected %v got %v", stringType(v["F01"][0]), target.F01)
+	}
+
+	if len(target.F02) != 3 || target.F02[0] != stringType(v["F02"][0]) || target.F02[1] != stringType(v["F02"][1]) || target.F02[2] != stringType(v["F02"][2]) {
+		t.Errorf("F02: %v", target.F02)
+	}
+
+	if len(target.F03) != 2 || target.F03["foo"] != stringType(v["F03.foo"][0]) || target.F03["baz"] != stringType(v["F03.baz"][0]) {
+		t.Errorf("F03: %v", target.F03)
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Example from the docs.
+
+// Not supported yet.
+/*
+type Phone struct {
+	Label  string
+	Number string
+}
+
+type Person struct {
+	Name   string
+	Phones []Phone
+}
+
+func TestMultiStructField(t *testing.T) {
+	v := map[string][]string{
+		"Name":          {"Moe"},
+		"Phones.Label":  {"home", "office"},
+		"Phones.Number": {"111-111", "222-222"},
+	}
+
+	person := new(Person)
+	err := Load(person, v)
+
+	if err != nil {
+		t.Errorf("TestMultiStructField. Error: %v", err)
+	}
+
+	if person.Name != v["Name"][0] {
+		t.Errorf("Expected %v, got %v", v["Name"][0], person.Name)
+	}
+
+	if person.Phones == nil || len(person.Phones) != 2 {
+		t.Errorf("Expected 2 items in person.Phones, got %v", person.Phones)
+	} else {
+		if person.Phones[0].Label != v["Phones.Label"][0] {
+			t.Errorf("Expected %v, got %v", v["Phones.Label"][0], person.Phones[0].Label)
+		}
+		if person.Phones[1].Label != v["Phones.Label"][1] {
+			t.Errorf("Expected %v, got %v", v["Phones.Label"][1], person.Phones[1].Label)
+		}
+		if person.Phones[0].Number != v["Phones.Number"][0] {
+			t.Errorf("Expected %v, got %v", v["Phones.Number"][0], person.Phones[0].Number)
+		}
+		if person.Phones[1].Number != v["Phones.Number"][1] {
+			t.Errorf("Expected %v, got %v", v["Phones.Number"][1], person.Phones[1].Number)
+		}
+	}
+}
+*/
