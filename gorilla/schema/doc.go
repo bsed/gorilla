@@ -75,14 +75,9 @@ Single values are filled using the first value for a key from the source map.
 Slices are filled using all values for a key from the source map. So to fill
 a Person with multiple Phone values, like:
 
-	type Phones struct {
-		Label  []string
-		Number []string
-	}
-
 	type Person struct {
 		Name   string
-		Phones Phones
+		Phones []Phone
 	}
 
 ...an HTML form that accepts three Phone values would look like this:
