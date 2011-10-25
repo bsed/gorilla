@@ -435,8 +435,6 @@ func TestCompositeType(t *testing.T) {
 // ----------------------------------------------------------------------------
 // Example from the docs.
 
-// Not supported yet.
-/*
 type Phone struct {
 	Label  string
 	Number string
@@ -482,4 +480,3 @@ func TestMultiStructField(t *testing.T) {
 		}
 	}
 }
-*/
