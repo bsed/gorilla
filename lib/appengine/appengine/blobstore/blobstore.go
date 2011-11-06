@@ -8,7 +8,6 @@ package blobstore
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"http"
 	"io"
@@ -50,7 +49,7 @@ type BlobInfo struct {
 
 // Stat returns the BlobInfo for a provided blobKey. If no blob was found for
 // that key, Stat returns datastore.ErrNoSuchEntity.
-func Stat(c appengine.Context, blobKey appengine.BlobKey) (*BlobInfo, error) {
+func Stat(c appengine.Context, blobKey appengine.BlobKey) (*BlobInfo, os.Error) {
 	dskey := datastore.NewKey(c, blobInfoKind, string(blobKey), 0, nil)
 	m := make(datastore.Map)
 	if err := datastore.Get(c, dskey, m); err != nil {
@@ -61,7 +60,7 @@ func Stat(c appengine.Context, blobKey appengine.BlobKey) (*BlobInfo, error) {
 	size, ok2 := m["size"].(int64)
 	creation, ok3 := m["creation"].(datastore.Time)
 	if !ok0 || !ok1 || !ok2 || !ok3 {
-		return nil, errors.New("blobstore: invalid blob info")
+		return nil, os.NewError("blobstore: invalid blob info")
 	}
 	bi := &BlobInfo{
 		BlobKey:      blobKey,
@@ -92,7 +91,7 @@ func Send(response http.ResponseWriter, blobKey appengine.BlobKey) {
 // fill out, passing the application path to load when the POST of the
 // form is completed. These URLs expire and should not be reused. The
 // opts parameter may be nil.
-func UploadURL(c appengine.Context, successPath string, opts *UploadURLOptions) (*url.URL, error) {
+func UploadURL(c appengine.Context, successPath string, opts *UploadURLOptions) (*url.URL, os.Error) {
 	req := &pb.CreateUploadURLRequest{
 		SuccessPath: proto.String(successPath),
 	}
@@ -118,12 +117,12 @@ type UploadURLOptions struct {
 }
 
 // Delete deletes a blob.
-func Delete(c appengine.Context, blobKey appengine.BlobKey) error {
+func Delete(c appengine.Context, blobKey appengine.BlobKey) os.Error {
 	return DeleteMulti(c, []appengine.BlobKey{blobKey})
 }
 
 // DeleteMulti deletes multiple blobs.
-func DeleteMulti(c appengine.Context, blobKey []appengine.BlobKey) error {
+func DeleteMulti(c appengine.Context, blobKey []appengine.BlobKey) os.Error {
 	s := make([]string, len(blobKey))
 	for i, b := range blobKey {
 		s[i] = string(b)
@@ -138,7 +137,7 @@ func DeleteMulti(c appengine.Context, blobKey []appengine.BlobKey) error {
 	return nil
 }
 
-func errorf(format string, args ...interface{}) error {
+func errorf(format string, args ...interface{}) os.Error {
 	return fmt.Errorf("blobstore: "+format, args...)
 }
 
@@ -146,7 +145,7 @@ func errorf(format string, args ...interface{}) error {
 // App Engine after a user's successful upload of blobs. Given the request,
 // ParseUpload returns a map of the blobs received (keyed by HTML form
 // element name) and other non-blob POST parameters.
-func ParseUpload(req *http.Request) (blobs map[string][]*BlobInfo, other map[string][]string, err error) {
+func ParseUpload(req *http.Request) (blobs map[string][]*BlobInfo, other map[string][]string, err os.Error) {
 	_, params := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	boundary := params["boundary"]
 	if boundary == "" {
@@ -159,7 +158,7 @@ func ParseUpload(req *http.Request) (blobs map[string][]*BlobInfo, other map[str
 	mreader := multipart.NewReader(io.MultiReader(req.Body, strings.NewReader("\r\n\r\n")), boundary)
 	for {
 		part, perr := mreader.NextPart()
-		if perr == io.EOF {
+		if perr == os.EOF {
 			break
 		}
 		if perr != nil {
@@ -251,7 +250,7 @@ type reader struct {
 	off int64
 }
 
-func (r *reader) Read(p []byte) (int, error) {
+func (r *reader) Read(p []byte) (int, os.Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -267,7 +266,7 @@ func (r *reader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func (r *reader) ReadAt(p []byte, off int64) (int, error) {
+func (r *reader) ReadAt(p []byte, off int64) (int, os.Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -299,7 +298,7 @@ func (r *reader) ReadAt(p []byte, off int64) (int, error) {
 	return n, nil
 }
 
-func (r *reader) Seek(offset int64, whence int) (ret int64, err error) {
+func (r *reader) Seek(offset int64, whence int) (ret int64, err os.Error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch whence {
@@ -320,7 +319,7 @@ func (r *reader) Seek(offset int64, whence int) (ret int64, err error) {
 
 // fetch fetches readBufferSize bytes starting at the given offset. On success,
 // the data is saved as r.buf.
-func (r *reader) fetch(off int64) error {
+func (r *reader) fetch(off int64) os.Error {
 	req := &pb.FetchDataRequest{
 		BlobKey:    proto.String(string(r.blobKey)),
 		StartIndex: proto.Int64(off),
@@ -331,7 +330,7 @@ func (r *reader) fetch(off int64) error {
 		return err
 	}
 	if len(res.Data) == 0 {
-		return io.EOF
+		return os.EOF
 	}
 	r.buf, r.r, r.off = res.Data, 0, off
 	return nil
@@ -339,7 +338,7 @@ func (r *reader) fetch(off int64) error {
 
 // seek seeks to the given offset with an effective whence equal to SEEK_SET.
 // It discards the read buffer if the invariant cannot be maintained.
-func (r *reader) seek(off int64) (int64, error) {
+func (r *reader) seek(off int64) (int64, os.Error) {
 	delta := off - r.off
 	if delta >= 0 && delta < int64(len(r.buf)) {
 		r.r = int(delta)
@@ -359,11 +358,11 @@ type Writer struct {
 	filename string
 
 	buf      []byte
-	writeErr error // set in flush
+	writeErr os.Error // set in flush
 
 	// set on Close:
 	closed   bool
-	closeErr error
+	closeErr os.Error
 
 	// set on first Key:
 	blobKey appengine.BlobKey
@@ -386,7 +385,7 @@ const creationHandlePrefix = "writable:"
 // application/octet-stream. The returned Writer should be written to,
 // then closed, and then its Key method can be called to retrieve the
 // newly-created blob key if there were no errors.
-func Create(c appengine.Context, mimeType string) (*Writer, error) {
+func Create(c appengine.Context, mimeType string) (*Writer, os.Error) {
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
@@ -425,7 +424,7 @@ func Create(c appengine.Context, mimeType string) (*Writer, error) {
 	return w, nil
 }
 
-func (w *Writer) Write(p []byte) (n int, err error) {
+func (w *Writer) Write(p []byte) (n int, err os.Error) {
 	if w.closed {
 		return 0, errorf("Writer is already closed")
 	}
@@ -456,7 +455,7 @@ func (w *Writer) flush() {
 
 // Close flushes outstanding buffered writes and finalizes the blob. After
 // calling Close the key can be retrieved by calling Key.
-func (w *Writer) Close() (closeErr error) {
+func (w *Writer) Close() (closeErr os.Error) {
 	defer func() {
 		// Save the error for Key
 		w.closeErr = closeErr
@@ -479,7 +478,7 @@ func (w *Writer) Close() (closeErr error) {
 
 // Key returns the created blob key. It must be called after Close.
 // An error is returned if Close wasn't called or returned an error.
-func (w *Writer) Key() (appengine.BlobKey, error) {
+func (w *Writer) Key() (appengine.BlobKey, os.Error) {
 	if !w.closed {
 		return "", errorf("cannot call Key before Close")
 	}
@@ -508,7 +507,7 @@ func (w *Writer) Key() (appengine.BlobKey, error) {
 	return k, err
 }
 
-func (w *Writer) keyNewWay(handle string) (appengine.BlobKey, error) {
+func (w *Writer) keyNewWay(handle string) (appengine.BlobKey, os.Error) {
 	key := datastore.NewKey(w.c, blobFileIndexKind, handle, 0, nil)
 	m := make(datastore.Map)
 	err := datastore.Get(w.c, key, m)
@@ -534,7 +533,7 @@ func (w *Writer) keyNewWay(handle string) (appengine.BlobKey, error) {
 // by doing an query against __BlobInfo__ entities.  This is now
 // deprecated (corollary: the other way doesn't work yet), so we try
 // this only after the new way fails, like Python does.
-func (w *Writer) keyOldWay(handle string) (appengine.BlobKey, error) {
+func (w *Writer) keyOldWay(handle string) (appengine.BlobKey, os.Error) {
 	query := datastore.NewQuery(blobInfoKind).
 		Filter("creation_handle =", handle).
 		KeysOnly().

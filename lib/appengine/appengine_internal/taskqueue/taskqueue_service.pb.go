@@ -5,11 +5,12 @@ package appengine
 
 import proto "goprotobuf.googlecode.com/hg/proto"
 import "math"
+import "os"
 
 // Reference proto, math & os imports to suppress error if they are not otherwise used.
 var _ = proto.GetString
 var _ = math.Inf
-var _ error
+var _ os.Error
 
 type TaskQueueServiceError_ErrorCode int32
 
@@ -219,8 +220,8 @@ type TaskQueueServiceError struct {
 	XXX_unrecognized []byte `json:",omitempty"`
 }
 
-func (this *TaskQueueServiceError) Reset()        { *this = TaskQueueServiceError{} }
-func (this *TaskQueueServiceError) Error() string { return proto.CompactTextString(this) }
+func (this *TaskQueueServiceError) Reset()         { *this = TaskQueueServiceError{} }
+func (this *TaskQueueServiceError) String() string { return proto.CompactTextString(this) }
 
 type TaskPayload struct {
 	XXX_extensions   map[int32]proto.Extension `json:",omitempty"`
@@ -230,10 +231,10 @@ type TaskPayload struct {
 func (this *TaskPayload) Reset()         { *this = TaskPayload{} }
 func (this *TaskPayload) String() string { return proto.CompactTextString(this) }
 
-func (this *TaskPayload) Marshal() ([]byte, error) {
+func (this *TaskPayload) Marshal() ([]byte, os.Error) {
 	return proto.MarshalMessageSet(this.ExtensionMap())
 }
-func (this *TaskPayload) Unmarshal(buf []byte) error {
+func (this *TaskPayload) Unmarshal(buf []byte) os.Error {
 	return proto.UnmarshalMessageSet(buf, this.ExtensionMap())
 }
 // ensure TaskPayload satisfies proto.Marshaler and proto.Unmarshaler

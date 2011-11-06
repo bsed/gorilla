@@ -20,6 +20,8 @@ Example:
 package mail
 
 import (
+	"os"
+
 	"appengine"
 	"appengine_internal"
 
@@ -53,7 +55,7 @@ type Attachment struct {
 }
 
 // Send sends an email message.
-func Send(c appengine.Context, msg *Message) error {
+func Send(c appengine.Context, msg *Message) os.Error {
 	req := &mail_proto.MailMessage{
 		Sender:   &msg.Sender,
 		To:       msg.To,

@@ -7,6 +7,7 @@ package sessions
 import (
 	"fmt"
 	"http"
+	"os"
 	"time"
 	"appengine"
 	"appengine/datastore"
@@ -45,13 +46,13 @@ type DatastoreSessionStore struct {
 
 // Load loads a session for the given key.
 func (s *DatastoreSessionStore) Load(r *http.Request, key string,
-	info *sessions.SessionInfo) {
+info *sessions.SessionInfo) {
 	data := sessions.GetCookie(s, r, key)
 	if sidval, ok := data["sid"]; ok {
 		// Cleanup session data.
 		sid := sidval.(string)
 		for k, _ := range data {
-			delete(data, k)
+			data[k] = nil, false
 		}
 		// Get session from datastore and deserialize it.
 		c := appengine.NewContext(r)
@@ -66,7 +67,7 @@ func (s *DatastoreSessionStore) Load(r *http.Request, key string,
 
 // Save saves the session in the response.
 func (s *DatastoreSessionStore) Save(r *http.Request, w http.ResponseWriter,
-	key string, info *sessions.SessionInfo) (flag bool, err error) {
+key string, info *sessions.SessionInfo) (flag bool, err os.Error) {
 	sid, serialized, error := getIdAndData(info)
 	if error != nil {
 		err = error
@@ -98,13 +99,13 @@ type MemcacheSessionStore struct {
 
 // Load loads a session for the given key.
 func (s *MemcacheSessionStore) Load(r *http.Request, key string,
-	info *sessions.SessionInfo) {
+info *sessions.SessionInfo) {
 	data := sessions.GetCookie(s, r, key)
 	if sidval, ok := data["sid"]; ok {
 		// Cleanup session data.
 		sid := sidval.(string)
 		for k, _ := range data {
-			delete(data, k)
+			data[k] = nil, false
 		}
 		// Get session from memcache and deserialize it.
 		c := appengine.NewContext(r)
@@ -117,7 +118,7 @@ func (s *MemcacheSessionStore) Load(r *http.Request, key string,
 
 // Save saves the session in the response.
 func (s *MemcacheSessionStore) Save(r *http.Request, w http.ResponseWriter,
-	key string, info *sessions.SessionInfo) (flag bool, err error) {
+key string, info *sessions.SessionInfo) (flag bool, err os.Error) {
 	sid, serialized, error := getIdAndData(info)
 	if error != nil {
 		err = error
@@ -141,7 +142,7 @@ func sessionKey(sid string) string {
 }
 
 // Create a new sid and serialize data.
-func getIdAndData(info *sessions.SessionInfo) (sid string, serialized []byte, err error) {
+func getIdAndData(info *sessions.SessionInfo) (sid string, serialized []byte, err os.Error) {
 	// Create a new session id.
 	sid, err = sessions.GenerateSessionId(128)
 	if err != nil {

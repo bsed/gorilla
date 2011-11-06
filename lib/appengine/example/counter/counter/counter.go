@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"http"
 	"io"
+	"os"
 	"strconv"
 
 	"appengine"
 	"appengine/memcache"
 )
 
-func serveError(c appengine.Context, w http.ResponseWriter, err error) {
+func serveError(c appengine.Context, w http.ResponseWriter, err os.Error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	io.WriteString(w, "Internal Server Error")

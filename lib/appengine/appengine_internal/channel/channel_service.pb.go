@@ -5,11 +5,12 @@ package appengine
 
 import proto "goprotobuf.googlecode.com/hg/proto"
 import "math"
+import "os"
 
 // Reference proto, math & os imports to suppress error if they are not otherwise used.
 var _ = proto.GetString
 var _ = math.Inf
-var _ error
+var _ os.Error
 
 type ChannelServiceError_ErrorCode int32
 
@@ -45,8 +46,8 @@ type ChannelServiceError struct {
 	XXX_unrecognized []byte `json:",omitempty"`
 }
 
-func (this *ChannelServiceError) Reset()        { *this = ChannelServiceError{} }
-func (this *ChannelServiceError) Error() string { return proto.CompactTextString(this) }
+func (this *ChannelServiceError) Reset()         { *this = ChannelServiceError{} }
+func (this *ChannelServiceError) String() string { return proto.CompactTextString(this) }
 
 type CreateChannelRequest struct {
 	ApplicationKey   *string `protobuf:"bytes,1,req,name=application_key" json:"application_key,omitempty"`

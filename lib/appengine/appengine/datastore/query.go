@@ -5,9 +5,9 @@
 package datastore
 
 import (
-	"errors"
 	"fmt"
 	"math"
+	"os"
 	"reflect"
 	"strings"
 
@@ -65,7 +65,7 @@ type order struct {
 func NewQuery(kind string) *Query {
 	q := &Query{kind: kind}
 	if kind == "" {
-		q.err = errors.New("datastore: empty kind")
+		q.err = os.NewError("datastore: empty kind")
 	}
 	return q
 }
@@ -81,14 +81,14 @@ type Query struct {
 	limit    int32
 	offset   int32
 
-	err error
+	err os.Error
 }
 
 // Ancestor sets the ancestor filter for the Query.
 // The ancestor should not be nil.
 func (q *Query) Ancestor(ancestor *Key) *Query {
 	if ancestor == nil {
-		q.err = errors.New("datastore: nil query ancestor")
+		q.err = os.NewError("datastore: nil query ancestor")
 		return q
 	}
 	q.ancestor = ancestor
@@ -104,7 +104,7 @@ func (q *Query) Ancestor(ancestor *Key) *Query {
 func (q *Query) Filter(filterStr string, value interface{}) *Query {
 	filterStr = strings.TrimSpace(filterStr)
 	if len(filterStr) < 1 {
-		q.err = errors.New("datastore: invalid filter: " + filterStr)
+		q.err = os.NewError("datastore: invalid filter: " + filterStr)
 		return q
 	}
 	f := filter{
@@ -145,7 +145,7 @@ func (q *Query) Order(fieldName string) *Query {
 		return q
 	}
 	if len(o.FieldName) == 0 {
-		q.err = errors.New("datastore: empty order")
+		q.err = os.NewError("datastore: empty order")
 		return q
 	}
 	q.order = append(q.order, o)
@@ -163,11 +163,11 @@ func (q *Query) KeysOnly() *Query {
 // A zero value means unlimited. A negative value is invalid.
 func (q *Query) Limit(limit int) *Query {
 	if limit < 0 {
-		q.err = errors.New("datastore: negative query limit")
+		q.err = os.NewError("datastore: negative query limit")
 		return q
 	}
 	if limit > math.MaxInt32 {
-		q.err = errors.New("datastore: query limit overflow")
+		q.err = os.NewError("datastore: query limit overflow")
 		return q
 	}
 	q.limit = int32(limit)
@@ -178,11 +178,11 @@ func (q *Query) Limit(limit int) *Query {
 // A negative value is invalid.
 func (q *Query) Offset(offset int) *Query {
 	if offset < 0 {
-		q.err = errors.New("datastore: negative query offset")
+		q.err = os.NewError("datastore: negative query offset")
 		return q
 	}
 	if offset > math.MaxInt32 {
-		q.err = errors.New("datastore: query offset overflow")
+		q.err = os.NewError("datastore: query offset overflow")
 		return q
 	}
 	q.offset = int32(offset)
@@ -202,9 +202,9 @@ const (
 )
 
 // toProto converts the query to a protocol buffer.
-func (q *Query) toProto(dst *pb.Query, appID string, zlp zeroLimitPolicy) error {
+func (q *Query) toProto(dst *pb.Query, appID string, zlp zeroLimitPolicy) os.Error {
 	if q.kind == "" {
-		return errors.New("datastore: empty query kind")
+		return os.NewError("datastore: empty query kind")
 	}
 	dst.Reset()
 	dst.App = proto.String(appID)
@@ -218,31 +218,31 @@ func (q *Query) toProto(dst *pb.Query, appID string, zlp zeroLimitPolicy) error 
 	}
 	for _, qf := range q.filter {
 		if qf.FieldName == "" {
-			return errors.New("datastore: empty query filter field name")
+			return os.NewError("datastore: empty query filter field name")
 		}
 		p, errStr := valueToProto(appID, qf.FieldName, reflect.ValueOf(qf.Value), false)
 		if errStr != "" {
-			return errors.New("datastore: bad query filter value type: " + errStr)
+			return os.NewError("datastore: bad query filter value type: " + errStr)
 		}
 		xf := &pb.Query_Filter{
 			Op:       operatorToProto[qf.Op],
 			Property: []*pb.Property{p},
 		}
 		if xf.Op == nil {
-			return errors.New("datastore: unknown query filter operator")
+			return os.NewError("datastore: unknown query filter operator")
 		}
 		dst.Filter = append(dst.Filter, xf)
 	}
 	for _, qo := range q.order {
 		if qo.FieldName == "" {
-			return errors.New("datastore: empty query order field name")
+			return os.NewError("datastore: empty query order field name")
 		}
 		xo := &pb.Query_Order{
 			Property:  proto.String(qo.FieldName),
 			Direction: sortDirectionToProto[qo.Direction],
 		}
 		if xo.Direction == nil {
-			return errors.New("datastore: unknown query order direction")
+			return os.NewError("datastore: unknown query order direction")
 		}
 		dst.Order = append(dst.Order, xo)
 	}
@@ -256,7 +256,7 @@ func (q *Query) toProto(dst *pb.Query, appID string, zlp zeroLimitPolicy) error 
 }
 
 // Count returns the number of results for the query.
-func (q *Query) Count(c appengine.Context) (int, error) {
+func (q *Query) Count(c appengine.Context) (int, os.Error) {
 	// Check that the query is well-formed.
 	if q.err != nil {
 		return 0, q.err
@@ -306,7 +306,7 @@ func (q *Query) Count(c appengine.Context) (int, error) {
 	for {
 		// The QueryResult should have no actual entity data, just skipped results.
 		if len(res.Result) != 0 {
-			return 0, errors.New("datastore: internal error: Count request returned too much data")
+			return 0, os.NewError("datastore: internal error: Count request returned too much data")
 		}
 		n += proto.GetInt32(res.SkippedResults)
 		if !proto.GetBool(res.MoreResults) {
@@ -327,9 +327,9 @@ func (q *Query) Count(c appengine.Context) (int, error) {
 
 // callNext issues a datastore_v3/Next RPC to advance a cursor, such as that
 // returned by a query with more results.
-func callNext(c appengine.Context, res *pb.QueryResult, offset, limit int32, zlp zeroLimitPolicy) error {
+func callNext(c appengine.Context, res *pb.QueryResult, offset, limit int32, zlp zeroLimitPolicy) os.Error {
 	if res.Cursor == nil {
-		return errors.New("datastore: internal error: server did not return a cursor")
+		return os.NewError("datastore: internal error: server did not return a cursor")
 	}
 	// TODO: should I eventually call datastore_v3/DeleteCursor on the cursor?
 	req := &pb.NextRequest{
@@ -350,7 +350,7 @@ func callNext(c appengine.Context, res *pb.QueryResult, offset, limit int32, zlp
 // that query, as well as appending the values to dst.
 // The dst must be a pointer to a slice of structs, struct pointers, or Maps.
 // If q is a ``keys-only'' query, GetAll ignores dst and only returns the keys.
-func (q *Query) GetAll(c appengine.Context, dst interface{}) ([]*Key, error) {
+func (q *Query) GetAll(c appengine.Context, dst interface{}) ([]*Key, os.Error) {
 	var (
 		dv       reflect.Value
 		et       reflect.Type
@@ -437,11 +437,11 @@ type Iterator struct {
 	offset int32
 	limit  int32
 	res    pb.QueryResult
-	err    error
+	err    os.Error
 }
 
 // Done is returned when a query iteration has completed.
-var Done = errors.New("datastore: query has no more results")
+var Done = os.NewError("datastore: query has no more results")
 
 // Next returns the key of the next result. When there are no more results,
 // Done is returned as the error.
@@ -449,7 +449,7 @@ var Done = errors.New("datastore: query has no more results")
 // stored for that key into the struct pointer or Map dst, with the same
 // semantics and possible errors as for the Get function.
 // If the query is keys only, it is valid to pass a nil interface{} for dst.
-func (t *Iterator) Next(dst interface{}) (*Key, error) {
+func (t *Iterator) Next(dst interface{}) (*Key, os.Error) {
 	k, e, err := t.next()
 	if err != nil || e == nil {
 		return k, err
@@ -457,7 +457,7 @@ func (t *Iterator) Next(dst interface{}) (*Key, error) {
 	return loadEntity(dst, k, e)
 }
 
-func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
+func (t *Iterator) next() (*Key, *pb.EntityProto, os.Error) {
 	if t.err != nil {
 		return nil, nil, t.err
 	}
@@ -486,7 +486,7 @@ func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
 		}
 		t.limit = 0
 		if proto.GetBool(t.res.MoreResults) {
-			t.err = errors.New("datastore: internal error: limit exhausted but more_results is true")
+			t.err = os.NewError("datastore: internal error: limit exhausted but more_results is true")
 			return nil, nil, t.err
 		}
 	}
@@ -496,11 +496,11 @@ func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
 	var e *pb.EntityProto
 	e, t.res.Result = t.res.Result[0], t.res.Result[1:]
 	if e.Key == nil {
-		return nil, nil, errors.New("datastore: internal error: server did not return a key")
+		return nil, nil, os.NewError("datastore: internal error: server did not return a key")
 	}
 	k, err := protoToKey(e.Key)
 	if err != nil || k.Incomplete() {
-		return nil, nil, errors.New("datastore: internal error: server returned an invalid key")
+		return nil, nil, os.NewError("datastore: internal error: server returned an invalid key")
 	}
 	if proto.GetBool(t.res.KeysOnly) {
 		return k, nil, nil
@@ -509,7 +509,7 @@ func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
 }
 
 // loadEntity loads an EntityProto into a Map or struct.
-func loadEntity(dst interface{}, k *Key, e *pb.EntityProto) (*Key, error) {
+func loadEntity(dst interface{}, k *Key, e *pb.EntityProto) (*Key, os.Error) {
 	if m, ok := dst.(Map); ok {
 		return k, loadMap(m, k, e)
 	}

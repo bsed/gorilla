@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"http"
 	"json"
+	"os"
 	"strings"
 	"testing"
 )
@@ -40,7 +41,7 @@ func (rw *ResponseRecorder) Header() http.Header {
 }
 
 // Write always succeeds and writes to rw.Body, if not nil.
-func (rw *ResponseRecorder) Write(buf []byte) (int, error) {
+func (rw *ResponseRecorder) Write(buf []byte) (int, os.Error) {
 	if rw.Body != nil {
 		rw.Body.Write(buf)
 	}
@@ -68,7 +69,7 @@ type ArithArgs struct {
 
 type Arith int
 
-func (t *Arith) Multiply(r *http.Request, args ArithArgs, reply *int) error {
+func (t *Arith) Multiply(r *http.Request, args ArithArgs, reply *int) os.Error {
 	*reply = args.A * args.B
 	return nil
 }

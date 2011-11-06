@@ -63,18 +63,18 @@ const startSize = 10 // initial slice/string sizes
 // Encoders are defined in encoder.go
 // An encoder outputs the full representation of a field, including its
 // tag and encoder type.
-type encoder func(p *Buffer, prop *Properties, base uintptr) error
+type encoder func(p *Buffer, prop *Properties, base uintptr) os.Error
 
 // A valueEncoder encodes a single integer in a particular encoding.
-type valueEncoder func(o *Buffer, x uint64) error
+type valueEncoder func(o *Buffer, x uint64) os.Error
 
 // Decoders are defined in decode.go
 // A decoder creates a value from its wire representation.
 // Unrecognized subelements are saved in unrec.
-type decoder func(p *Buffer, prop *Properties, base uintptr, sbase uintptr) error
+type decoder func(p *Buffer, prop *Properties, base uintptr, sbase uintptr) os.Error
 
 // A valueDecoder decodes a single integer in a particular encoding.
-type valueDecoder func(o *Buffer) (x uint64, err error)
+type valueDecoder func(o *Buffer) (x uint64, err os.Error)
 
 // StructProperties represents properties for all the fields of a struct.
 type StructProperties struct {
@@ -195,7 +195,7 @@ func (p *Properties) Parse(s string) {
 		return
 	}
 
-	var err error
+	var err os.Error
 	p.Tag, err = strconv.Atoi(fields[1])
 	if err != nil {
 		return
@@ -541,7 +541,7 @@ func propByIndex(t reflect.Type, x []int) *Properties {
 
 // Get the address and type of a pointer to a struct from an interface.
 // unsafe.Reflect can do this, but does multiple mallocs.
-func getbase(pb interface{}) (t reflect.Type, b uintptr, err error) {
+func getbase(pb interface{}) (t reflect.Type, b uintptr, err os.Error) {
 	// get pointer
 	x := *(*[2]uintptr)(unsafe.Pointer(&pb))
 	b = x[1]

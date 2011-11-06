@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"json"
 	"math"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -429,7 +430,7 @@ func TestRequiredBit(t *testing.T) {
 	err := o.Marshal(pb)
 	if err == nil {
 		t.Error("did not catch missing required fields")
-	} else if strings.Index(err.Error(), "GoTest") < 0 {
+	} else if strings.Index(err.String(), "GoTest") < 0 {
 		t.Error("wrong error type:", err)
 	}
 }
@@ -844,12 +845,12 @@ func TestEncodeDecodeBytes1(t *testing.T) {
 
 	d, err := Marshal(pb)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Errorf(err.String())
 	}
 
 	pbd := new(GoTest)
 	if err := Unmarshal(d, pbd); err != nil {
-		t.Errorf(err.Error())
+		t.Errorf(err.String())
 	}
 
 	if pbd.F_BytesRequired == nil || len(pbd.F_BytesRequired) != 0 {
@@ -873,12 +874,12 @@ func TestEncodeDecodeBytes2(t *testing.T) {
 
 	d, err := Marshal(pb)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Errorf(err.String())
 	}
 
 	pbd := new(GoTest)
 	if err := Unmarshal(d, pbd); err != nil {
-		t.Errorf(err.Error())
+		t.Errorf(err.String())
 	}
 
 	if len(pbd.F_BytesRepeated) != 1 || pbd.F_BytesRepeated[0] == nil {
@@ -1122,6 +1123,7 @@ func TestProto1RepeatedGroup(t *testing.T) {
 	}
 }
 
+
 // Test that enums work.  Checks for a bug introduced by making enums
 // named types instead of int32: newInt32FromUint64 would crash with
 // a type mismatch in reflect.PointTo.
@@ -1154,7 +1156,7 @@ func TestRequiredFieldEnforcement(t *testing.T) {
 	_, err := Marshal(pb)
 	if err == nil {
 		t.Error("marshal: expected error, got nil")
-	} else if strings.Index(err.Error(), "GoTestField") < 0 {
+	} else if strings.Index(err.String(), "GoTestField") < 0 {
 		t.Errorf("marshal: bad error type: %v", err)
 	}
 
@@ -1165,7 +1167,7 @@ func TestRequiredFieldEnforcement(t *testing.T) {
 	err = Unmarshal(buf, pb)
 	if err == nil {
 		t.Error("unmarshal: expected error, got nil")
-	} else if strings.Index(err.Error(), "GoTestField") < 0 {
+	} else if strings.Index(err.String(), "GoTestField") < 0 {
 		t.Errorf("unmarshal: bad error type: %v", err)
 	}
 }
@@ -1173,7 +1175,7 @@ func TestRequiredFieldEnforcement(t *testing.T) {
 // A type that implements the Marshaler interface, but is not nillable.
 type nonNillableInt uint64
 
-func (nni nonNillableInt) Marshal() ([]byte, error) {
+func (nni nonNillableInt) Marshal() ([]byte, os.Error) {
 	return EncodeVarint(uint64(nni)), nil
 }
 
@@ -1186,7 +1188,7 @@ type nillableMessage struct {
 	x uint64
 }
 
-func (nm *nillableMessage) Marshal() ([]byte, error) {
+func (nm *nillableMessage) Marshal() ([]byte, os.Error) {
 	return EncodeVarint(nm.x), nil
 }
 
