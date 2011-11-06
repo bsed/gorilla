@@ -22,6 +22,7 @@ package channel
 
 import (
 	"json"
+	"os"
 
 	"appengine"
 	"appengine_internal"
@@ -32,7 +33,7 @@ import (
 
 // Create creates a channel and returns a token for use by the client.
 // The clientID is an appication-provided string used to identify the client.
-func Create(c appengine.Context, clientID string) (token string, err error) {
+func Create(c appengine.Context, clientID string) (token string, err os.Error) {
 	req := &channel_proto.CreateChannelRequest{
 		ApplicationKey: &clientID,
 	}
@@ -43,7 +44,7 @@ func Create(c appengine.Context, clientID string) (token string, err error) {
 }
 
 // Send sends a message on the channel associated with clientID.
-func Send(c appengine.Context, clientID, message string) error {
+func Send(c appengine.Context, clientID, message string) os.Error {
 	req := &channel_proto.SendMessageRequest{
 		ApplicationKey: &clientID,
 		Message:        &message,
@@ -54,7 +55,7 @@ func Send(c appengine.Context, clientID, message string) error {
 
 // SendJSON is a helper function that sends a JSON-encoded value
 // on the channel associated with clientID.
-func SendJSON(c appengine.Context, clientID string, value interface{}) error {
+func SendJSON(c appengine.Context, clientID string, value interface{}) os.Error {
 	m, err := json.Marshal(value)
 	if err != nil {
 		return err

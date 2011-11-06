@@ -5,11 +5,12 @@ package remote_api
 
 import proto "goprotobuf.googlecode.com/hg/proto"
 import "math"
+import "os"
 
 // Reference proto, math & os imports to suppress error if they are not otherwise used.
 var _ = proto.GetString
 var _ = math.Inf
-var _ error
+var _ os.Error
 
 type Request struct {
 	ServiceName      *string `protobuf:"bytes,2,req,name=service_name" json:"service_name,omitempty"`
@@ -27,8 +28,8 @@ type ApplicationError struct {
 	XXX_unrecognized []byte  `json:",omitempty"`
 }
 
-func (this *ApplicationError) Reset()        { *this = ApplicationError{} }
-func (this *ApplicationError) Error() string { return proto.CompactTextString(this) }
+func (this *ApplicationError) Reset()         { *this = ApplicationError{} }
+func (this *ApplicationError) String() string { return proto.CompactTextString(this) }
 
 type Response struct {
 	Response         []byte            `protobuf:"bytes,1,opt,name=response" json:"response,omitempty"`

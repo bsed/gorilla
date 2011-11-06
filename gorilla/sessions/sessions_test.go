@@ -10,6 +10,7 @@ import (
 	"crypto/hmac"
 	"fmt"
 	"http"
+	"os"
 	"testing"
 	"time"
 )
@@ -48,7 +49,7 @@ func (rw *ResponseRecorder) Header() http.Header {
 }
 
 // Write always succeeds and writes to rw.Body, if not nil.
-func (rw *ResponseRecorder) Write(buf []byte) (int, error) {
+func (rw *ResponseRecorder) Write(buf []byte) (int, os.Error) {
 	if rw.Body != nil {
 		rw.Body.Write(buf)
 	}
@@ -102,7 +103,7 @@ func TestEncryption(t *testing.T) {
 	}
 
 	var encrypted, decrypted []byte
-	var err error
+	var err os.Error
 
 	for _, value := range testStringValues {
 		encrypted, err = encrypt(block, []byte(value))
@@ -207,20 +208,8 @@ func TestEncoder(t *testing.T) {
 			t.Errorf("%v: %v", err3, encoded)
 			count++
 		}
-
-    // AG: For some unknown I cannot get following to pass; the maps are the same
-    // but the orders are mismached. See the alternative test after the commented
-    // out code
-//		if fmt.Sprintf("%v", decoded) != fmt.Sprintf("%v", value) {
-//			t.Errorf("Expected %v, got %v.", value, decoded)
-//		}
-    // AG: Alternative test with key
-		if fmt.Sprintf("%v", decoded["foo"]) != fmt.Sprintf("%v", value["foo"]) {
-			t.Errorf("Expected %v, got %v.", value["foo"], decoded["foo"])
-		}
-
-		if fmt.Sprintf("%v", decoded["baz"]) != fmt.Sprintf("%v", value["baz"]) {
-			t.Errorf("Expected %v, got %v.", value["baz"], decoded["baz"])
+		if fmt.Sprintf("%v", decoded) != fmt.Sprintf("%v", value) {
+			t.Errorf("Expected %v, got %v.", value, decoded)
 		}
 		_, err4 := e2.Decode("sid", encoded)
 		if err4 == nil {
@@ -236,7 +225,7 @@ func TestLoadSaveSession(t *testing.T) {
 	var req *http.Request
 	var rsp *ResponseRecorder
 	var hdr http.Header
-	var err error
+	var err os.Error
 	var err2 bool
 	var session SessionData
 	var cookies []string
@@ -317,9 +306,9 @@ func TestLoadSaveSession(t *testing.T) {
 				t.Errorf("Expected %v:%v; Got %v:%v", k, v, k, session[k])
 			}
 		}
-		delete(session, "a")
-		delete(session, "b")
-		delete(session, "c")
+		session["a"] = nil, false
+		session["b"] = nil, false
+		session["c"] = nil, false
 		session["d"] = "4"
 	} else {
 		t.Error(err)
@@ -372,7 +361,7 @@ func TestFlashes(t *testing.T) {
 	var req *http.Request
 	var rsp *ResponseRecorder
 	var hdr http.Header
-	var err error
+	var err os.Error
 	var ok, err2 bool
 	var cookies []string
 	var flashes []interface{}
@@ -453,7 +442,7 @@ func TestKeyRotation(t *testing.T) {
 	var req *http.Request
 	var rsp *ResponseRecorder
 	var hdr http.Header
-	var err error
+	var err os.Error
 	var err2 bool
 	var session SessionData
 	var cookies []string

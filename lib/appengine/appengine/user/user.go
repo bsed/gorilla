@@ -6,6 +6,7 @@
 package user
 
 import (
+	"os"
 	"strings"
 
 	"appengine"
@@ -46,12 +47,12 @@ func (u *User) String() string {
 
 // LoginURL returns a URL that, when visited, prompts the user to sign in,
 // then redirects the user to the URL specified by 'dest'.
-func LoginURL(c appengine.Context, dest string) (string, error) {
+func LoginURL(c appengine.Context, dest string) (string, os.Error) {
 	return LoginURLFederated(c, dest, "")
 }
 
 // LoginURLFederated is like LoginURL but accepts a user's OpenID identifier.
-func LoginURLFederated(c appengine.Context, dest, identity string) (string, error) {
+func LoginURLFederated(c appengine.Context, dest, identity string) (string, os.Error) {
 	req := &pb.CreateLoginURLRequest{
 		DestinationUrl: proto.String(dest),
 	}
@@ -67,7 +68,7 @@ func LoginURLFederated(c appengine.Context, dest, identity string) (string, erro
 
 // LogoutURL returns a URL that, when visited, signs the user out,
 // then redirects the user to the URL specified by 'dest'.
-func LogoutURL(c appengine.Context, dest string) (string, error) {
+func LogoutURL(c appengine.Context, dest string) (string, os.Error) {
 	req := &pb.CreateLogoutURLRequest{
 		DestinationUrl: proto.String(dest),
 	}

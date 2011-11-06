@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"http"
 	"image"
-	"image/color"
 	"image/png"
 	"json"
 	"strconv"
@@ -24,19 +23,19 @@ func init() {
 	http.HandleFunc("/tiles", tileHandler)
 	http.HandleFunc("/memcache-stats", memcacheHandler)
 
-	for i := range color_ {
+	for i := range color {
 		// Use a broader range of color for low intensities.
 		if i < 255/10 {
-			color_[i] = color.RGBA{uint8(i * 10), 0, 0, 0xFF}
+			color[i] = image.RGBAColor{uint8(i * 10), 0, 0, 0xFF}
 		} else {
-			color_[i] = color.RGBA{0xFF, 0, uint8(i - 255/10), 0xFF}
+			color[i] = image.RGBAColor{0xFF, 0, uint8(i - 255/10), 0xFF}
 		}
 	}
 }
 
 var (
 	// color is the mapping of intensity to color.
-	color_ [256]color.Color
+	color [256]image.Color
 
 	frontPageTmpl = template.Must(template.ParseFile("map.html"))
 )
@@ -104,7 +103,7 @@ func render(x, y, z int) []byte {
 	tileX, tileY := x*tileSize, y*tileSize
 	scale := 1 / float64(int(1<<uint(z))*tileSize)
 
-	img := image.NewPaletted(image.Rect(0, 0, tileSize, tileSize), color.Palette(color_[:]))
+	img := image.NewPaletted(tileSize, tileSize, image.PalettedColorModel(color[:]))
 	for i := 0; i < tileSize; i++ {
 		for j := 0; j < tileSize; j++ {
 			c := complex(float64(tileX+i)*scale, float64(tileY+j)*scale)

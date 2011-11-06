@@ -7,6 +7,7 @@ package mux
 import (
 	"bytes"
 	"http"
+	"os"
 	"testing"
 )
 
@@ -44,7 +45,7 @@ func (rw *ResponseRecorder) Header() http.Header {
 }
 
 // Write always succeeds and writes to rw.Body, if not nil.
-func (rw *ResponseRecorder) Write(buf []byte) (int, error) {
+func (rw *ResponseRecorder) Write(buf []byte) (int, os.Error) {
 	if rw.Body != nil {
 		rw.Body.Write(buf)
 	}

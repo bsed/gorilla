@@ -61,7 +61,7 @@ func (c *Context) Clear(req *http.Request) {
 	defer c.lk.Unlock()
 	if c.m != nil {
 		if c.m[req] != nil {
-			delete(c.m, req)
+			c.m[req] = nil, false
 		}
 	}
 }
@@ -72,7 +72,7 @@ func (c *Context) ClearNamespace(req *http.Request, ns Namespacer) {
 	defer c.lk.Unlock()
 	if c.m != nil {
 		if c.m[req] != nil {
-			delete(c.m[req], ns)
+			c.m[req][ns] = nil, false
 		}
 	}
 }
