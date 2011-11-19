@@ -616,7 +616,7 @@ func (r *Route) Host(template string) *Route {
 
 // Matcher adds a matcher to match the request using a custom function.
 func (r *Route) Matcher(matcherFunc MatcherFunc) *Route {
-	return r.addMatcher(&customMatcher{matcherFunc: matcherFunc})
+	return r.addMatcher(matcherFunc)
 }
 
 // Methods adds a matcher to match the request against HTTP methods.
@@ -728,21 +728,17 @@ type RouteMatch struct {
 // MatcherFunc is the type used by custom matchers.
 type MatcherFunc func(*http.Request) bool
 
+// Match matches the request using a custom matcher function.
+func (m MatcherFunc) Match(request *http.Request) (*RouteMatch, bool) {
+	return nil, m(request)
+}
+
 // routeMatcher is the interface used by the router, route and route matchers.
 //
 // Only Router and Route actually return a route; it indicates a final match.
 // Route matchers return nil and the result from the individual match.
 type routeMatcher interface {
 	Match(*http.Request) (*RouteMatch, bool)
-}
-
-// customMatcher matches the request using a custom matcher function.
-type customMatcher struct {
-	matcherFunc MatcherFunc
-}
-
-func (m *customMatcher) Match(request *http.Request) (*RouteMatch, bool) {
-	return nil, m.matcherFunc(request)
 }
 
 // headerMatcher matches the request against header values.
