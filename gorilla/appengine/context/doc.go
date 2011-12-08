@@ -17,20 +17,20 @@ own context:
 	)
 
 	type Context struct {
-		c *context.Context
+		context.Context
 	}
 
 	func NewContext(r *http.Request) *Context {
 		return &Context{
-			c: *context.Context{appengine.NewContext(r)},
+			context.Context: context.Context{appengine.NewContext(r)},
 		}
 	}
 
 You can now add custom fields and methods to Context and pass it to all
 functions that accept appengine.Context.
 
-This is convenient because since we commonly pass an appengine.Context instance
-as argument, we can use it to also pass app-specific types such as registries
-or whatever the app needs.
+This is convenient because we can attach to the context app-specific types
+such as registries or whatever the app needs. And the implementation of the
+appengine.Context interface remains encapsulated in a single place.
 */
 package context
