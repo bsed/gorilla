@@ -506,4 +506,21 @@ func TestKeyRotation(t *testing.T) {
 	}
 }
 
+func TestInvalidKey(t *testing.T) {
+	_, err := DefaultSessionFactory.SetStoreKeys("cookie", []byte("1"), []byte("1"))
+	if err == nil {
+		t.Errorf("Expected error.")
+	}
+	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
+	rsp = NewRecorder()
+	if session, err = Session(req); err != nil {
+		t.Errorf("Error getting a session")
+	}
+	session["foo"] = "bar"
+	errs := sessions.Save(req, rsp)
+	if errs == nil {
+		t.Errorf("Expected error.")
+	}
+}
+
 // TODO test Config()
