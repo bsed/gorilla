@@ -34,10 +34,8 @@ type Context struct {
 func (c *Context) Get(req *http.Request, ns Namespacer) interface{} {
 	c.lk.Lock()
 	defer c.lk.Unlock()
-	if c.m != nil {
-		if c.m[req] != nil {
-			return c.m[req][ns]
-		}
+	if c.m != nil && c.m[req] != nil {
+		return c.m[req][ns]
 	}
 	return nil
 }
@@ -59,10 +57,8 @@ func (c *Context) Set(req *http.Request, ns Namespacer, val interface{}) {
 func (c *Context) Clear(req *http.Request) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
-	if c.m != nil {
-		if c.m[req] != nil {
-			c.m[req] = nil, false
-		}
+	if c.m != nil && c.m[req] != nil {
+		c.m[req] = nil, false
 	}
 }
 
@@ -70,10 +66,8 @@ func (c *Context) Clear(req *http.Request) {
 func (c *Context) ClearNamespace(req *http.Request, ns Namespacer) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
-	if c.m != nil {
-		if c.m[req] != nil {
-			c.m[req][ns] = nil, false
-		}
+	if c.m != nil && c.m[req] != nil {
+		c.m[req][ns] = nil, false
 	}
 }
 
@@ -95,7 +89,8 @@ type Namespacer interface {
 //
 //     var ns = new(context.Namespace)
 //
-// ...then call Set() or Get() as needed to define or retrieve request variables:
+// ...then call Set() or Get() as needed to define or retrieve request
+// variables:
 //
 //     // val is nil because we haven't set any value yet.
 //     val := ns.Get(request)
