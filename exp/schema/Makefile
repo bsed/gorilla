@@ -6,5 +6,6 @@ GOFILES=\
 	doc.go\
 	error.go\
 	converter.go\
+	flattener.go\
 
 include ${GOROOT}/src/Make.pkg
