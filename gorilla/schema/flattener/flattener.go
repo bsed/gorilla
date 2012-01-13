@@ -12,16 +12,14 @@ import (
 
 // Item represents an item in a flattened structure.
 type Item struct {
-	// Full name in dotted notation.
-	Path     string
+	// Full path in dotted notation.
+	Path   string
+	// Key for maps, field name for structs or empty for slices.
+	Name   string
 	// Value.
-	Value    reflect.Value
+	Value  reflect.Value
 	// Parent: a map, struct or slice.
-	Parent   reflect.Value
-	// Field name if parent is a struct or key if parent is a map.
-	Name     string
-	// True if parent is a slice, false otherwise.
-	Multiple bool
+	Parent reflect.Value
 }
 
 // Flatten converts nested structs or maps to an array of Item with paths
@@ -30,51 +28,64 @@ type Item struct {
 // See in the documentation the supported types and constraints.
 func Flatten(i interface{}) ([]*Item, os.Error) {
 	value := recursiveIndirect(reflect.ValueOf(i))
-	for value.Kind() == reflect.Ptr {
-		value = value.Elem()
-	}
-	if value.Kind() != reflect.Struct {
-		return nil, os.NewError("Interface must be a struct.")
-	}
 	items := make([]*Item, 0)
-	flatten(value, value, &items, "", "", false)
-	return items, nil
-}
-
-func flatten(value, parent reflect.Value, items *[]*Item, path, name string, multiple bool) {
 	kind := value.Kind()
-	if kind == reflect.Map {
-		flattenMap(value, items, path)
-	} else if kind == reflect.Slice {
-		flattenSlice(value, items, path)
-	} else if kind == reflect.Struct {
-		flattenStruct(value, items, path)
-	} else {
-		item := &Item{
-			Path:     path,
-			Value:    value,
-			Parent:   parent,
-			Name:     name,
-			Multiple: multiple,
+	if kind == reflect.Map || kind == reflect.Struct {
+		if err := flatten(&items, value, value, "", ""); err != nil {
+			return nil, err
 		}
-		*items = append(*items, item)
+	} else {
+		return nil, os.NewError("Interface must be a map or struct.")
 	}
+	return items[:], nil
 }
 
-func flattenMap(value reflect.Value, items *[]*Item, path string) {
-	//flatten(mValue, value, items, key(path, mName), key, false)
+func flatten(items *[]*Item, value, parent reflect.Value, path, name string) os.Error {
+	switch value.Kind() {
+	case reflect.Map:
+		return flattenMap(items, value, path)
+	case reflect.Slice:
+		return flattenSlice(items, value, path)
+	case reflect.Struct:
+		return flattenStruct(items, value, path)
+	}
+	item := &Item{
+		Path:   path,
+		Name:   name,
+		Value:  value,
+		Parent: parent,
+	}
+	*items = append(*items, item)
+	return nil
 }
 
-func flattenSlice(value reflect.Value, items *[]*Item, path string) {
+func flattenMap(items *[]*Item, value reflect.Value, path string) os.Error {
+	// Only map[string]anyOfTheBaseTypes.
+	stringKey := value.Type().Key().Kind() == reflect.String
+	if !stringKey || !isSupportedBasicType(value.Type().Elem()) {
+		return os.NewError("Map must be map[string]SupportedTypes.")
+	}
+	keys := value.MapKeys()
+	for _, k := range keys {
+		mKey := k.String()
+		mValue := recursiveIndirect(value.MapIndex(k))
+		flatten(items, mValue, value, key(path, mKey), mKey)
+	}
+	return nil
+}
+
+func flattenSlice(items *[]*Item, value reflect.Value, path string) os.Error {
 	// Don't need to check if the type is supported because it is checked
 	// in flattenMap or flattenStruct.
 	num := value.Len()
 	for i := 0; i < num; i++ {
-		flatten(value.Index(i), value, items, path, "", true)
+		sValue := recursiveIndirect(value.Index(i))
+		flatten(items, sValue, value, path, "")
 	}
+	return nil
 }
 
-func flattenStruct(value reflect.Value, items *[]*Item, path string) {
+func flattenStruct(items *[]*Item, value reflect.Value, path string) os.Error {
 	num := value.NumField()
 	sType := value.Type()
 	for i := 0; i < num; i++ {
@@ -88,8 +99,9 @@ func flattenStruct(value reflect.Value, items *[]*Item, path string) {
 		if fName == "" {
 			fName = field.Name
 		}
-		flatten(fValue, value, items, key(path, fName), field.Name, false)
+		flatten(items, fValue, value, key(path, fName), field.Name)
 	}
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -103,9 +115,48 @@ func recursiveIndirect(value reflect.Value) reflect.Value {
 	return value
 }
 
+// isSupportedType returns true for supported field types.
 func isSupportedType(t reflect.Type) bool {
-	// TODO
-	return true
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if isSupportedBasicType(t) {
+		return true
+	} else {
+		switch t.Kind() {
+		case reflect.Slice:
+			// Only []anyOfTheBaseTypes.
+			return isSupportedBasicType(t.Elem())
+		case reflect.Map:
+			// Only map[string]anyOfTheBaseTypes.
+			stringKey := t.Key().Kind() == reflect.String
+			if stringKey && isSupportedBasicType(t.Elem()) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isSupportedBasicType returns true for supported basic field types.
+//
+// Only basic types can be used in maps/slices values.
+func isSupportedBasicType(t reflect.Type) bool {
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.Bool,
+		reflect.Float32, reflect.Float64,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
+		reflect.Int64,
+		reflect.String,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
+		reflect.Uint64,
+		reflect.Struct:
+		return true
+	}
+	return false
 }
 
 func key(parts ...string) string {
