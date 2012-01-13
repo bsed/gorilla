@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/schema/flattener converts nested structs or maps to a
-single-level map with keys in dotted notation.
+Package gorilla/schema ...
 */
-package flattener
+package schema
