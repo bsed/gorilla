@@ -11,7 +11,7 @@ import (
 
 // ErrMulti stores multiple errors.
 //
-// ErrMulti was borrowed appengine/datastore, from the App Engine SDK.
+// ErrMulti was borrowed from appengine/datastore, from the App Engine SDK.
 type ErrMulti []os.Error
 
 // String returns a string representation of the error.
