@@ -29,4 +29,29 @@ func TestFlatten(t *testing.T) {
 	for _, item := range items {
 		fmt.Printf("%v\n", item)
 	}
+
+
+
+}
+
+interface DataProvider {
+	Get(key string) interface{}
+	GetAll(key string) []interface{}
+}
+
+//
+func load(i interface{}, data DataProvider, prefix string) {
+	items, err := flattener.Flatten(i)
+	for _, item := range items {
+		path = prefixedPath(item.Path, prefix)
+
+		switch item.Parent.Kind() {
+			case reflect.Map:
+				key := item.Name
+
+			case reflect.Slice:
+			case reflect.Struct:
+		}
+
+	}
 }
