@@ -5,6 +5,7 @@
 package datastore
 
 import (
+	"fmt"
 	"testing"
 	"gae-go-testing.googlecode.com/git/appenginetesting"
 )
@@ -30,7 +31,15 @@ func TestQueryString(t *testing.T) {
 		 Order("-updated")
 
 	s := q.String()
-	if s != "SELECT * FROM Wiki WHERE ANCESTOR IS KEY('agtkZXZ-dGVzdGFwcHIKCxIEV2lraRgqDA') AND section=\"golang\" AND public=true ORDER BY title ASC, updated DESC" {
-		t.Errorf("Unexpected Query.String() result: %v", s)
+	expected := fmt.Sprintf("SELECT * FROM Wiki WHERE ANCESTOR IS KEY('%v') AND section=\"golang\" AND public=true ORDER BY title ASC, updated DESC", k.Encode())
+	if s != expected {
+		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s, expected)
+	}
+
+	q = q.Ancestor(nil)
+	s = q.String()
+	expected = fmt.Sprintf("SELECT * FROM Wiki WHERE section=\"golang\" AND public=true ORDER BY title ASC, updated DESC")
+	if s != expected {
+		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s, expected)
 	}
 }
