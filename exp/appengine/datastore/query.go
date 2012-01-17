@@ -5,6 +5,7 @@
 package datastore
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -70,6 +71,47 @@ func (q *Query) Order(order string) *Query {
 	c := q.clone()
 	c.order = append(c.order, queryOrder(order))
 	return c
+}
+
+// String returns a representation of the query in a readable format.
+func (q *Query) String() string {
+	buf := bytes.NewBufferString("")
+	var hasWhere bool
+	if q.kind != "" {
+		fmt.Fprintf(buf, "SELECT * FROM %v ", q.kind)
+	}
+	if q.ancestor != nil {
+		fmt.Fprintf(buf, "WHERE ANCESTOR IS KEY('%v') ", q.ancestor.Encode())
+		hasWhere = true
+	}
+	if q.filter != nil {
+		for i, filter := range q.filter {
+			if !hasWhere {
+				buf.WriteString("WHERE ")
+				hasWhere = true
+			} else if hasWhere || i > 0 {
+				buf.WriteString("AND ")
+			}
+			// TODO value doesn't follow GQL strictly.
+			fmt.Fprintf(buf, "%v%#v ", filter.property, filter.value)
+		}
+	}
+	if q.order != nil {
+		buf.WriteString("ORDER BY ")
+		for i, order := range q.order {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			property := string(order)
+			direction := "ASC"
+			if strings.HasPrefix(property, "-") {
+				property = property[1:]
+				direction = "DESC"
+			}
+			fmt.Fprintf(buf, "%v %v", property, direction)
+		}
+	}
+	return buf.String()
 }
 
 // Private methods ------------------------------------------------------------
