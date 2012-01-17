@@ -17,5 +17,20 @@ func getContext(t *testing.T) *appenginetesting.Context {
 	return c
 }
 
-func TestTemp(t *testing.T) {
+func TestQueryString(t *testing.T) {
+	c := getContext(t)
+	defer c.Close()
+
+	k := NewKey(c, "Wiki", "", 42, nil)
+	q := NewQuery("Wiki").
+		 Ancestor(k).
+		 Filter("section=", "golang").
+		 Filter("public=", true).
+		 Order("title").
+		 Order("-updated")
+
+	s := q.String()
+	if s != "SELECT * FROM Wiki WHERE ANCESTOR IS KEY('agtkZXZ-dGVzdGFwcHIKCxIEV2lraRgqDA') AND section=\"golang\" AND public=true ORDER BY title ASC, updated DESC" {
+		t.Errorf("Unexpected Query.String() result: %v", s)
+	}
 }
