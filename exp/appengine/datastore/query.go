@@ -53,16 +53,16 @@ type Query struct {
 
 // Kind sets the entity kind for the Query.
 func (q *Query) Kind(kind string) *Query {
-	c := q.clone()
+	c := *q
 	c.kind = kind
-	return c
+	return &c
 }
 
 // Ancestor sets the ancestor filter for the Query.
 func (q *Query) Ancestor(ancestor *Key) *Query {
-	c := q.clone()
+	c := *q
 	c.ancestor = ancestor
-	return c
+	return &c
 }
 
 // Filter adds a field-based filter to the Query.
@@ -71,9 +71,9 @@ func (q *Query) Ancestor(ancestor *Key) *Query {
 // Fields are compared against the provided value using the operator.
 // Multiple filters are AND'ed together.
 func (q *Query) Filter(filterStr string, value interface{}) *Query {
-	c := q.clone()
+	c := *q
 	c.filter = append(c.filter, queryFilter{filterStr, value})
-	return c
+	return &c
 }
 
 // Order adds a field-based sort to the query.
@@ -81,9 +81,9 @@ func (q *Query) Filter(filterStr string, value interface{}) *Query {
 // The default order is ascending; to sort in descending
 // order prefix the fieldName with a minus sign (-).
 func (q *Query) Order(order string) *Query {
-	c := q.clone()
+	c := *q
 	c.order = append(c.order, queryOrder(order))
-	return c
+	return &c
 }
 
 // String returns a string representation of the query.
@@ -132,20 +132,10 @@ func (q *Query) Run(c appengine.Context, o *QueryOptions) *Iterator {
 
 // Private methods ------------------------------------------------------------
 
-// clone returns a copy of the query.
-func (q *Query) clone() *Query {
-	return &Query{
-		kind:     q.kind,
-		ancestor: q.ancestor,
-		filter:   q.filter,
-		order:    q.order,
-	}
-}
-
 // toProto converts the query to a protocol buffer.
 //
 // Values are stored as defined by the user and validation only happens here.
-// It returns a ErrMulti with all encountered errors, if any.
+// It returns an ErrMulti with all encountered errors, if any.
 func (q *Query) toProto(dst *pb.Query) os.Error {
 	var errMulti ErrMulti
 	if q.kind != "" {
@@ -208,60 +198,48 @@ type QueryOptions struct {
 // Limit sets the maximum number of keys/entities to return.
 // A zero value means unlimited. A negative value is invalid.
 func (o *QueryOptions) Limit(limit int) *QueryOptions {
-	c := o.clone()
+	c := *o
 	c.limit = limit
-	return c
+	return &c
 }
 
 // Offset sets how many keys to skip over before returning results.
 // A negative value is invalid.
 func (o *QueryOptions) Offset(offset int) *QueryOptions {
-	c := o.clone()
+	c := *o
 	c.offset = offset
-	return c
+	return &c
 }
 
 // KeysOnly configures the query to return keys, instead of keys and entities.
 func (o *QueryOptions) KeysOnly(keysOnly bool) *QueryOptions {
-	c := o.clone()
+	c := *o
 	c.keysOnly = keysOnly
-	return c
+	return &c
 }
 
 // Compile configures the query to produce cursors.
 func (o *QueryOptions) Compile(compile bool) *QueryOptions {
-	c := o.clone()
+	c := *o
 	c.compile = compile
-	return c
+	return &c
 }
 
 // Cursor sets the cursor position to start the query.
 func (o *QueryOptions) Cursor(cursor *Cursor) *QueryOptions {
 	// TODO: When a cursor is set, should we automatically configure it
 	// to produce cursors?
-	c := o.clone()
+	c := *o
 	c.startCursor = cursor
-	return c
+	return &c
 }
 
 // Private methods ------------------------------------------------------------
 
-// clone returns a copy of the fetch options.
-func (o *QueryOptions) clone() *QueryOptions {
-	return &QueryOptions{
-		limit:       o.limit,
-		offset:      o.offset,
-		keysOnly:    o.keysOnly,
-		compile:     o.compile,
-		startCursor: o.startCursor,
-		endCursor:   o.endCursor,
-	}
-}
-
 // toProto converts the query to a protocol buffer.
 //
 // Values are stored as defined by the user and validation only happens here.
-// It returns a ErrMulti with all encountered errors, if any.
+// It returns an ErrMulti with all encountered errors, if any.
 //
 // TODO: zero limit policy
 func (o *QueryOptions) toProto(dst *pb.Query) os.Error {
