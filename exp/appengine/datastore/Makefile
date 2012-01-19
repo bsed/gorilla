@@ -6,6 +6,7 @@ GOFILES=\
 	doc.go\
 	datastore.go\
 	error.go\
+	iterator.go\
 	key.go\
 	load.go\
 	prop.go\
