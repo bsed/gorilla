@@ -46,15 +46,13 @@ const (
 // Context
 // ----------------------------------------------------------------------------
 
-// Vars stores the variables extracted from a URL.
+// RouteVars stores the variables extracted from a URL.
 type RouteVars map[string]string
 
-// ctx is the request context namespace for this package.
-//
-// It stores route variables for each request.
+// ctx stores route variables for each request.
 var ctx = new(context.Namespace)
 
-// Vars returns the route variables for the matched route in a given request.
+// Vars returns the route variables for the current request, if any.
 func Vars(request *http.Request) RouteVars {
 	rv := ctx.Get(request)
 	if rv != nil {
@@ -63,10 +61,10 @@ func Vars(request *http.Request) RouteVars {
 	return nil
 }
 
-// routeCtx is the request context that stores the currently matched route.
+// routeCtx stores the currently matched route.
 var routeCtx = new(context.Namespace)
 
-// CurrentRoute returns the currently matched route, if any.
+// CurrentRoute returns the matched route for the current request, if any.
 func CurrentRoute(request *http.Request) *Route {
 	rv := routeCtx.Get(request)
 	if rv != nil {
@@ -82,7 +80,7 @@ func CurrentRoute(request *http.Request) *Route {
 // Router registers routes to be matched and dispatches a handler.
 //
 // It implements the http.Handler interface, so it can be registered to serve
-// requests. For example, to send all incoming requests to the default router:
+// requests:
 //
 //     var router = new(mux.Router)
 //
@@ -98,8 +96,7 @@ func CurrentRoute(request *http.Request) *Route {
 //         http.Handle("/", router)
 //     }
 //
-// The DefaultRouter is a Router instance ready to register URLs and handlers.
-// If needed, new instances can be created and registered.
+// This will send all incoming requests to the router.
 type Router struct {
 	// Routes to be matched, in order.
 	Routes []*Route
