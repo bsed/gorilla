@@ -145,8 +145,8 @@ This also works for host variables:
 
 	// url.String() will be "http://news.domain.com/articles/technology/42"
 	url := r.NamedRoutes["article"].URL("subdomain", "news",
-										  "category", "technology",
-										  "id", "42")
+										"category", "technology",
+										"id", "42")
 
 All variable names defined in the route are required, and their values must
 conform to the corresponding patterns, if any.
@@ -160,6 +160,6 @@ we would do:
 
 	// "/articles/technology/42"
 	path := r.NamedRoutes["article"].URLPath("category", "technology",
-											   "id", "42").String()
+											 "id", "42").String()
 */
 package mux
