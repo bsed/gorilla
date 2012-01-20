@@ -20,17 +20,12 @@ import (
 
 // TODO
 // ====
-// - Ancestor Queries:
-//   - http://code.google.com/appengine/docs/python/datastore/queries.html#Ancestor_Queries
-// - Kindless Queries:
-//   - http://code.google.com/appengine/docs/python/datastore/queries.html#Kindless_Queries
-//   - http://code.google.com/appengine/docs/java/datastore/queries.html#Kindless_Queries
-// - Kindless Ancestor Queries:
-//   - http://code.google.com/appengine/docs/python/datastore/queries.html#Kindless_Ancestor_Queries
 // - Maybe split Query.getProto() in smaller functions to perform checkings
 //   related to datastore restrictions:
+//   - http://code.google.com/appengine/docs/java/datastore/queries.html#Restrictions_on_Queries
 //   - http://code.google.com/appengine/docs/python/datastore/queries.html#Restrictions_on_Queries
 // - Async calls:
+//   - http://code.google.com/appengine/docs/java/datastore/async.html
 //   - http://code.google.com/appengine/docs/python/datastore/async.html
 // - IN, OR and != filters
 
@@ -44,6 +39,7 @@ func NewQuery(kind string) *Query {
 }
 
 // Query represents a datastore query, and is immutable.
+// Methods don't modify the query; instead they return a modified copy.
 type Query struct {
 	kind     string
 	ancestor *Key
@@ -86,8 +82,11 @@ func (q *Query) Order(order string) *Query {
 	return &c
 }
 
-// String returns a string representation of the query.
-func (q *Query) String() string {
+// GQL returns a GQL representation of the query.
+//
+// This implementation is still incomplete: filter values are not properly
+// converted to a GQL representation.
+func (q *Query) GQL(options *QueryOptions) string {
 	var hasWhere bool
 	buf := bytes.NewBufferString("SELECT *")
 	if q.kind != "" {
@@ -105,16 +104,21 @@ func (q *Query) String() string {
 			} else {
 				buf.WriteString(" AND")
 			}
-			fmt.Fprintf(buf, " %v", filter.String())
+			fmt.Fprintf(buf, " %v", filter.GQL())
 		}
 	}
 	if q.order != nil {
 		buf.WriteString(" ORDER BY")
 		for i, order := range q.order {
 			if i > 0 {
-				buf.WriteString(",")
+				buf.WriteByte(',')
 			}
-			fmt.Fprintf(buf, " %v", order.String())
+			fmt.Fprintf(buf, " %v", order.GQL())
+		}
+	}
+	if options != nil {
+		if optionsGQL := options.GQL(); optionsGQL != "" {
+			fmt.Fprintf(buf, " %v", optionsGQL)
 		}
 	}
 	return buf.String()
@@ -123,11 +127,11 @@ func (q *Query) String() string {
 // Run ------------------------------------------------------------------------
 
 // Run runs the query in the given context.
-func (q *Query) Run(c appengine.Context, o *QueryOptions) *Iterator {
-	if o == nil {
-		o = &QueryOptions{}
+func (q *Query) Run(c appengine.Context, options *QueryOptions) *Iterator {
+	if options == nil {
+		options = &QueryOptions{}
 	}
-	return newIterator(c, q, o, "RunQuery")
+	return newIterator(c, q, options, "RunQuery")
 }
 
 // Private methods ------------------------------------------------------------
@@ -137,15 +141,15 @@ func (q *Query) Run(c appengine.Context, o *QueryOptions) *Iterator {
 // Values are stored as defined by the user and validation only happens here.
 // It returns an ErrMulti with all encountered errors, if any.
 func (q *Query) toProto(dst *pb.Query) os.Error {
+	// Backend will complain about these; should we check before the RPC call?
+	// os.NewError("datastore: kindless queries only support __key__ filters")
+	// os.NewError("datastore: kindless queries only support ascending __key__ order")
 	var errMulti ErrMulti
 	if q.kind != "" {
 		dst.Kind = proto.String(q.kind)
-	} else {
-		// TODO: kindless queries.
-		errMulti = append(errMulti, os.NewError("datastore: empty query kind"))
 	}
 	if q.ancestor != nil {
-		dst.Ancestor = q.ancestor.toProto()
+		dst.Ancestor = keyToProto(q.ancestor)
 	}
 	if q.filter != nil {
 		dst.Filter = make([]*pb.Query_Filter, len(q.filter))
@@ -183,6 +187,7 @@ func NewQueryOptions(limit int, offset int) *QueryOptions {
 }
 
 // QueryOptions defines a configuration to run a query, and is immutable.
+// Methods don't modify the options; instead they return a modified copy.
 type QueryOptions struct {
 	limit       int
 	offset      int
@@ -190,6 +195,7 @@ type QueryOptions struct {
 	compile     bool
 	startCursor *Cursor
 	endCursor   *Cursor
+	namespace   string // temporarily here until supported by appengine.Context
 	// TODO?
 	// batchSize: int, hint for the number of results returned per RPC
 	// prefetchSize: int, hint for the number of results in the first RPC
@@ -227,11 +233,29 @@ func (o *QueryOptions) Compile(compile bool) *QueryOptions {
 
 // Cursor sets the cursor position to start the query.
 func (o *QueryOptions) Cursor(cursor *Cursor) *QueryOptions {
-	// TODO: When a cursor is set, should we automatically configure it
-	// to produce cursors?
 	c := *o
 	c.startCursor = cursor
 	return &c
+}
+
+// Namespace sets the namespace for the query.
+//
+// This is a temporary function to fill the gap until appengine.Context
+// supports namespaces.
+func (o *QueryOptions) Namespace(namespace string) *QueryOptions {
+	c := *o
+	c.namespace = namespace
+	return &c
+}
+
+// GQL returns a GQL representation of the options.
+func (o *QueryOptions) GQL() string {
+	if o.limit > 0 {
+		return fmt.Sprintf("LIMIT %v,%v", o.offset, o.limit)
+	} else if o.offset > 0 {
+		return fmt.Sprintf("OFFSET %v", o.offset)
+	}
+	return ""
 }
 
 // Private methods ------------------------------------------------------------
@@ -257,10 +281,23 @@ func (o *QueryOptions) toProto(dst *pb.Query) os.Error {
 	dst.KeysOnly = proto.Bool(o.keysOnly)
 	dst.Compile = proto.Bool(o.compile)
 	if o.startCursor != nil {
-		dst.CompiledCursor = o.startCursor.compiledCursor
+		if o.startCursor.compiledCursor != nil {
+			dst.CompiledCursor = o.startCursor.compiledCursor
+		} else {
+			errMulti = append(errMulti,
+				os.NewError("datastore: empty start cursor."))
+		}
 	}
 	if o.endCursor != nil {
-		dst.EndCompiledCursor = o.endCursor.compiledCursor
+		if o.endCursor.compiledCursor != nil {
+			dst.EndCompiledCursor = o.endCursor.compiledCursor
+		} else {
+			errMulti = append(errMulti,
+				os.NewError("datastore: empty end cursor."))
+		}
+	}
+	if o.namespace != "" {
+		dst.NameSpace = proto.String(o.namespace)
 	}
 	if len(errMulti) > 0 {
 		return errMulti
@@ -272,7 +309,7 @@ func (o *QueryOptions) toProto(dst *pb.Query) os.Error {
 // queryFilter
 // ----------------------------------------------------------------------------
 
-var operatorToProto = map[string]*pb.Query_Filter_Operator{
+var queryFilterOperatorToProto = map[string]*pb.Query_Filter_Operator{
 	"<":  pb.NewQuery_Filter_Operator(pb.Query_Filter_LESS_THAN),
 	"<=": pb.NewQuery_Filter_Operator(pb.Query_Filter_LESS_THAN_OR_EQUAL),
 	"=":  pb.NewQuery_Filter_Operator(pb.Query_Filter_EQUAL),
@@ -286,10 +323,11 @@ type queryFilter struct {
 	value  interface{}
 }
 
-// String returns a string representation of the filter.
-func (q queryFilter) String() string {
+// GQL returns a GQL representation of the filter.
+func (q queryFilter) GQL() string {
 	// TODO: value doesn't follow GQL strictly.
-	return fmt.Sprintf("%v%#v", q.filter, q.value)
+	property, operator, _ := q.parse()
+	return fmt.Sprintf("%v%v%#v", property, operator, q.value)
 }
 
 // toProto converts the filter to a pb.Query_Filter.
@@ -298,7 +336,7 @@ func (q queryFilter) toProto(dst *pb.Query_Filter) os.Error {
 	if err != nil {
 		return err
 	}
-	dst.Op = operatorToProto[operator]
+	dst.Op = queryFilterOperatorToProto[operator]
 	if dst.Op == nil {
 		return fmt.Errorf("datastore: invalid operator %q in filter %q",
 			operator, q.filter)
@@ -331,7 +369,7 @@ func (q queryFilter) parse() (property, operator string, err os.Error) {
 // queryOrder
 // ----------------------------------------------------------------------------
 
-var orderDirectionToProto = map[string]*pb.Query_Order_Direction{
+var queryOrderDirectionToProto = map[string]*pb.Query_Order_Direction{
 	"+": pb.NewQuery_Order_Direction(pb.Query_Order_ASCENDING),
 	"-": pb.NewQuery_Order_Direction(pb.Query_Order_DESCENDING),
 }
@@ -339,13 +377,13 @@ var orderDirectionToProto = map[string]*pb.Query_Order_Direction{
 // queryOrder stores a query order as defined by the user.
 type queryOrder string
 
-// String returns a string representation of the order.
-func (q queryOrder) String() string {
+// GQL returns a GQL representation of the order.
+func (q queryOrder) GQL() string {
 	property, direction, _ := q.parse()
-	if direction == "+" {
-		direction = "ASC"
-	} else {
+	if direction == "-" {
 		direction = "DESC"
+	} else {
+		direction = "ASC"
 	}
 	return fmt.Sprintf("%v %v", property, direction)
 }
@@ -357,7 +395,7 @@ func (q queryOrder) toProto(dst *pb.Query_Order) os.Error {
 		return os.NewError("datastore: empty query order property")
 	}
 	dst.Property = proto.String(property)
-	dst.Direction = orderDirectionToProto[direction]
+	dst.Direction = queryOrderDirectionToProto[direction]
 	return nil
 }
 
@@ -365,7 +403,7 @@ func (q queryOrder) toProto(dst *pb.Query_Order) os.Error {
 func (q queryOrder) parse() (property, direction string, err os.Error) {
 	property = strings.TrimSpace(string(q))
 	direction = "+"
-	if strings.HasPrefix(property, "-") {
+	if property[0] == '-' {
 		property = strings.TrimSpace(property[1:])
 		direction = "-"
 	}
