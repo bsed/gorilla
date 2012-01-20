@@ -34,12 +34,37 @@ func NewIncompleteKey(c appengine.Context, kind string, parent *Key) *Key {
 // the key returned is incomplete.
 // parent must either be a complete key or nil.
 func NewKey(c appengine.Context, kind, stringID string, intID int64, parent *Key) *Key {
+	// TODO: get namespace from context once it supports it.
 	return &Key{
 		appID:    c.FullyQualifiedAppID(),
 		parent:   parent,
 		kind:     kind,
 		stringID: stringID,
 		intID:    intID,
+	}
+}
+
+// NewNamespaceKey is the same as NewKey, but creates a key with a
+// namespace.
+//
+// This is a temporary function to fill the gap until appengine.Context
+// supports namespaces.
+//
+// namespace must either be a valid namespace or zero for the default
+// namespace. Valid namespaces match the pattern `^[0-9A-Za-z._\-]{0,100}$`.
+// If the namespace is zero, the namespace from the parent is used.
+// If the namespace is not zero, it must match the namespace from the parent.
+func NewNamespaceKey(c appengine.Context, kind, stringID string, intID int64, parent *Key, namespace string) *Key {
+	for p := parent; p != nil && namespace == ""; p = p.parent {
+		namespace = p.namespace
+	}
+	return &Key{
+		appID:     c.FullyQualifiedAppID(),
+		namespace: namespace,
+		parent:    parent,
+		kind:      kind,
+		stringID:  stringID,
+		intID:     intID,
 	}
 }
 
@@ -117,7 +142,7 @@ func (k *Key) Eq(o *Key) bool {
 // suitable for use in HTML and URLs.
 // This is compatible with the Python and Java runtimes.
 func (k *Key) Encode() string {
-	ref := k.toProto()
+	ref := keyToProto(k)
 
 	b, err := proto.Marshal(ref)
 	if err != nil {
@@ -179,7 +204,10 @@ func (k *Key) valid() bool {
 			if k.parent.Incomplete() {
 				return false
 			}
-			if k.parent.appID != k.appID || k.parent.namespace != k.namespace {
+			if k.parent.appID != k.appID {
+				return false
+			}
+			if k.parent.namespace != k.namespace {
 				return false
 			}
 		}
@@ -195,49 +223,19 @@ func (k *Key) root() *Key {
 	return k
 }
 
-// toProto converts the key to a Reference protocol buffer.
-func (k *Key) toProto() *pb.Reference {
-	n := 0
-	for i := k; i != nil; i = i.parent {
-		n++
+// marshal marshals the key's string representation to the buffer.
+func (k *Key) marshal(b *bytes.Buffer) {
+	if k.parent != nil {
+		k.parent.marshal(b)
 	}
-	e := make([]*pb.Path_Element, n)
-	for i := k; i != nil; i = i.parent {
-		n--
-		e[n] = &pb.Path_Element{
-			Type: &i.kind,
-		}
-		// At most one of {Name,Id} should be set.
-		// Neither will be set for incomplete keys.
-		if i.stringID != "" {
-			e[n].Name = &i.stringID
-		} else if i.intID != 0 {
-			e[n].Id = &i.intID
-		}
-	}
-	return &pb.Reference{
-		App: proto.String(k.appID),
-		Path: &pb.Path{
-			Element: e,
-		},
-	}
-}
-
-// keyToReferenceValue is the same as toProto except the output is a
-// PropertyValue_ReferenceValue instead of a Reference.
-func (k *Key) toReferenceValue() *pb.PropertyValue_ReferenceValue {
-	ref := k.toProto()
-	pe := make([]*pb.PropertyValue_ReferenceValue_PathElement, len(ref.Path.Element))
-	for i, e := range ref.Path.Element {
-		pe[i] = &pb.PropertyValue_ReferenceValue_PathElement{
-			Type: e.Type,
-			Id:   e.Id,
-			Name: e.Name,
-		}
-	}
-	return &pb.PropertyValue_ReferenceValue{
-		App:         ref.App,
-		Pathelement: pe,
+	b.WriteString(k.namespace)
+	b.WriteByte('/')
+	b.WriteString(k.kind)
+	b.WriteByte(',')
+	if k.stringID != "" {
+		b.WriteString(k.stringID)
+	} else {
+		b.WriteString(strconv.Itoa64(k.intID))
 	}
 }
 
@@ -246,11 +244,12 @@ func (k *Key) toReferenceValue() *pb.PropertyValue_ReferenceValue {
 // ----------------------------------------------------------------------------
 
 type gobKey struct {
-	Kind     string
-	StringID string
-	IntID    int64
-	Parent   *gobKey
-	AppID    string
+	Kind      string
+	StringID  string
+	IntID     int64
+	Parent    *gobKey
+	AppID     string
+	Namespace string
 }
 
 func keyToGobKey(k *Key) *gobKey {
@@ -258,11 +257,12 @@ func keyToGobKey(k *Key) *gobKey {
 		return nil
 	}
 	return &gobKey{
-		Kind:     k.kind,
-		StringID: k.stringID,
-		IntID:    k.intID,
-		Parent:   keyToGobKey(k.parent),
-		AppID:    k.appID,
+		Kind:      k.kind,
+		StringID:  k.stringID,
+		IntID:     k.intID,
+		Parent:    keyToGobKey(k.parent),
+		AppID:     k.appID,
+		Namespace: k.namespace,
 	}
 }
 
@@ -271,11 +271,12 @@ func gobKeyToKey(gk *gobKey) *Key {
 		return nil
 	}
 	return &Key{
-		kind:     gk.Kind,
-		stringID: gk.StringID,
-		intID:    gk.IntID,
-		parent:   gobKeyToKey(gk.Parent),
-		appID:    gk.AppID,
+		kind:      gk.Kind,
+		stringID:  gk.StringID,
+		intID:     gk.IntID,
+		parent:    gobKeyToKey(gk.Parent),
+		appID:     gk.AppID,
+		namespace: gk.Namespace,
 	}
 }
 
@@ -312,10 +313,11 @@ func DecodeKey(encoded string) (*Key, os.Error) {
 // protoToKey converts a Reference proto to a *Key.
 func protoToKey(r *pb.Reference) (k *Key, err os.Error) {
 	appID := proto.GetString(r.App)
+	namespace := proto.GetString(r.NameSpace)
 	for _, e := range r.Path.Element {
 		k = &Key{
 			appID:     appID,
-			namespace: proto.GetString(e.Type),
+			namespace: namespace,
 			parent:    k,
 			kind:      proto.GetString(e.Type),
 			stringID:  proto.GetString(e.Name),
@@ -328,17 +330,52 @@ func protoToKey(r *pb.Reference) (k *Key, err os.Error) {
 	return
 }
 
+// keyToProto converts a key to a Reference protocol buffer.
+func keyToProto(k *Key) *pb.Reference {
+	var namespace *string
+	if k.namespace != "" {
+		namespace = proto.String(k.namespace)
+	}
+	n := 0
+	for i := k; i != nil; i = i.parent {
+		n++
+	}
+	e := make([]*pb.Path_Element, n)
+	for i := k; i != nil; i = i.parent {
+		n--
+		e[n] = &pb.Path_Element{
+			Type: &i.kind,
+		}
+		// At most one of {Name,Id} should be set.
+		// Neither will be set for incomplete keys.
+		if i.stringID != "" {
+			e[n].Name = &i.stringID
+		} else if i.intID != 0 {
+			e[n].Id = &i.intID
+		}
+	}
+	return &pb.Reference{
+		App:       proto.String(k.appID),
+		NameSpace: namespace,
+		Path:      &pb.Path{
+			Element: e,
+		},
+	}
+}
+
 // referenceValueToKey is the same as protoToKey except the input is a
 // PropertyValue_ReferenceValue instead of a Reference.
 func referenceValueToKey(r *pb.PropertyValue_ReferenceValue) (k *Key, err os.Error) {
 	appID := proto.GetString(r.App)
+	namespace := proto.GetString(r.NameSpace)
 	for _, e := range r.Pathelement {
 		k = &Key{
-			kind:     proto.GetString(e.Type),
-			stringID: proto.GetString(e.Name),
-			intID:    proto.GetInt64(e.Id),
-			parent:   k,
-			appID:    appID,
+			appID:     appID,
+			namespace: namespace,
+			parent:    k,
+			kind:      proto.GetString(e.Type),
+			stringID:  proto.GetString(e.Name),
+			intID:     proto.GetInt64(e.Id),
 		}
 		if !k.valid() {
 			return nil, ErrInvalidKey
@@ -346,18 +383,64 @@ func referenceValueToKey(r *pb.PropertyValue_ReferenceValue) (k *Key, err os.Err
 	}
 	return
 }
-
-// marshal marshals the key's string representation to the buffer.
-func (k *Key) marshal(b *bytes.Buffer) {
-	if k.parent != nil {
-		k.parent.marshal(b)
+// keyToReferenceValue is the same as toProto except the output is a
+// PropertyValue_ReferenceValue instead of a Reference.
+func keyToReferenceValue(k *Key) *pb.PropertyValue_ReferenceValue {
+	ref := keyToProto(k)
+	pe := make([]*pb.PropertyValue_ReferenceValue_PathElement, len(ref.Path.Element))
+	for i, e := range ref.Path.Element {
+		pe[i] = &pb.PropertyValue_ReferenceValue_PathElement{
+			Type: e.Type,
+			Id:   e.Id,
+			Name: e.Name,
+		}
 	}
-	b.WriteByte('/')
-	b.WriteString(k.kind)
-	b.WriteByte(',')
-	if k.stringID != "" {
-		b.WriteString(k.stringID)
-	} else {
-		b.WriteString(strconv.Itoa64(k.intID))
+	return &pb.PropertyValue_ReferenceValue{
+		App:         ref.App,
+		NameSpace:   ref.NameSpace,
+		Pathelement: pe,
 	}
 }
+
+// multiKeyToProto is a batch version of keyToProto.
+func multiKeyToProto(appID string, key []*Key) []*pb.Reference {
+	ret := make([]*pb.Reference, len(key))
+	for i, k := range key {
+		ret[i] = keyToProto(k)
+	}
+	return ret
+}
+
+// multiValid is a batch version of Key.valid. It returns an os.Error, not a
+// []bool.
+func multiValid(key []*Key) os.Error {
+	invalid := false
+	for _, k := range key {
+		if !k.valid() {
+			invalid = true
+			break
+		}
+	}
+	if !invalid {
+		return nil
+	}
+	err := make(ErrMulti, len(key))
+	for i, k := range key {
+		if !k.valid() {
+			err[i] = ErrInvalidKey
+		}
+	}
+	return err
+}
+
+/*
+// TODO: Validate the namespace or let the backend return an error?
+
+var namespaceRegexp = regexp.MustCompile(`^[0-9A-Za-z._\-]{0,100}$`)
+
+// validNamespace validates a namespace using the same rule used by
+// the Python runtime: it must match the pattern `^[0-9A-Za-z._\-]{0,100}$`.
+func validNamespace(namespace string) bool {
+	return namespaceRegexp.Match([]byte(namespace))
+}
+*/

@@ -38,12 +38,12 @@ type nameValue struct {
 func nvToProto(defaultAppID string, key *Key, typeName string, nv []nameValue) (*pb.EntityProto, os.Error) {
 	const errMsg = "datastore: cannot store field named %q from a %q: %s"
 	e := &pb.EntityProto{
-		Key: key.toProto(),
+		Key: keyToProto(key),
 	}
 	if key.parent == nil {
 		e.EntityGroup = &pb.Path{}
 	} else {
-		e.EntityGroup = key.root().toProto().Path
+		e.EntityGroup = keyToProto(key.root()).Path
 	}
 	for _, x := range nv {
 		isBlob := x.value.Type() == typeOfByteSlice
@@ -189,12 +189,12 @@ func propertiesToProto(defaultAppID string, key *Key, src <-chan Property) (*pb.
 		}
 	}()
 	e := &pb.EntityProto{
-		Key: key.toProto(),
+		Key: keyToProto(key),
 	}
 	if key.parent == nil {
 		e.EntityGroup = &pb.Path{}
 	} else {
-		e.EntityGroup = key.root().toProto().Path
+		e.EntityGroup = keyToProto(key.root()).Path
 	}
 	prevMultiple := make(map[string]bool)
 
@@ -225,7 +225,7 @@ func propertiesToProto(defaultAppID string, key *Key, src <-chan Property) (*pb.
 			if v == nil {
 				continue
 			}
-			x.Value.Referencevalue = v.toReferenceValue()
+			x.Value.Referencevalue = keyToReferenceValue(v)
 		case Time:
 			x.Value.Int64Value = proto.Int64(int64(v))
 			x.Meaning = pb.NewProperty_Meaning(pb.Property_GD_WHEN)

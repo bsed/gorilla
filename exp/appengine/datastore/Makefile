@@ -3,8 +3,8 @@ include ${GOROOT}/src/Make.inc
 TARG=gorilla.googlecode.com/hg/gorilla/appengine/datastore
 
 GOFILES=\
-	doc.go\
 	datastore.go\
+	doc.go\	
 	error.go\
 	iterator.go\
 	key.go\
