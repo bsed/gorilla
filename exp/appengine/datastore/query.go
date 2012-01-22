@@ -82,14 +82,6 @@ func (q *Query) Order(order string) *Query {
 	return &c
 }
 
-// Error validates the query and returns an ErrMulti if errors were found.
-func (q *Query) Error() os.Error {
-	if err := q.validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 // Run ------------------------------------------------------------------------
 
 // Run runs the query in the given context.
@@ -97,7 +89,7 @@ func (q *Query) Run(c appengine.Context, options *QueryOptions) *Iterator {
 	if options == nil {
 		options = &QueryOptions{}
 	}
-	return newIterator(c, q, options, "RunQuery")
+	return newIterator(c, q, options)
 }
 
 // Private methods ------------------------------------------------------------
@@ -189,8 +181,6 @@ type QueryOptions struct {
 	startCursor  *Cursor
 	endCursor    *Cursor
 	namespace    string // temporarily here until supported by appengine.Context
-	batchSize    int    // hint for the number of results returned per RPC
-	prefetchSize int    // hint for the number of results in the first RPC
 
 	valid bool
 	err   os.Error
@@ -243,14 +233,6 @@ func (o *QueryOptions) Namespace(namespace string) *QueryOptions {
 	return &c
 }
 
-// Error validates the options and returns an ErrMulti if errors were found.
-func (o *QueryOptions) Error() os.Error {
-	if err := o.validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 // Private methods ------------------------------------------------------------
 
 // toProto converts the query to a protocol buffer.
@@ -293,12 +275,6 @@ func (o *QueryOptions) validate() os.Error {
 		err = append(err, e)
 	}
 	if e := validInt32(o.offset, "offset"); e != nil {
-		err = append(err, e)
-	}
-	if e := validInt32(o.batchSize, "batchSize"); e != nil {
-		err = append(err, e)
-	}
-	if e := validInt32(o.prefetchSize, "prefetchSize"); e != nil {
 		err = append(err, e)
 	}
 	if o.startCursor != nil && o.startCursor.compiledCursor == nil {
