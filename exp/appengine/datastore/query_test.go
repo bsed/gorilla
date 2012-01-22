@@ -5,7 +5,6 @@
 package datastore
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -23,51 +22,6 @@ func getKeyMap(t *testing.T, iter *Iterator) map[string]*Key {
 		m[key.Encode()] = key
 	}
 	return m
-}
-
-func TestQueryGQL(t *testing.T) {
-	c := getContext(t)
-	defer c.Close()
-
-	k := NewKey(c, "Kind", "", 42, nil)
-
-	q1 := NewQuery("Kind").
-		  Ancestor(k).
-		  Filter("f1=", "v1").
-		  Filter("f2=", true).
-		  Order("f3").
-		  Order("-f4")
-	s1 := q1.GQL(nil)
-	expect1 := fmt.Sprintf("SELECT * FROM Kind WHERE ANCESTOR IS KEY('%v') AND f1=\"v1\" AND f2=true ORDER BY f3 ASC, f4 DESC", k.Encode())
-	if s1 != expect1 {
-		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s1, expect1)
-	}
-
-	q2 := q1.Ancestor(nil).Filter("f5 >=", 42)
-	s2 := q2.GQL(nil)
-	expect2 := fmt.Sprintf("SELECT * FROM Kind WHERE f1=\"v1\" AND f2=true AND f5>=42 ORDER BY f3 ASC, f4 DESC")
-	if s2 != expect2 {
-		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s2, expect2)
-	}
-
-	s3 := q1.GQL(nil)
-	if s3 != expect1 {
-		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s3, expect1)
-	}
-
-	options := NewQueryOptions(200, 100)
-	s4 := q1.GQL(options)
-	expect4 := " LIMIT 100,200"
-	if s4 != expect1 + expect4 {
-		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s4, expect1 + expect4)
-	}
-
-	options = options.Limit(0)
-	s5 := q1.GQL(options)
-	expect5 := " OFFSET 100"
-	if s5 != expect1 + expect5 {
-		t.Errorf("Unexpected Query.String()\nresult: %v\nexpect: %v\n", s5, expect1 + expect5)
-	}
 }
 
 func TestKindlessQuery(t *testing.T) {
@@ -101,7 +55,6 @@ func TestKindlessAncestorQuery(t *testing.T) {
 	c := getContext(t)
 	defer c.Close()
 
-	// Kindless ancestor query.
 	k1 := NewKey(c, "A", "a", 0, nil)
 	k2 := NewKey(c, "B", "b", 0, k1)
 	k3 := NewKey(c, "C", "c", 0, k2)
