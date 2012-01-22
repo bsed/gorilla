@@ -119,6 +119,10 @@ func valueToProto(name string, v reflect.Value, multiple bool) (p *pb.Property, 
 	return p, ""
 }
 
+// ----------------------------------------------------------------------------
+// Get
+// ----------------------------------------------------------------------------
+
 // Get loads the entity stored for k into dst, which may be either a struct
 // pointer, a PropertyLoadSaver or a Map (although Maps are deprecated). If
 // there is no such entity for the key, Get returns ErrNoSuchEntity.
@@ -177,6 +181,10 @@ func GetMulti(c appengine.Context, key []*Key, dst []interface{}) os.Error {
 	return nil
 }
 
+// ----------------------------------------------------------------------------
+// Put
+// ----------------------------------------------------------------------------
+
 // Put saves the entity src into the datastore with key k. src may be either a
 // struct pointer, a PropertyLoadSaver or a Map (although Maps are deprecated);
 // if the former then any unexported fields of that struct will be skipped.
@@ -232,6 +240,10 @@ func PutMulti(c appengine.Context, key []*Key, src []interface{}) ([]*Key, os.Er
 	}
 	return ret, nil
 }
+
+// ----------------------------------------------------------------------------
+// Delete
+// ----------------------------------------------------------------------------
 
 // Delete deletes the entity for the given key.
 func Delete(c appengine.Context, key *Key) os.Error {

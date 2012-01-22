@@ -56,7 +56,7 @@ func callNext(c appengine.Context, res *pb.QueryResult, offset, limit int32, zlp
 }
 
 // newIterator returns a new Iterator.
-func newIterator(c appengine.Context, q *Query, o *QueryOptions, method string) *Iterator {
+func newIterator(c appengine.Context, q *Query, o *QueryOptions) *Iterator {
 	// TODO: get namespace from context once it supports it.
 	// TODO: zero limit policy
 	var req pb.Query
@@ -67,13 +67,14 @@ func newIterator(c appengine.Context, q *Query, o *QueryOptions, method string) 
 	if err := o.toProto(&req); err != nil {
 		return &Iterator{err: err}
 	}
-	// Query doesn't know about context so we must set the app field.
+	// Query doesn't know about context so we must set app and namespace.
 	req.App = proto.String(c.FullyQualifiedAppID())
-	if err := c.Call("datastore_v3", method, &req, &res, nil); err != nil {
+	if err := c.Call("datastore_v3", "RunQuery", &req, &res, nil); err != nil {
 		return &Iterator{err: err}
 	}
 	return &Iterator{
 		c:      c,
+		query:  q,
 		res:    res,
 		limit:  *req.Limit,
 		offset: *req.Offset,
@@ -83,9 +84,11 @@ func newIterator(c appengine.Context, q *Query, o *QueryOptions, method string) 
 // Iterator is the result of running a query.
 type Iterator struct {
 	c      appengine.Context
+	query  *Query
 	res    pb.QueryResult
 	limit  int32
 	offset int32
+	pos    int
 	err    os.Error
 }
 
@@ -95,52 +98,54 @@ type Iterator struct {
 // stored for that key into the struct pointer or Map dst, with the same
 // semantics and possible errors as for the Get function.
 // If the query is keys only, it is valid to pass a nil interface{} for dst.
-func (t *Iterator) Next(dst interface{}) (*Key, os.Error) {
-	k, e, err := t.next()
+func (q *Iterator) Next(dst interface{}) (*Key, os.Error) {
+	k, e, err := q.next()
 	if err != nil || e == nil {
 		return k, err
 	}
+	q.pos += 1
 	return k, loadEntity(dst, e)
 }
 
-func (t *Iterator) next() (*Key, *pb.EntityProto, os.Error) {
-	if t.err != nil {
-		return nil, nil, t.err
+// Cursor returns the query cursor positioned after the last query result.
+func (q *Iterator) Cursor() *Cursor {
+	if err := q.nextBatch(); err != nil {
+		q.err = err
 	}
-
-	// Issue datastore_v3/Next RPCs as necessary.
-	for len(t.res.Result) == 0 {
-		if !proto.GetBool(t.res.MoreResults) {
-			t.err = Done
-			return nil, nil, t.err
-		}
-		t.offset -= proto.GetInt32(t.res.SkippedResults)
-		if t.offset < 0 {
-			t.offset = 0
-		}
-		if err := callNext(t.c, &t.res, t.offset, t.limit, zeroLimitMeansUnlimited); err != nil {
-			t.err = err
-			return nil, nil, t.err
-		}
-		// For an Iterator, a zero limit means unlimited.
-		if t.limit == 0 {
-			continue
-		}
-		t.limit -= int32(len(t.res.Result))
-		if t.limit > 0 {
-			continue
-		}
-		t.limit = 0
-		if proto.GetBool(t.res.MoreResults) {
-			t.err = os.NewError("datastore: internal error: limit exhausted but more_results is true")
-			return nil, nil, t.err
-		}
+	if q.res.CompiledCursor != nil {
+		return &Cursor{q.res.CompiledCursor}
 	}
+	return nil
+}
 
-	// Pop the EntityProto from the front of t.res.Result and
+// cursor returns the cursor that points to the result at the given index
+// for the current query.
+func (q *Iterator) CursorAt(index int) *Cursor {
+	// TODO: validate index.
+	// TODO: don't need RPC in all cases.
+	options := &QueryOptions{
+		limit:    0,
+		offset:   index,
+		keysOnly: true,
+		compile:  true,
+	}
+	return q.query.Run(q.c, options).Cursor()
+}
+
+// Private methods ------------------------------------------------------------
+
+func (q *Iterator) next() (*Key, *pb.EntityProto, os.Error) {
+	if q.err != nil {
+		return nil, nil, q.err
+	}
+	if err := q.nextBatch(); err != nil {
+		q.err = err
+		return nil, nil, err
+	}
+	// Pop the EntityProto from the front of q.res.Result and
 	// extract its key.
 	var e *pb.EntityProto
-	e, t.res.Result = t.res.Result[0], t.res.Result[1:]
+	e, q.res.Result = q.res.Result[0], q.res.Result[1:]
 	if e.Key == nil {
 		return nil, nil, os.NewError("datastore: internal error: server did not return a key")
 	}
@@ -148,10 +153,42 @@ func (t *Iterator) next() (*Key, *pb.EntityProto, os.Error) {
 	if err != nil || k.Incomplete() {
 		return nil, nil, os.NewError("datastore: internal error: server returned an invalid key")
 	}
-	if proto.GetBool(t.res.KeysOnly) {
+	if proto.GetBool(q.res.KeysOnly) {
 		return k, nil, nil
 	}
 	return k, e, nil
+}
+
+// nextBatch issues datastore_v3/Next RPCs as necessary.
+func (q *Iterator) nextBatch() os.Error {
+	for len(q.res.Result) == 0 {
+		if !proto.GetBool(q.res.MoreResults) {
+			q.err = Done
+			return q.err
+		}
+		q.offset -= proto.GetInt32(q.res.SkippedResults)
+		if q.offset < 0 {
+			q.offset = 0
+		}
+		if err := callNext(q.c, &q.res, q.offset, q.limit, zeroLimitMeansUnlimited); err != nil {
+			q.err = err
+			return q.err
+		}
+		// For an Iterator, a zero limit means unlimited.
+		if q.limit == 0 {
+			continue
+		}
+		q.limit -= int32(len(q.res.Result))
+		if q.limit > 0 {
+			continue
+		}
+		q.limit = 0
+		if proto.GetBool(q.res.MoreResults) {
+			q.err = os.NewError("datastore: internal error: limit exhausted but more_results is true")
+			return q.err
+		}
+	}
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -175,6 +212,18 @@ func (c *Cursor) Encode() string {
 	// We don't return the error to follow Key.Encode which only
 	// returns a string. It is unlikely to happen anyway.
 	return ""
+}
+
+// advance returns a new Cursor advanced by the given offset.
+func (c *Cursor) advance(ctx appengine.Context, query *Query, offset int) *Cursor {
+	options := &QueryOptions{
+		limit:       0,
+		offset:      offset,
+		keysOnly:    true,
+		compile:     true,
+		startCursor: c,
+	}
+	return query.Run(ctx, options).Cursor()
 }
 
 // DecodeCursor decodes a cursor from the opaque representation returned by

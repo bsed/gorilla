@@ -4,7 +4,7 @@ TARG=gorilla.googlecode.com/hg/gorilla/appengine/datastore
 
 GOFILES=\
 	datastore.go\
-	doc.go\	
+	doc.go\
 	error.go\
 	iterator.go\
 	key.go\
