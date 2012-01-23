@@ -232,6 +232,11 @@ func newRoute() *Route {
 	}
 }
 
+// Errors returns an ErrMulti with errors encountered when building the route.
+func (r *Route) Errors() os.Error {
+	return r.err
+}
+
 // Clone clones a route.
 func (r *Route) Clone() *Route {
 	// Shallow copy is enough.
