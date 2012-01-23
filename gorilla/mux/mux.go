@@ -278,7 +278,7 @@ func (r *Route) Match(req *http.Request) (*RouteMatch, bool) {
 				if p1 {
 					ru.Path = ru.Path[:len(ru.Path)-1]
 				} else {
-					ru.Path = ru.Path + "/"
+					ru.Path += "/"
 				}
 				redirectURL = ru.String()
 			}
