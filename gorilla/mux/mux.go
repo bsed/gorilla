@@ -123,6 +123,9 @@ func (r *Router) root() *Router {
 // Match matches registered routes against the request.
 func (r *Router) Match(request *http.Request) (match *RouteMatch, ok bool) {
 	for _, route := range r.Routes {
+		if route.err != nil {
+			continue
+		}
 		if match, ok = route.Match(request); ok {
 			return
 		}
