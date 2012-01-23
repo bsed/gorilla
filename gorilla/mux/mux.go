@@ -594,14 +594,14 @@ func (r *Route) Headers(pairs ...string) *Route {
 // calling mux.Vars(request).
 func (r *Route) Host(template string) *Route {
 	if template == "" {
-		panic(fmt.Sprintf(errEmptyHost, template))
+		r.err = append(r.err, fmt.Errorf(errEmptyHost, template))
+		return r
 	}
-
 	tpl := &parsedTemplate{Template: template}
-	err := parseTemplate(tpl, "[^.]+", false, false,
-		variableNames(r.pathTemplate))
-	if err != nil {
-		panic(err)
+	vars := variableNames(r.pathTemplate)
+	if err := parseTemplate(tpl, "[^.]+", false, false, vars); err != nil {
+		r.err = append(r.err, err)
+		return r
 	}
 	r.hostTemplate = tpl
 	return r
@@ -618,7 +618,8 @@ func (r *Route) Matcher(matcherFunc MatcherFunc) *Route {
 // "GET", "POST", "PUT".
 func (r *Route) Methods(methods ...string) *Route {
 	if len(methods) == 0 {
-		panic(errEmptyMethods)
+		r.err = append(r.err, os.NewError(errEmptyMethods))
+		return r
 	}
 	for k, v := range methods {
 		methods[k] = strings.ToUpper(v)
@@ -647,13 +648,14 @@ func (r *Route) Methods(methods ...string) *Route {
 // calling mux.Vars(request).
 func (r *Route) Path(template string) *Route {
 	if template == "" || template[0] != '/' {
-		panic(fmt.Sprintf(errEmptyPath, template))
+		r.err = append(r.err, fmt.Errorf(errEmptyPath, template))
+		return r
 	}
 	tpl := &parsedTemplate{Template: template}
-	err := parseTemplate(tpl, "[^/]+", false, r.redirectSlash,
-		variableNames(r.hostTemplate))
-	if err != nil {
-		panic(err)
+	vars := variableNames(r.hostTemplate)
+	if err := parseTemplate(tpl, "[^/]+", false, r.redirectSlash, vars); err != nil {
+		r.err = append(r.err, err)
+		return r
 	}
 	r.pathTemplate = tpl
 	return r
@@ -662,13 +664,14 @@ func (r *Route) Path(template string) *Route {
 // PathPrefix adds a matcher to match the request against a URL path prefix.
 func (r *Route) PathPrefix(template string) *Route {
 	if template == "" || template[0] != '/' {
-		panic(fmt.Sprintf(errEmptyPathPrefix, template))
+		r.err = append(r.err, fmt.Errorf(errEmptyPathPrefix, template))
+		return r
 	}
 	tpl := &parsedTemplate{Template: template}
-	err := parseTemplate(tpl, "[^/]+", true, false,
-		variableNames(r.hostTemplate))
-	if err != nil {
-		panic(err)
+	vars := variableNames(r.hostTemplate)
+	if err := parseTemplate(tpl, "[^/]+", true, false, vars); err != nil {
+		r.err = append(r.err, err)
+		return r
 	}
 	r.pathTemplate = tpl
 	return r
@@ -701,7 +704,8 @@ func (r *Route) Queries(pairs ...string) *Route {
 // "http", "https".
 func (r *Route) Schemes(schemes ...string) *Route {
 	if len(schemes) == 0 {
-		panic(errEmptySchemes)
+		r.err = append(r.err, os.NewError(errEmptySchemes))
+		return r
 	}
 	for k, v := range schemes {
 		schemes[k] = strings.ToLower(v)
