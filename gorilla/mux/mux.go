@@ -39,7 +39,9 @@ const (
 	errEmptySchemes string = "Schemes() requires at least one parameter."
 	errOddHeaders   string = "Headers() requires an even number of parameters, got %v."
 	errOddQueries   string = "Queries() requires an even number of parameters, got %v."
-	errOddURLPairs  string = "URL() requires an even number of parameters, got %v."
+	//errOddURLPairs  string = "URL() requires an even number of parameters, got %v."
+
+	errPairs = "Parameters must be multiple of 2, got %v"
 )
 
 // ----------------------------------------------------------------------------
@@ -219,6 +221,8 @@ type Route struct {
 	redirectSlash bool
 	// The name associated with this route.
 	name string
+	// All errors encountered when building the route.
+	err ErrMulti
 }
 
 // newRoute returns a new Route instance.
@@ -230,20 +234,9 @@ func newRoute() *Route {
 
 // Clone clones a route.
 func (r *Route) Clone() *Route {
-	// Fields are private and not changed once set, so we can reuse matchers
-	// and parsed templates. Must make a copy of the matchers array, though.
-	//
-	// The name field is not cloned.
-	matchers := make([]*routeMatcher, len(r.matchers))
-	copy(matchers, r.matchers)
-	return &Route{
-		router:        r.router,
-		handler:       r.handler,
-		matchers:      matchers,
-		hostTemplate:  r.hostTemplate,
-		pathTemplate:  r.pathTemplate,
-		redirectSlash: r.redirectSlash,
-	}
+	// Shallow copy is enough.
+	c := *r
+	return &c
 }
 
 // Match matches this route against the request.
@@ -347,7 +340,25 @@ func (r *Route) NewRouter() *Router {
 
 // URL building ---------------------------------------------------------------
 
-// URL builds a URL for the route.
+// URL builds a URL for the route. It returns nil in case of errors.
+func (r *Route) URL(pairs ...string) *url.URL {
+	u, _ := r.URLDebug(pairs...)
+	return u
+}
+
+// URLHost builds a URL host for the route. It returns nil in case of errors.
+func (r *Route) URLHost(pairs ...string) *url.URL {
+	u, _ := r.URLHostDebug(pairs...)
+	return u
+}
+
+// URLPath builds a URL path for the route. It returns nil in case of errors.
+func (r *Route) URLPath(pairs ...string) *url.URL {
+	u, _ := r.URLPathDebug(pairs...)
+	return u
+}
+
+// URLDebug builds a URL for the route.
 //
 // It accepts a sequence of key/value pairs for the route variables. For
 // example, given this route:
@@ -381,93 +392,77 @@ func (r *Route) NewRouter() *Router {
 // conform to the corresponding patterns, if any.
 //
 // In case of bad arguments it will return nil.
-func (r *Route) URL(pairs ...string) (rv *url.URL) {
-	rv, _ = r.URLDebug(pairs...)
-	return
-}
-
-// URLDebug is a debug version of URL: it also returns an error in case of
-// failure.
-func (r *Route) URLDebug(pairs ...string) (rv *url.URL, err os.Error) {
+func (r *Route) URLDebug(pairs ...string) (*url.URL, os.Error) {
+	var err os.Error
+	var values map[string]string
 	var scheme, host, path string
-	values := stringMapFromPairs(errOddURLPairs, pairs...)
+	if values, err = stringMapFromPairs(pairs...); err != nil {
+		return nil, fmt.Errorf("Route.URL: %v", err.String())
+	}
 	if r.hostTemplate != nil {
 		// Set a default scheme.
 		scheme = "http"
 		if host, err = reverseRoute(r.hostTemplate, values); err != nil {
-			return
+			return nil, fmt.Errorf("Route.URL: %v", err.String())
 		}
 	}
 	if r.pathTemplate != nil {
 		if path, err = reverseRoute(r.pathTemplate, values); err != nil {
-			return
+			return nil, fmt.Errorf("Route.URL: %v", err.String())
 		}
 	}
-	rv = &url.URL{
+	return &url.URL{
 		Scheme: scheme,
 		Host:   host,
 		Path:   path,
-	}
-	return
+	}, nil
 }
 
-// URLHost builds the host part of the URL for a route.
+// URLHostDebug builds the host part of the URL for a route.
 //
 // The route must have a host defined.
 //
 // In case of bad arguments or missing host it will return nil.
-func (r *Route) URLHost(pairs ...string) (rv *url.URL) {
-	rv, _ = r.URLHostDebug(pairs...)
-	return
-}
-
-// URLHostDebug is a debug version of URLHost: it also returns an error in
-// case of failure.
-func (r *Route) URLHostDebug(pairs ...string) (rv *url.URL, err os.Error) {
+func (r *Route) URLHostDebug(pairs ...string) (*url.URL, os.Error) {
 	if r.hostTemplate == nil {
-		err = muxError(errMissingHost)
-		return
+		return nil, os.NewError(errMissingHost)
 	}
+	var err os.Error
+	var values map[string]string
 	var host string
-	values := stringMapFromPairs(errOddURLPairs, pairs...)
-	if host, err = reverseRoute(r.hostTemplate, values); err != nil {
-		return
-	} else {
-		rv = &url.URL{
-			Scheme: "http",
-			Host:   host,
-		}
+	if values, err = stringMapFromPairs(pairs...); err != nil {
+		return nil, err
 	}
-	return
+	if host, err = reverseRoute(r.hostTemplate, values); err != nil {
+		return nil, err
+	}
+	return &url.URL{
+		Scheme: "http",
+		Host:   host,
+	}, nil
 }
 
-// URLPath builds the path part of the URL for a route.
+// URLPathDebug builds the path part of the URL for a route.
 //
 // The route must have a path defined.
 //
 // In case of bad arguments or missing path it will return nil.
-func (r *Route) URLPath(pairs ...string) (rv *url.URL) {
-	rv, _ = r.URLPathDebug(pairs...)
-	return
-}
-
-// URLPathDebug is a debug version of URLPath: it also returns an error in
-// case of failure.
-func (r *Route) URLPathDebug(pairs ...string) (rv *url.URL, err os.Error) {
+func (r *Route) URLPathDebug(pairs ...string) (*url.URL, os.Error) {
 	if r.pathTemplate == nil {
-		err = muxError(errMissingPath)
-		return
+		return nil, os.NewError(errMissingPath)
 	}
+	var err os.Error
 	var path string
-	values := stringMapFromPairs(errOddURLPairs, pairs...)
-	if path, err = reverseRoute(r.pathTemplate, values); err != nil {
-		return
-	} else {
-		rv = &url.URL{
-			Path: path,
-		}
+	var values map[string]string
+	if values, err = stringMapFromPairs(pairs...); err != nil {
+		return nil, err
 	}
-	return
+	if path, err = reverseRoute(r.pathTemplate, values); err != nil {
+		return nil, err
+	}
+	return &url.URL{
+		Path: path,
+	}, nil
 }
 
 // reverseRoute builds a URL part based on the route's parsed template.
@@ -477,7 +472,7 @@ func reverseRoute(tpl *parsedTemplate, values map[string]string) (rv string, err
 	urlValues := make([]interface{}, len(tpl.VarsN))
 	for k, v := range tpl.VarsN {
 		if value, ok = values[v]; !ok {
-			err = muxError(errMissingRouteVar, v)
+			err = fmt.Errorf(errMissingRouteVar, v)
 			return
 		}
 		urlValues[k] = value
@@ -489,7 +484,7 @@ func reverseRoute(tpl *parsedTemplate, values map[string]string) (rv string, err
 		// message, we check individual regexps if the URL doesn't match.
 		for k, v := range tpl.VarsN {
 			if !tpl.VarsR[k].MatchString(values[v]) {
-				err = muxError(errBadRouteVar, values[v],
+				err = fmt.Errorf(errBadRouteVar, values[v],
 					tpl.VarsR[k].String())
 				return
 			}
@@ -571,9 +566,10 @@ func (r *Route) addMatcher(m routeMatcher) *Route {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Headers(pairs ...string) *Route {
-	headers := stringMapFromPairs(errOddHeaders, pairs...)
-	if len(headers) == 0 {
-		panic(errEmptyHeaders)
+	headers, err := stringMapFromPairs(pairs...)
+	if err != nil {
+		r.err = append(r.err, err)
+		return r
 	}
 	return r.addMatcher(&headerMatcher{headers: headers})
 }
@@ -691,9 +687,10 @@ func (r *Route) PathPrefix(template string) *Route {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Queries(pairs ...string) *Route {
-	queries := stringMapFromPairs(errOddQueries, pairs...)
-	if len(queries) == 0 {
-		panic(errEmptyQueries)
+	queries, err := stringMapFromPairs(pairs...)
+	if err != nil {
+		r.err = append(r.err, err)
+		return r
 	}
 	return r.addMatcher(&queryMatcher{queries: queries})
 }
@@ -837,12 +834,12 @@ redirectSlash bool, names *[]string) os.Error {
 		}
 		// Name or pattern can't be empty.
 		if name == "" || patt == "" {
-			return muxError(errBadTemplatePart, template[idxs[i]:end])
+			return fmt.Errorf(errBadTemplatePart, template[idxs[i]:end])
 		}
 		// Name must be unique for the route.
 		if names != nil {
 			if matchInArray(*names, name) {
-				return muxError(errVarName, name)
+				return fmt.Errorf(errVarName, name)
 			}
 			*names = append(*names, name)
 		}
@@ -897,24 +894,49 @@ func getBraceIndices(s string) ([]int, os.Error) {
 			if level--; level == 0 {
 				idxs = append(idxs, idx, i+1)
 			} else if level < 0 {
-				return nil, muxError(errUnbalancedBraces, s)
+				return nil, fmt.Errorf(errUnbalancedBraces, s)
 			}
 		}
 	}
 	if level != 0 {
-		return nil, muxError(errUnbalancedBraces, s)
+		return nil, fmt.Errorf(errUnbalancedBraces, s)
 	}
 	return idxs, nil
 }
 
 // ----------------------------------------------------------------------------
-// Helpers
+// ErrMulti
 // ----------------------------------------------------------------------------
 
-// muxError returns a formatted error.
-func muxError(msg string, vars ...interface{}) os.Error {
-	return os.NewError(fmt.Sprintf(msg, vars...))
+// ErrMulti stores multiple errors.
+type ErrMulti []os.Error
+
+// String returns a string representation of the error.
+func (m ErrMulti) String() string {
+	s, n := "", 0
+	for _, e := range m {
+		if e == nil {
+			continue
+		}
+		if n == 0 {
+			s = e.String()
+		}
+		n++
+	}
+	switch n {
+	case 0:
+		return "(0 errors)"
+	case 1:
+		return s
+	case 2:
+		return s + " (and 1 other error)"
+	}
+	return fmt.Sprintf("%s (and %d other errors)", s, n-1)
 }
+
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
 //
@@ -936,16 +958,16 @@ func cleanPath(p string) string {
 }
 
 // stringMapFromPairs converts variadic string parameters to a string map.
-func stringMapFromPairs(err string, pairs ...string) map[string]string {
-	size := len(pairs)
-	if size%2 != 0 {
-		panic(fmt.Sprintf(err, pairs))
+func stringMapFromPairs(pairs ...string) (map[string]string, os.Error) {
+	length := len(pairs)
+	if length % 2 != 0 {
+		return nil, fmt.Errorf(errPairs, pairs)
 	}
-	m := make(map[string]string, size/2)
-	for i := 0; i < size; i += 2 {
+	m := make(map[string]string, length / 2)
+	for i := 0; i < length; i += 2 {
 		m[pairs[i]] = pairs[i+1]
 	}
-	return m
+	return m, nil
 }
 
 // variableNames returns a copy of variable names for route templates.
