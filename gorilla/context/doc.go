@@ -19,9 +19,8 @@ Here we define a key using a custom int type to avoid name collisions:
 
 	const Key1 contextKey = 0
 
-Then somewhere in the package set a variable in the context. Context variables
-are bound to a http.Request object, so you need a request instance to set a
-value:
+Then set a variable in the context. Context variables are bound to a
+http.Request object, so you need a request instance to set a value:
 
 	context.DefaultContext.Set(request, Key1, "bar")
 
@@ -34,9 +33,10 @@ The application can later access the variable using the same key you provided:
 		// ...
 	}
 
-You can store any type in the request context, because it accepts and returns
-interface{}. To enforce a given type, a good idea is to make the key private
-and wrap the getter and setter to accept and return values of a specific type:
+And that's all about the basic usage. We discuss some other ideas below.
+
+A Context can store any type. To enforce a given type, make the key private
+and wrap Get() and Set() to accept and return values of a specific type:
 
 	type contextKey int
 
@@ -57,8 +57,8 @@ and wrap the getter and setter to accept and return values of a specific type:
 	}
 
 A context must be cleared at the end of a request, to remove all values
-that were stored. This is done in a http.Handler, after a request was served.
-Just call Clear() passing the request:
+that were stored. This can be done in a http.Handler, after a request was
+served. Just call Clear() passing the request:
 
 	context.DefaultContext.Clear(request)
 
