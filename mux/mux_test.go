@@ -667,9 +667,7 @@ func TestRedirectSlash(t *testing.T) {
 }
 
 // Test for the new regexp library, still not available in stable Go.
-/*
 func TestNewRegexp(t *testing.T) {
-	var p *parsedTemplate
 	var matches []string
 
 	tests := map[string]map[string][]string{
@@ -712,7 +710,8 @@ func TestNewRegexp(t *testing.T) {
 	}
 
 	for pattern, paths := range tests {
-		p, _ = parseTemplate(pattern, "[^/]+", false, nil)
+		p := &parsedTemplate{Template: pattern}
+		_ = parseTemplate(p, "[^/]+", false, false, nil)
 		for path, result := range paths {
 			matches = p.Regexp.FindStringSubmatch(path)
 			if result == nil {
@@ -733,4 +732,3 @@ func TestNewRegexp(t *testing.T) {
 		}
 	}
 }
-*/
