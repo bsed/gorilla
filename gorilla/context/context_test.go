@@ -5,8 +5,15 @@
 package context
 
 import (
-	"http"
+	"net/http"
 	"testing"
+)
+
+type keyType int
+
+const (
+   key1 keyType = iota
+   key2
 )
 
 func TestContext(t *testing.T) {
@@ -16,47 +23,31 @@ func TestContext(t *testing.T) {
 		}
 	}
 
-	req, _ := http.NewRequest("GET", "http://localhost:8080/", nil)
-	ns := new(Namespace)
+	c := new(Context)
+	r, _ := http.NewRequest("GET", "http://localhost:8080/", nil)
 
-	// Context.Get(), Namespace.Get(), still empty.
-	assertEqual(DefaultContext.Get(req, ns), nil)
-	assertEqual(ns.Get(req), nil)
+	// Get()
+	assertEqual(c.Get(r, key1), nil)
 
-	// Context.Set().
-	DefaultContext.Set(req, ns, "1")
-	assertEqual(DefaultContext.Get(req, ns), "1")
-	assertEqual(ns.Get(req), "1")
-	assertEqual(len(DefaultContext.m), 1)
-	assertEqual(len(DefaultContext.m[req]), 1)
+	// Set()
+	c.Set(r, key1, "1")
+	assertEqual(c.Get(r, key1), "1")
+	assertEqual(len(c.m[r]), 1)
 
-	// Context.Clear().
-	DefaultContext.Clear(req)
-	assertEqual(DefaultContext.Get(req, ns), nil)
-	assertEqual(ns.Get(req), nil)
-	assertEqual(len(DefaultContext.m), 0)
+	c.Set(r, key2, "2")
+	assertEqual(c.Get(r, key2), "2")
+	assertEqual(len(c.m[r]), 2)
 
-	// Context.ClearNamespace().
-	DefaultContext.Set(req, ns, "2")
-	assertEqual(DefaultContext.Get(req, ns), "2")
-	assertEqual(ns.Get(req), "2")
-	DefaultContext.ClearNamespace(req, ns)
-	assertEqual(DefaultContext.Get(req, ns), nil)
-	assertEqual(ns.Get(req), nil)
-	assertEqual(len(DefaultContext.m), 1)
-	assertEqual(len(DefaultContext.m[req]), 0)
+	// Delete()
+	c.Delete(r, key1)
+	assertEqual(c.Get(r, key1), nil)
+	assertEqual(len(c.m[r]), 1)
 
-	// Namespace.Set().
-	ns.Set(req, "3")
-	assertEqual(DefaultContext.Get(req, ns), "3")
-	assertEqual(ns.Get(req), "3")
-	assertEqual(len(DefaultContext.m), 1)
-	assertEqual(len(DefaultContext.m[req]), 1)
+	c.Delete(r, key2)
+	assertEqual(c.Get(r, key2), nil)
+	assertEqual(len(c.m[r]), 0)
 
-	// Namespace.Clear().
-	ns.Clear(req)
-	assertEqual(DefaultContext.Get(req, ns), nil)
-	assertEqual(ns.Get(req), nil)
-	assertEqual(len(DefaultContext.m), 1)
-	assertEqual(len(DefaultContext.m[req]), 0)
+	// Clear()
+	c.Clear(r)
+	assertEqual(len(c.m), 0)
 }

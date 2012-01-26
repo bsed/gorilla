@@ -3,75 +3,67 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/context provides utilities to manage request contexts.
+Package gorilla/context provides a container to store values for a request.
 
-A context stores global values for HTTP requests in a thread-safe manner.
-The original idea was posted by Brad Fitzpatrick to the go-nuts mailing list:
+A context stores global variables used during a request. For example, a router
+can set variables extracted from the URL and later application handlers can
+access those values. There are several others common cases.
 
-	http://groups.google.com/group/golang-nuts/msg/e2d679d303aa5d53
+Here's the basic usage: first define the keys that you will need. The key
+type is interface{} so a key can be of any type that supports equality.
+Here we define a key using a custom int type to avoid name collisions:
 
-Any library that needs to set request variables to be accessed by handlers
-can set up a namespace to store those variables. First you create a namespace:
+	package foo
 
-	var ns = new(context.Namespace)
+	type contextKey int
 
-...then call Set() or Get() as needed to define or retrieve request variables:
+	const Key1 contextKey = 0
 
-	// val is nil because we haven't set any value yet.
-	val := ns.Get(request)
+Then somewhere in the package set a variable in the context. Context variables
+are bound to a http.Request object, so you need a request instance to set a
+value:
 
-	// let's set a value, then.
-	ns.Set(request, "foo")
+	context.DefaultContext.Set(request, Key1, "bar")
 
-	// val is now "foo".
-	val = ns.Get(request)
+The application can later access the variable using the same key you provided:
+
+	func MyHandler(w http.ResponseWriter, r *http.Request) {
+		// val is "bar".
+		val = context.DefaultContext.Get(r, foo.Key1)
+
+		// ...
+	}
 
 You can store any type in the request context, because it accepts and returns
-interface{}. To enforce a given type, wrap the getter and setter to accept and
-return values of a specific type ("SomeType" in this example):
+interface{}. To enforce a given type, a good idea is to make the key private
+and wrap the getter and setter to accept and return values of a specific type:
 
-	ns = new(context.Namespace)
+	type contextKey int
 
-	// Val returns a value for this package from the request context.
-	func Val(request *http.Request) SomeType {
-		rv := ns.Get(request)
+	const key1 contextKey = 0
+
+	// GetKey1 returns a value for this package from the request context.
+	func GetKey1(request *http.Request) SomeType {
+		rv := context.DefaultContext.Get(request, key1)
 		if rv != nil {
 			return rv.(SomeType)
 		}
 		return nil
 	}
 
-	// SetVal sets a value for this package in the request context.
-	func SetVal(request *http.Request, val SomeType) {
-		ns.Set(request, val)
+	// SetKey1 sets a value for this package in the request context.
+	func SetKey1(request *http.Request, val SomeType) {
+		context.DefaultContext.Set(request, key1, val)
 	}
 
-Notice that we now perform type casting in Val(), but set the value directly
-in SetVal().
+A context must be cleared at the end of a request, to remove all values
+that were stored. This is done in a http.Handler, after a request was served.
+Just call Clear() passing the request:
 
-To access the namespace variable inside a handler, call the namespace
-getter function passing the current request. For the previous example
-we would do:
-
-	func someHandler(w http.ResponseWriter, r *http.Request) {
-		val := Val(req)
-
-		// ...
-	}
-
-Make sure that the main handler clears the context after serving a request:
-
-	func handler(w http.ResponseWriter, r *http.Request) {
-		defer context.DefaultContext.Clear(r)
-
-		// ...
-	}
-
-This calls Clear() from the Context instance, removing all namespaces
-registered for a request.
+	context.DefaultContext.Clear(request)
 
 The package gorilla/mux clears the default context, so if you are using the
-default handler from there you don't need to clear anything: any namespaces
-set using the default context will be cleared at the end of a request.
+default handler from there you don't need to do anything: context variables
+will be deleted at the end of a request.
 */
 package context
