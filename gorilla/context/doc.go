@@ -44,8 +44,7 @@ and wrap Get() and Set() to accept and return values of a specific type:
 
 	// GetKey1 returns a value for this package from the request context.
 	func GetKey1(request *http.Request) SomeType {
-		rv := context.DefaultContext.Get(request, key1)
-		if rv != nil {
+		if rv := context.DefaultContext.Get(request, key1); rv != nil {
 			return rv.(SomeType)
 		}
 		return nil
