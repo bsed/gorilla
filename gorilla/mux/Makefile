@@ -1,12 +1,12 @@
 include ${GOROOT}/src/Make.inc
 
-TARG=gorilla.googlecode.com/hg/gorilla/mux
+TARG=code.google.com/p/gorilla/mux
 
 GOFILES=\
 	doc.go\
 	mux.go\
 
 DEPS=\
-	gorilla.googlecode.com/hg/gorilla/context\
+	code.google.com/p/gorilla/context\
 
 include ${GOROOT}/src/Make.pkg
