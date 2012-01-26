@@ -1,3 +1,14 @@
+Go1 development version
+-----------------------
+- Changed import paths to follow gofix recommendation:
+	- code.google.com/p/gorilla/appengine
+	- code.google.com/p/gorilla/context
+	- code.google.com/p/gorilla/mux
+	- code.google.com/p/gorilla/schema
+	- code.google.com/p/gorilla/sessions
+	- code.google.com/p/gorilla/rpc
+-
+
 September 25, 2010
 ------------------
 - Dropped mux.NewRouter(): new(mux.Router) will work fine.
