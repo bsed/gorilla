@@ -19,30 +19,21 @@ import (
 
 // All error descriptions.
 const (
-	errRouteName string = "Duplicated route name: %q."
-	errVarName   string = "Duplicated route variable name: %q."
 	// Template parsing.
-	errUnbalancedBraces string = "Unbalanced curly braces in route template: %q."
-	errBadTemplatePart  string = "Missing name or pattern in route template: %q."
+	errUnbalancedBraces = "Unbalanced curly braces in route template: %q."
+	errBadTemplatePart  = "Missing name or pattern in route template: %q."
+	errVarName          = "Duplicated route variable name: %q."
 	// URL building.
-	errMissingRouteVar string = "Missing route variable: %q."
-	errBadRouteVar     string = "Route variable doesn't match: got %q, expected %q."
-	errMissingHost     string = "Route doesn't have a host."
-	errMissingPath     string = "Route doesn't have a path."
+	errMissingRouteVar  = "Missing route variable: %q."
+	errBadRouteVar      = "Route variable doesn't match: got %q, expected %q."
+	errMissingHost      = "Route doesn't have a host."
+	errMissingPath      = "Route doesn't have a path."
 	// Empty parameter errors.
-	errEmptyHost       string = "Host() requires a non-zero string, got %q."
-	errEmptyPath       string = "Path() requires a non-zero string that starts with a slash, got %q."
-	errEmptyPathPrefix string = "PathPrefix() requires a non-zero string that starts with a slash, got %q."
-	// Variadic errors.
-	errEmptyHeaders string = "Headers() requires at least a pair of parameters."
-	errEmptyMethods string = "Methods() requires at least one parameter."
-	errEmptyQueries string = "Queries() requires at least a pair of parameters."
-	errEmptySchemes string = "Schemes() requires at least one parameter."
-	errOddHeaders   string = "Headers() requires an even number of parameters, got %v."
-	errOddQueries   string = "Queries() requires an even number of parameters, got %v."
-	//errOddURLPairs  string = "URL() requires an even number of parameters, got %v."
-
-	errPairs = "Parameters must be multiple of 2, got %v"
+	errEmptyHost        = "Host() requires a non-zero string, got %q."
+	errEmptyPath        = "Path() requires a non-zero string that starts with a slash, got %q."
+	errEmptyPathPrefix  = "PathPrefix() requires a non-zero string that starts with a slash, got %q."
+	// Variadic pairs.
+	errPairs            = "Parameters must be multiple of 2, got %v"
 )
 
 // ----------------------------------------------------------------------------
@@ -213,7 +204,7 @@ type Route struct {
 	// Request handler for this route.
 	handler http.Handler
 	// List of matchers.
-	matchers []*routeMatcher
+	matchers []routeMatcher
 	// Special case matcher: parsed template for host matching.
 	hostTemplate *parsedTemplate
 	// Special case matcher: parsed template for path matching.
@@ -231,7 +222,7 @@ type Route struct {
 // newRoute returns a new Route instance.
 func newRoute() *Route {
 	return &Route{
-		matchers: make([]*routeMatcher, 0),
+		matchers: make([]routeMatcher, 0),
 	}
 }
 
@@ -290,7 +281,7 @@ func (r *Route) Match(req *http.Request) (*RouteMatch, bool) {
 	var match *RouteMatch
 	if r.matchers != nil {
 		for _, matcher := range r.matchers {
-			if rv, ok := (*matcher).Match(req); !ok {
+			if rv, ok := (matcher).Match(req); !ok {
 				return nil, false
 			} else if rv != nil {
 				match = rv
@@ -558,7 +549,7 @@ func (r *Route) RedirectSlash(value bool) *Route {
 
 // addMatcher adds a matcher to the array of route matchers.
 func (r *Route) addMatcher(m routeMatcher) *Route {
-	r.matchers = append(r.matchers, &m)
+	r.matchers = append(r.matchers, m)
 	return r
 }
 
@@ -574,6 +565,9 @@ func (r *Route) addMatcher(m routeMatcher) *Route {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Headers(pairs ...string) *Route {
+	if len(pairs) == 0 {
+		return r
+	}
 	headers, err := stringMapFromPairs(pairs...)
 	if err != nil {
 		r.err = append(r.err, err)
@@ -626,7 +620,6 @@ func (r *Route) Matcher(matcherFunc MatcherFunc) *Route {
 // "GET", "POST", "PUT".
 func (r *Route) Methods(methods ...string) *Route {
 	if len(methods) == 0 {
-		r.err = append(r.err, errors.New(errEmptyMethods))
 		return r
 	}
 	for k, v := range methods {
@@ -698,6 +691,9 @@ func (r *Route) PathPrefix(template string) *Route {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Queries(pairs ...string) *Route {
+	if len(pairs) == 0 {
+		return r
+	}
 	queries, err := stringMapFromPairs(pairs...)
 	if err != nil {
 		r.err = append(r.err, err)
@@ -712,7 +708,6 @@ func (r *Route) Queries(pairs ...string) *Route {
 // "http", "https".
 func (r *Route) Schemes(schemes ...string) *Route {
 	if len(schemes) == 0 {
-		r.err = append(r.err, errors.New(errEmptySchemes))
 		return r
 	}
 	for k, v := range schemes {
