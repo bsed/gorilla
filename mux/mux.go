@@ -19,6 +19,11 @@ import (
 
 // All error descriptions.
 const (
+	// Parameter.
+	errEmptyHost        = "Host() requires a non-zero string, got %q."
+	errEmptyPath        = "Path() requires a non-zero string that starts with a slash, got %q."
+	errEmptyPathPrefix  = "PathPrefix() requires a non-zero string that starts with a slash, got %q."
+	errPairs            = "Parameters must be multiple of 2, got %v"
 	// Template parsing.
 	errUnbalancedBraces = "Unbalanced curly braces in route template: %q."
 	errBadTemplatePart  = "Missing name or pattern in route template: %q."
@@ -28,12 +33,6 @@ const (
 	errBadRouteVar      = "Route variable doesn't match: got %q, expected %q."
 	errMissingHost      = "Route doesn't have a host."
 	errMissingPath      = "Route doesn't have a path."
-	// Empty parameter errors.
-	errEmptyHost        = "Host() requires a non-zero string, got %q."
-	errEmptyPath        = "Path() requires a non-zero string that starts with a slash, got %q."
-	errEmptyPathPrefix  = "PathPrefix() requires a non-zero string that starts with a slash, got %q."
-	// Variadic pairs.
-	errPairs            = "Parameters must be multiple of 2, got %v"
 )
 
 // ----------------------------------------------------------------------------
@@ -47,23 +46,28 @@ const (
    routeKey
 )
 
-// RouteVars stores the variables extracted from a URL.
-type RouteVars map[string]string
-
 // Vars returns the route variables for the current request, if any.
-func Vars(request *http.Request) RouteVars {
-	if rv := context.DefaultContext.Get(request, varsKey); rv != nil {
-		return rv.(RouteVars)
+func Vars(r *http.Request) map[string]string {
+	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
+		return rv.(map[string]string)
 	}
 	return nil
 }
 
 // CurrentRoute returns the matched route for the current request, if any.
-func CurrentRoute(request *http.Request) *Route {
-	if rv := context.DefaultContext.Get(request, routeKey); rv != nil {
+func CurrentRoute(r *http.Request) *Route {
+	if rv := context.DefaultContext.Get(r, routeKey); rv != nil {
 		return rv.(*Route)
 	}
 	return nil
+}
+
+func setVars(r *http.Request, val interface{}) {
+	context.DefaultContext.Set(r, varsKey, val)
+}
+
+func setCurrentRoute(r *http.Request, val interface{}) {
+	context.DefaultContext.Set(r, routeKey, val)
 }
 
 // ----------------------------------------------------------------------------
@@ -290,7 +294,7 @@ func (r *Route) Match(req *http.Request) (*RouteMatch, bool) {
 		}
 	}
 	// We have a match.
-	vars := make(RouteVars)
+	vars := make(map[string]string)
 	if hostMatches != nil {
 		for k, v := range r.hostTemplate.VarsN {
 			vars[v] = hostMatches[k+1]
@@ -307,8 +311,8 @@ func (r *Route) Match(req *http.Request) (*RouteMatch, bool) {
 	if redirectURL != "" {
 		match.Handler = http.RedirectHandler(redirectURL, 301)
 	}
-	context.DefaultContext.Set(req, varsKey, vars)
-	context.DefaultContext.Set(req, routeKey, match.Route)
+	setVars(req, vars)
+	setCurrentRoute(req, match.Route)
 	return match, true
 }
 
@@ -978,12 +982,10 @@ func stringMapFromPairs(pairs ...string) (map[string]string, error) {
 }
 
 // variableNames returns a copy of variable names for route templates.
-func variableNames(templates ...*parsedTemplate) *[]string {
-	names := make([]string, 0)
-	for _, t := range templates {
-		if t != nil && len(t.VarsN) != 0 {
-			names = append(names, t.VarsN...)
-		}
+func variableNames(tpl *parsedTemplate) *[]string {
+	var names []string
+	if tpl != nil {
+		names = tpl.VarsN
 	}
 	return &names
 }
@@ -1006,7 +1008,7 @@ func matchMap(toCheck map[string]string, toMatch map[string][]string,
 		if canonicalKey {
 			k = http.CanonicalHeaderKey(k)
 		}
-		if values, keyExists := toMatch[k]; !keyExists {
+		if values := toMatch[k]; values == nil {
 			return false
 		} else if v != "" {
 			// If value was defined as an empty string we only check that the
