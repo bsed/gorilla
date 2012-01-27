@@ -256,7 +256,7 @@ var headerMatcherTests = []headerMatcherTest{
 type hostMatcherTest struct {
 	matcher *Route
 	url     string
-	vars    RouteVars
+	vars    map[string]string
 	result  bool
 }
 
@@ -307,7 +307,7 @@ var methodMatcherTests = []methodMatcherTest{
 type pathMatcherTest struct {
 	matcher *Route
 	url     string
-	vars    RouteVars
+	vars    map[string]string
 	result  bool
 }
 
@@ -611,7 +611,8 @@ func TestSubRouting(t *testing.T) {
 
 func TestVariableNames(t *testing.T) {
 	route := newRoute().Host("{arg1}.domain.com").Path("/{arg2}/{arg3:[0-9]+}")
-	names := variableNames(route.hostTemplate, route.pathTemplate)
+	names := variableNames(route.hostTemplate)
+	*names = append(*names, *variableNames(route.pathTemplate)...)
 	if len(*names) != 3 {
 		t.Errorf("Expected %v variable names in %v.", len(*names), *names)
 	}
