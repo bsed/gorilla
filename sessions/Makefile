@@ -7,6 +7,6 @@ GOFILES=\
 	sessions.go\
 
 DEPS=\
-	gorilla.googlecode.com/hg/gorilla/context\
+	code.google.com/p/gorilla/context\
 
 include ${GOROOT}/src/Make.pkg

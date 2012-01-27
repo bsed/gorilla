@@ -8,12 +8,25 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/hmac"
+	"crypto/sha256"
+	"errors"
 	"fmt"
-	"http"
-	"os"
+	"net/http"
 	"testing"
 	"time"
 )
+
+func compareMaps(m1 map[string]interface{}, m2 map[string]interface{}) error {
+	if len(m1) != len(m2) {
+		return errors.New("different maps")
+	}
+	for k, v := range m1 {
+		if m2[k] != v {
+			return fmt.Errorf("Different value for key %v: expected %v, got %v", k, m2[k], v)
+		}
+	}
+	return nil
+}
 
 // ----------------------------------------------------------------------------
 // ResponseRecorder
@@ -49,7 +62,7 @@ func (rw *ResponseRecorder) Header() http.Header {
 }
 
 // Write always succeeds and writes to rw.Body, if not nil.
-func (rw *ResponseRecorder) Write(buf []byte) (int, os.Error) {
+func (rw *ResponseRecorder) Write(buf []byte) (int, error) {
 	if rw.Body != nil {
 		rw.Body.Write(buf)
 	}
@@ -103,7 +116,7 @@ func TestEncryption(t *testing.T) {
 	}
 
 	var encrypted, decrypted []byte
-	var err os.Error
+	var err error
 
 	for _, value := range testStringValues {
 		encrypted, err = encrypt(block, []byte(value))
@@ -139,9 +152,9 @@ func TestEncryptionBadBlock(t *testing.T) {
 
 func TestAuthentication(t *testing.T) {
 	// TODO test too old / too new timestamps
-	hash := hmac.NewSHA256([]byte("secret-key"))
+	hash := hmac.New(sha256.New, []byte("secret-key"))
 	key := "session-key"
-	timestamp := time.UTC().Seconds()
+	timestamp := time.Now().UTC().Unix()
 
 	for _, value := range testStringValues {
 		signed := createHmac(hash, key, []byte(value), timestamp)
@@ -174,7 +187,7 @@ func TestEncoder(t *testing.T) {
 		t.Error(err)
 	}
 	e1 := Encoder{
-		Hash:  hmac.NewSHA256([]byte("secret-key1")),
+		Hash:  hmac.New(sha256.New, []byte("secret-key1")),
 		Block: b,
 	}
 
@@ -183,7 +196,7 @@ func TestEncoder(t *testing.T) {
 		t.Error(err)
 	}
 	e2 := Encoder{
-		Hash:  hmac.NewSHA256([]byte("secret-key2")),
+		Hash:  hmac.New(sha256.New, []byte("secret-key2")),
 		Block: b,
 	}
 
@@ -208,7 +221,7 @@ func TestEncoder(t *testing.T) {
 			t.Errorf("%v: %v", err3, encoded)
 			count++
 		}
-		if fmt.Sprintf("%v", decoded) != fmt.Sprintf("%v", value) {
+		if err := compareMaps(decoded, value); err != nil {
 			t.Errorf("Expected %v, got %v.", value, decoded)
 		}
 		_, err4 := e2.Decode("sid", encoded)
@@ -225,7 +238,7 @@ func TestLoadSaveSession(t *testing.T) {
 	var req *http.Request
 	var rsp *ResponseRecorder
 	var hdr http.Header
-	var err os.Error
+	var err error
 	var err2 bool
 	var session SessionData
 	var cookies []string
@@ -306,9 +319,9 @@ func TestLoadSaveSession(t *testing.T) {
 				t.Errorf("Expected %v:%v; Got %v:%v", k, v, k, session[k])
 			}
 		}
-		session["a"] = nil, false
-		session["b"] = nil, false
-		session["c"] = nil, false
+		delete(session, "a")
+		delete(session, "b")
+		delete(session, "c")
 		session["d"] = "4"
 	} else {
 		t.Error(err)
@@ -361,7 +374,7 @@ func TestFlashes(t *testing.T) {
 	var req *http.Request
 	var rsp *ResponseRecorder
 	var hdr http.Header
-	var err os.Error
+	var err error
 	var ok, err2 bool
 	var cookies []string
 	var flashes []interface{}
@@ -442,7 +455,7 @@ func TestKeyRotation(t *testing.T) {
 	var req *http.Request
 	var rsp *ResponseRecorder
 	var hdr http.Header
-	var err os.Error
+	var err error
 	var err2 bool
 	var session SessionData
 	var cookies []string
@@ -511,15 +524,16 @@ func TestInvalidKey(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error.")
 	}
-	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
-	rsp = NewRecorder()
-	if session, err = Session(req); err != nil {
+	req, _ := http.NewRequest("GET", "http://localhost:8080/", nil)
+	rsp := NewRecorder()
+	if session, err := Session(req); err != nil {
 		t.Errorf("Error getting a session")
-	}
-	session["foo"] = "bar"
-	errs := sessions.Save(req, rsp)
-	if errs == nil {
-		t.Errorf("Expected error.")
+	} else {
+		session["foo"] = "bar"
+		errs := Save(req, rsp)
+		if errs == nil {
+			t.Errorf("Expected error.")
+		}
 	}
 }
 
