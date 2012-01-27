@@ -1,6 +1,6 @@
 include ${GOROOT}/src/Make.inc
 
-TARG=gorilla.googlecode.com/hg/gorilla/appengine/datastore
+TARG=code.google.com/p/gorilla/appengine/datastore
 
 GOFILES=\
 	datastore.go\

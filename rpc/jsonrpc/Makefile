@@ -1,6 +1,6 @@
 include ${GOROOT}/src/Make.inc
 
-TARG=gorilla.googlecode.com/hg/gorilla/rpc/jsonrpc
+TARG=code.google.com/p/gorilla/rpc/jsonrpc
 
 GOFILES=\
 	jsonrpc.go\

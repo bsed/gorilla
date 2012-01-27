@@ -1,6 +1,6 @@
 include ${GOROOT}/src/Make.inc
 
-TARG=gorilla.googlecode.com/hg/gorilla/schema
+TARG=code.google.com/p/gorilla/schema
 
 GOFILES=\
 	doc.go\
