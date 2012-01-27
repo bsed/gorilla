@@ -6,13 +6,14 @@ package sessions
 
 import (
 	"fmt"
-	"http"
-	"os"
+	"net/http"
 	"time"
+
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
-	"gorilla.googlecode.com/hg/gorilla/sessions"
+
+	"code.google.com/p/gorilla/sessions"
 )
 
 type baseSessionStore struct {
@@ -46,13 +47,13 @@ type DatastoreSessionStore struct {
 
 // Load loads a session for the given key.
 func (s *DatastoreSessionStore) Load(r *http.Request, key string,
-info *sessions.SessionInfo) {
+	info *sessions.SessionInfo) {
 	data := sessions.GetCookie(s, r, key)
 	if sidval, ok := data["sid"]; ok {
 		// Cleanup session data.
 		sid := sidval.(string)
 		for k, _ := range data {
-			data[k] = nil, false
+			delete(data, k)
 		}
 		// Get session from datastore and deserialize it.
 		c := appengine.NewContext(r)
@@ -67,7 +68,7 @@ info *sessions.SessionInfo) {
 
 // Save saves the session in the response.
 func (s *DatastoreSessionStore) Save(r *http.Request, w http.ResponseWriter,
-key string, info *sessions.SessionInfo) (flag bool, err os.Error) {
+	key string, info *sessions.SessionInfo) (flag bool, err error) {
 	sid, serialized, error := getIdAndData(info)
 	if error != nil {
 		err = error
@@ -78,7 +79,7 @@ key string, info *sessions.SessionInfo) (flag bool, err os.Error) {
 	c := appengine.NewContext(r)
 	entityKey := datastore.NewKey(c, "Session", sessionKey(sid), 0, nil)
 	_, err = datastore.Put(appengine.NewContext(r), entityKey, &Session{
-		Date:  datastore.SecondsToTime(time.Seconds()),
+		Date:  datastore.SecondsToTime(time.Now()),
 		Value: serialized,
 	})
 	if err != nil {
@@ -99,13 +100,13 @@ type MemcacheSessionStore struct {
 
 // Load loads a session for the given key.
 func (s *MemcacheSessionStore) Load(r *http.Request, key string,
-info *sessions.SessionInfo) {
+	info *sessions.SessionInfo) {
 	data := sessions.GetCookie(s, r, key)
 	if sidval, ok := data["sid"]; ok {
 		// Cleanup session data.
 		sid := sidval.(string)
 		for k, _ := range data {
-			data[k] = nil, false
+			delete(data, k)
 		}
 		// Get session from memcache and deserialize it.
 		c := appengine.NewContext(r)
@@ -118,7 +119,7 @@ info *sessions.SessionInfo) {
 
 // Save saves the session in the response.
 func (s *MemcacheSessionStore) Save(r *http.Request, w http.ResponseWriter,
-key string, info *sessions.SessionInfo) (flag bool, err os.Error) {
+	key string, info *sessions.SessionInfo) (flag bool, err error) {
 	sid, serialized, error := getIdAndData(info)
 	if error != nil {
 		err = error
@@ -142,7 +143,7 @@ func sessionKey(sid string) string {
 }
 
 // Create a new sid and serialize data.
-func getIdAndData(info *sessions.SessionInfo) (sid string, serialized []byte, err os.Error) {
+func getIdAndData(info *sessions.SessionInfo) (sid string, serialized []byte, err error) {
 	// Create a new session id.
 	sid, err = sessions.GenerateSessionId(128)
 	if err != nil {
