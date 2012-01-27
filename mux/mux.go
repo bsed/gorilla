@@ -39,6 +39,8 @@ const (
 // Context
 // ----------------------------------------------------------------------------
 
+type RouteVars map[string]string
+
 type contextKey int
 
 const (
@@ -47,9 +49,9 @@ const (
 )
 
 // Vars returns the route variables for the current request, if any.
-func Vars(r *http.Request) map[string]string {
+func Vars(r *http.Request) RouteVars {
 	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
-		return rv.(map[string]string)
+		return rv.(RouteVars)
 	}
 	return nil
 }
@@ -294,7 +296,7 @@ func (r *Route) Match(req *http.Request) (*RouteMatch, bool) {
 		}
 	}
 	// We have a match.
-	vars := make(map[string]string)
+	vars := make(RouteVars)
 	if hostMatches != nil {
 		for k, v := range r.hostTemplate.VarsN {
 			vars[v] = hostMatches[k+1]
