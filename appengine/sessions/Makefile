@@ -7,8 +7,8 @@ GOFILES=\
 	sessions.go\
 
 DEPS=\
-	../../../lib/proto\
-	../../../lib/appengine-go\
-	../../sessions\
+	code.google.com/p/goprotobuf/proto\
+	code.google.com/p/appengine-go/appengine\
+	code.google.com/p/gorilla/sessions\
 
 include ${GOROOT}/src/Make.pkg

@@ -396,7 +396,7 @@ func (r *Route) URLPath(pairs ...string) *url.URL {
 // All variable names defined in the route are required, and their values must
 // conform to the corresponding patterns, if any.
 //
-// In case of bad arguments it will return nil.
+// In case of bad arguments it will return an error.
 func (r *Route) URLDebug(pairs ...string) (*url.URL, error) {
 	var err error
 	var values map[string]string
@@ -427,7 +427,7 @@ func (r *Route) URLDebug(pairs ...string) (*url.URL, error) {
 //
 // The route must have a host defined.
 //
-// In case of bad arguments or missing host it will return nil.
+// In case of bad arguments or missing host it will return an error.
 func (r *Route) URLHostDebug(pairs ...string) (*url.URL, error) {
 	if r.hostTemplate == nil {
 		return nil, errors.New(errMissingHost)
@@ -451,7 +451,7 @@ func (r *Route) URLHostDebug(pairs ...string) (*url.URL, error) {
 //
 // The route must have a path defined.
 //
-// In case of bad arguments or missing path it will return nil.
+// In case of bad arguments or missing path it will return an error.
 func (r *Route) URLPathDebug(pairs ...string) (*url.URL, error) {
 	if r.pathTemplate == nil {
 		return nil, errors.New(errMissingPath)
