@@ -5,8 +5,8 @@
 package schema
 
 import (
+	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -69,21 +69,21 @@ func getTypeConverter(rt reflect.Type) TypeConv {
 // The same value can be validated more than once, so it can have multiple
 // errors.
 type ValueError struct {
-	err []os.Error
+	err []error
 }
 
-func (e *ValueError) Errors() []os.Error {
+func (e *ValueError) Errors() []error {
 	return e.err
 }
 
-func (e *ValueError) Add(err os.Error) {
+func (e *ValueError) Add(err error) {
 	if e.err == nil {
-		e.err = make([]os.Error, 0)
+		e.err = make([]error, 0)
 	}
 	e.err = append(e.err, err)
 }
 
-func (e *ValueError) String() string {
+func (e *ValueError) Error() string {
 	if e.err == nil {
 		return ""
 	}
@@ -98,14 +98,14 @@ func (e *ValueError) String() string {
 //
 // Global errors are stored using an empty string key.
 type SchemaError struct {
-	err map[string][]os.Error
+	err map[string][]error
 }
 
-func (e *SchemaError) Errors() map[string][]os.Error {
+func (e *SchemaError) Errors() map[string][]error {
 	return e.err
 }
 
-func (e *SchemaError) Error(key string) []os.Error {
+func (e *SchemaError) Err(key string) []error {
 	if e.err != nil {
 		if v, ok := e.err[key]; ok {
 			return v
@@ -114,14 +114,14 @@ func (e *SchemaError) Error(key string) []os.Error {
 	return nil
 }
 
-func (e *SchemaError) Add(err os.Error, key string, index int) {
+func (e *SchemaError) Add(err error, key string, index int) {
 	if e.err == nil {
-		e.err = make(map[string][]os.Error)
+		e.err = make(map[string][]error)
 	}
 
 	v1, ok := e.err[key]
 	if !ok || index+1 > cap(v1) {
-		newV := make([]os.Error, index+1)
+		newV := make([]error, index+1)
 		if ok {
 			copy(newV, v1)
 		}
@@ -138,7 +138,7 @@ func (e *SchemaError) Add(err os.Error, key string, index int) {
 	e.err[key] = v1
 }
 
-func (e *SchemaError) String() string {
+func (e *SchemaError) Error() string {
 	if e.err == nil {
 		return ""
 	}
@@ -158,17 +158,17 @@ func (e *SchemaError) String() string {
 // keys as "paths" in dotted notation.
 //
 // See the package documentation for a full explanation of the mechanics.
-func Load(i interface{}, data map[string][]string) os.Error {
+func Load(i interface{}, data map[string][]string) error {
 	return loadAndValidate(i, data, nil, nil)
 }
 
 // not public yet, but will be once filters and validators are implemented.
 func loadAndValidate(i interface{}, data map[string][]string,
-filters map[string]string, validators map[string]string) os.Error {
+	filters map[string]string, validators map[string]string) error {
 	err := &SchemaError{}
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
-		err.Add(os.NewError("Interface must be a pointer to struct."), "", 0)
+		err.Add(errors.New("Interface must be a pointer to struct."), "", 0)
 	} else {
 		rv := val.Elem()
 		for path, values := range data {
@@ -176,7 +176,7 @@ filters map[string]string, validators map[string]string) os.Error {
 			loadValue(rv, values, parts, path, err)
 		}
 	}
-	if err.String() == "" {
+	if err.Error() == "" {
 		return nil
 	}
 	return err
@@ -198,7 +198,7 @@ filters map[string]string, validators map[string]string) os.Error {
 //
 // - se is the SchemaError instance to save errors.
 func loadValue(rv reflect.Value, values, parts []string, key string,
-se *SchemaError) {
+	se *SchemaError) {
 	spec, err := defaultStructMap.getOrLoad(rv.Type())
 	if err != nil {
 		// Struct spec could not be loaded.
@@ -305,64 +305,64 @@ se *SchemaError) {
 }
 
 // coerce coerces basic types from a string to a reflect.Value of a given kind.
-func coerce(kind reflect.Kind, value string) (rv reflect.Value, err os.Error) {
+func coerce(kind reflect.Kind, value string) (rv reflect.Value, err error) {
 	switch kind {
 	case reflect.Bool:
 		var v bool
-		v, err = strconv.Atob(value)
+		v, err = strconv.ParseBool(value)
 		rv = reflect.ValueOf(v)
 	case reflect.Float32:
-		var v float32
-		v, err = strconv.Atof32(value)
-		rv = reflect.ValueOf(v)
+		var v float64
+		v, err = strconv.ParseFloat(value, 32)
+		rv = reflect.ValueOf(float32(v))
 	case reflect.Float64:
 		var v float64
-		v, err = strconv.Atof64(value)
-		rv = reflect.ValueOf(v)
+		v, err = strconv.ParseFloat(value, 64)
+		rv = reflect.ValueOf(float64(v))
 	case reflect.Int:
-		var v int
-		v, err = strconv.Atoi(value)
-		rv = reflect.ValueOf(v)
+		var v int64
+		v, err = strconv.ParseInt(value, 10, 0)
+		rv = reflect.ValueOf(int(v))
 	case reflect.Int8:
-		var v int
-		v, err = strconv.Atoi(value)
+		var v int64
+		v, err = strconv.ParseInt(value, 10, 8)
 		rv = reflect.ValueOf(int8(v))
 	case reflect.Int16:
-		var v int
-		v, err = strconv.Atoi(value)
+		var v int64
+		v, err = strconv.ParseInt(value, 10, 16)
 		rv = reflect.ValueOf(int16(v))
 	case reflect.Int32:
-		var v int
-		v, err = strconv.Atoi(value)
+		var v int64
+		v, err = strconv.ParseInt(value, 10, 32)
 		rv = reflect.ValueOf(int32(v))
 	case reflect.Int64:
 		var v int64
-		v, err = strconv.Atoi64(value)
+		v, err = strconv.ParseInt(value, 10, 64)
 		rv = reflect.ValueOf(v)
 	case reflect.String:
 		rv = reflect.ValueOf(value)
 	case reflect.Uint:
-		var v uint
-		v, err = strconv.Atoui(value)
-		rv = reflect.ValueOf(v)
+		var v uint64
+		v, err = strconv.ParseUint(value, 10, 0)
+		rv = reflect.ValueOf(uint(v))
 	case reflect.Uint8:
-		var v uint
-		v, err = strconv.Atoui(value)
+		var v uint64
+		v, err = strconv.ParseUint(value, 10, 8)
 		rv = reflect.ValueOf(uint8(v))
 	case reflect.Uint16:
-		var v uint
-		v, err = strconv.Atoui(value)
+		var v uint64
+		v, err = strconv.ParseUint(value, 10, 16)
 		rv = reflect.ValueOf(uint16(v))
 	case reflect.Uint32:
-		var v uint
-		v, err = strconv.Atoui(value)
+		var v uint64
+		v, err = strconv.ParseUint(value, 10, 32)
 		rv = reflect.ValueOf(uint32(v))
 	case reflect.Uint64:
 		var v uint64
-		v, err = strconv.Atoui64(value)
+		v, err = strconv.ParseUint(value, 10, 64)
 		rv = reflect.ValueOf(v)
 	default:
-		err = os.NewError("Unsupported type.")
+		err = errors.New("Unsupported type.")
 	}
 	return
 }
@@ -403,7 +403,7 @@ func (m *structMap) getByType(t reflect.Type) (spec *structSpec) {
 //
 // It returns nil if the passed type is not a struct.
 func (m *structMap) getOrLoad(t reflect.Type) (spec *structSpec,
-err os.Error) {
+	err error) {
 	if spec = m.getByType(t); spec != nil {
 		return spec, nil
 	}
@@ -414,7 +414,7 @@ err os.Error) {
 	if spec, err = m.load(t, &loaded); err != nil {
 		// Roll back loaded structs.
 		for _, v := range loaded {
-			m.specs[v] = nil, false
+			delete(m.specs, v)
 		}
 		return
 	}
@@ -430,15 +430,15 @@ err os.Error) {
 //
 // The loaded argument is the list of keys to roll back in case of error.
 func (m *structMap) load(t reflect.Type, loaded *[]string) (spec *structSpec,
-err os.Error) {
+	err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = r.(os.Error)
+			err = r.(error)
 		}
 	}()
 
 	if t.Kind() != reflect.Struct {
-		return nil, os.NewError("Not a struct.")
+		return nil, errors.New("Not a struct.")
 	}
 
 	structId := getTypeId(t)
@@ -484,7 +484,7 @@ err os.Error) {
 		// The name must be unique for the struct.
 		for _, uniqueName := range uniqueNames {
 			if name == uniqueName {
-				return nil, os.NewError("Field names and name tags in a " +
+				return nil, errors.New("Field names and name tags in a " +
 					"struct must be unique.")
 			}
 		}
