@@ -7,7 +7,6 @@ package json
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"code.google.com/p/gorilla/rpc"
@@ -56,18 +55,8 @@ type Codec struct {
 }
 
 // NewRequest returns a CodecRequest.
-func (c *Codec)	NewRequest(w http.ResponseWriter, r *http.Request,
-	s *rpc.Server) (rpc.CodecRequest, error) {
-	// Decode the request body and check if RPC method is valid.
-	defer r.Body.Close()
-	req := new(serverRequest)
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		return nil, err
-	}
-	if !s.HasMethod(req.Method) {
-		return nil, fmt.Errorf("rpc: unrecognized method %q", req.Method)
-	}
-	return &CodecRequest{w: w, r: r, request: req}, nil
+func (c *Codec)	NewRequest() rpc.CodecRequest {
+	return new(CodecRequest)
 }
 
 // ----------------------------------------------------------------------------
@@ -76,23 +65,29 @@ func (c *Codec)	NewRequest(w http.ResponseWriter, r *http.Request,
 
 // CodecRequest decodes and encodes a single request.
 type CodecRequest struct {
-	w       http.ResponseWriter
-	r       *http.Request
+	server  *rpc.Server
 	request *serverRequest
+	err     error
 }
 
 // Method returns the RPC method for the current request.
 //
 // The method uses a dotted notation as in "Service.Method".
-func (c *CodecRequest) Method() string {
-	return c.request.Method
+func (c *CodecRequest) Method(r *http.Request) (string, error) {
+	if err := c.createServerRequest(r); err != nil {
+		return "", err
+	}
+	return c.request.Method, nil
 }
 
 // ReadRequest fills the request object for the RPC method.
-func (c *CodecRequest) ReadRequest(req interface{}) error {
+func (c *CodecRequest) ReadRequest(r *http.Request, args interface{}) error {
+	if err := c.createServerRequest(r); err != nil {
+		return err
+	}
 	// JSON params is array value. RPC params is struct.
 	// Unmarshal into array containing the request struct.
-	params := [1]interface{}{req}
+	params := [1]interface{}{args}
 	return json.Unmarshal(*c.request.Params, &params)
 }
 
@@ -100,24 +95,41 @@ func (c *CodecRequest) ReadRequest(req interface{}) error {
 //
 // The err parameter is the error resulted from calling the RPC method,
 // or nil if there was no error.
-func (c *CodecRequest) WriteResponse(res interface{}, err error) error {
-	response := &serverResponse{
-		Result: res,
-		Error:  err,
+func (c *CodecRequest) WriteResponse(w http.ResponseWriter, reply interface{}, methodErr error) error {
+	res := &serverResponse{
+		Result: reply,
+		Error:  methodErr,
 		Id:     c.request.Id,
 	}
-	if err != nil {
+	if methodErr != nil {
 		// Result must be null if there was an error invoking the method.
 		// http://json-rpc.org/wiki/specification#a1.2Response
-		response.Result = &null
+		res.Result = &null
 	}
 	if c.request.Id == nil {
 		// Id is null for notifications and they don't have a response.
-		response.Id = &null
+		res.Id = &null
 	} else {
-		c.w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		encoder := json.NewEncoder(c.w)
-		encoder.Encode(response)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		encoder := json.NewEncoder(w)
+		encoder.Encode(res)
+	}
+	return nil
+}
+
+// createServerRequest pre-process the request
+func (c *CodecRequest) createServerRequest(r *http.Request) error {
+	// Decode the request body and check if RPC method is valid.
+	if c.err != nil {
+		return c.err
+	}
+	if c.request == nil {
+		defer r.Body.Close()
+		req := new(serverRequest)
+		if c.err = json.NewDecoder(r.Body).Decode(req); c.err != nil {
+			return c.err
+		}
+		c.request = req
 	}
 	return nil
 }

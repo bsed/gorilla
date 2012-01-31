@@ -18,15 +18,19 @@ import (
 
 // Codec creates a CodecRequest to process each request.
 type Codec interface {
-	NewRequest(http.ResponseWriter, *http.Request, *Server) (CodecRequest, error)
+	NewRequest() CodecRequest
 }
 
 // CodecRequest decodes a request and encodes a response using a specific
 // serialization scheme.
 type CodecRequest interface {
-	Method() string
-	ReadRequest(interface{}) error
-	WriteResponse(interface{}, error) error
+	// Reads request and returns the RPC method name.
+	Method(*http.Request) (string, error)
+	// Reads request filling the RPC method args.
+	ReadRequest(*http.Request, interface{}) error
+	// Writes response using the RPC method reply. The error parameter is
+	// the error returned by the method call, if any.
+	WriteResponse(http.ResponseWriter, interface{}, error) error
 }
 
 // ----------------------------------------------------------------------------
@@ -98,21 +102,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a new codec request.
-	codecReq, errRequest := codec.NewRequest(w, r, s)
-	if errRequest != nil {
-		writeError(w, 400, errRequest.Error())
-		return
-	}
+	codecReq := codec.NewRequest()
 	// Get service method to be called.
-	serviceSpec, methodSpec, errMethod := s.services.get(codecReq.Method())
+	method, errMethod := codecReq.Method(r)
 	if errMethod != nil {
 		writeError(w, 400, errMethod.Error())
 		return
 	}
+	serviceSpec, methodSpec, errGet := s.services.get(method)
+	if errGet != nil {
+		writeError(w, 400, errGet.Error())
+		return
+	}
 	// Decode the args.
 	args := reflect.New(methodSpec.argsType)
-	if err := codecReq.ReadRequest(args.Interface()); err != nil {
-		writeError(w, 400, err.Error())
+	if errRead := codecReq.ReadRequest(r, args.Interface()); errRead != nil {
+		writeError(w, 400, errRead.Error())
 		return
 	}
 	// Call the service method.
@@ -133,8 +138,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// from the declared content-type
 	w.Header().Set("x-content-type-options", "nosniff")
 	// Encode the response.
-	if err := codecReq.WriteResponse(reply.Interface(), errResult); err != nil {
-		writeError(w, 400, err.Error())
+	if errWrite := codecReq.WriteResponse(w, reply.Interface(), errResult); errWrite != nil {
+		writeError(w, 400, errWrite.Error())
 	}
 }
 
