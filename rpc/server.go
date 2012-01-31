@@ -116,12 +116,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Call the service method.
-	res := reflect.New(methodSpec.replyType)
+	reply := reflect.New(methodSpec.replyType)
 	errValue := methodSpec.method.Func.Call([]reflect.Value{
 		serviceSpec.rcvr,
 		reflect.ValueOf(r),
 		args,
-		res,
+		reply,
 	})
 	// Cast the result to error if needed.
 	var errResult error
@@ -133,7 +133,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// from the declared content-type
 	w.Header().Set("x-content-type-options", "nosniff")
 	// Encode the response.
-	if err := codecReq.WriteResponse(w, res.Interface(), errResult); err != nil {
+	if err := codecReq.WriteResponse(w, reply.Interface(), errResult); err != nil {
 		writeError(w, 400, err.Error())
 	}
 }
