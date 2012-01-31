@@ -58,15 +58,6 @@ type Codec struct {
 // NewRequest returns a CodecRequest.
 func (c *Codec)	NewRequest(w http.ResponseWriter, r *http.Request,
 	s *rpc.Server) (rpc.CodecRequest, error) {
-	return newCodecRequest(w, r, s)
-}
-
-// ----------------------------------------------------------------------------
-// CodecRequest
-// ----------------------------------------------------------------------------
-
-func newCodecRequest(w http.ResponseWriter, r *http.Request,
-	s *rpc.Server) (rpc.CodecRequest, error) {
 	// Decode the request body and check if RPC method is valid.
 	defer r.Body.Close()
 	req := new(serverRequest)
@@ -78,6 +69,10 @@ func newCodecRequest(w http.ResponseWriter, r *http.Request,
 	}
 	return &CodecRequest{w: w, r: r, request: req}, nil
 }
+
+// ----------------------------------------------------------------------------
+// CodecRequest
+// ----------------------------------------------------------------------------
 
 // CodecRequest decodes and encodes a single request.
 type CodecRequest struct {
