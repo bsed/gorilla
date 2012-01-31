@@ -1,16 +1,16 @@
 // Copyright 2009 The Go Authors. All rights reserved.
-// Copyright 2011 Gorilla Authors. All rights reserved.
+// Copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package jsonrpc
+package json
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
-	"strings"
 	"testing"
+
+	"code.google.com/p/gorilla/rpc"
 )
 
 // ResponseRecorder is an implementation of http.ResponseWriter that
@@ -62,50 +62,45 @@ func (rw *ResponseRecorder) Flush() {
 
 // ----------------------------------------------------------------------------
 
-type ArithArgs struct {
-	A, B int
+type Service1Request struct {
+	A int
+	B int
 }
 
-type Arith int
+type Service1Response struct {
+	Result int
+}
 
-func (t *Arith) Multiply(r *http.Request, args ArithArgs, reply *int) error {
-	*reply = args.A * args.B
+type Service1 struct {
+}
+
+func (t *Service1) Multiply(r *http.Request, req *Service1Request, res *Service1Response) error {
+	res.Result = req.A * req.B
 	return nil
 }
 
-func TestRegister(t *testing.T) {
-	arith := new(Arith)
+func TestService(t *testing.T) {
+	s := rpc.NewServer()
+	s.RegisterCodec(NewCodec(), "application/json")
+	s.RegisterService(new(Service1), "")
 
-	s := new(Server)
-	s.Register(arith)
-	_, _, err := s.Map.Get("Arith.Multiply")
-	if err != nil {
-		t.Errorf("Expected to be registered: Arith.Multiply")
+	if !s.HasMethod("Service1.Multiply") {
+		t.Errorf("Expected to be registered: Service1.Multiply")
+		return
 	}
 
-	s = new(Server)
-	s.RegisterName("Foo", arith)
-	_, _, err = s.Map.Get("Foo.Multiply")
-	if err != nil {
-		t.Errorf("Expected to be registered: Foo.Multiply")
-	}
-}
-
-func TestServe(t *testing.T) {
-	arith := new(Arith)
-	s := new(Server)
-	s.Register(arith)
-
-	w := NewRecorder()
-	body := strings.NewReader(`{"method":"Arith.Multiply", "id":"anything", "params":[{"A":4, "B":2}]}`)
+	buf, _ := EncodeClientRequest("Service1.Multiply", &Service1Request{4, 2})
+	body := bytes.NewBuffer(buf)
 	r, _ := http.NewRequest("POST", "http://localhost:8080/", body)
 	r.Header.Set("Content-Type", "application/json")
+
+	w := NewRecorder()
 	s.ServeHTTP(w, r)
 
-	response := new(JsonResponse)
-	decoder := json.NewDecoder(w.Body)
-	decoder.Decode(response)
-	if response.Result != float64(8) {
-		t.Errorf("Wrong response: %v.", response.Result)
+	var res Service1Response
+	DecodeClientResponse(w.Body, &res)
+
+	if res.Result != 8 {
+		t.Errorf("Wrong response: %v.", res.Result)
 	}
 }
