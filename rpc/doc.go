@@ -63,7 +63,7 @@ The service must be exported (begin with an upper case letter) or local
 (defined in the package registering the service).
 
 When a service is registered, the server inspects the service methods
-to available the ones that follow these rules:
+and make available the ones that follow these rules:
 
 	- The method name is exported.
 	- The method has three arguments: *http.Request, *args, *reply.
