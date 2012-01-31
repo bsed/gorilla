@@ -55,17 +55,25 @@ type Codec struct {
 }
 
 // NewRequest returns a CodecRequest.
-func (c *Codec)	NewRequest() rpc.CodecRequest {
-	return new(CodecRequest)
+func (c *Codec)	NewRequest(r *http.Request) rpc.CodecRequest {
+	return newCodecRequest(r)
 }
 
 // ----------------------------------------------------------------------------
 // CodecRequest
 // ----------------------------------------------------------------------------
 
+// newCodecRequest returns a new CodecRequest.
+func newCodecRequest(r *http.Request) rpc.CodecRequest {
+	// Decode the request body and check if RPC method is valid.
+	req := new(serverRequest)
+	err := json.NewDecoder(r.Body).Decode(req)
+	r.Body.Close()
+	return &CodecRequest{request: req, err: err}
+}
+
 // CodecRequest decodes and encodes a single request.
 type CodecRequest struct {
-	server  *rpc.Server
 	request *serverRequest
 	err     error
 }
@@ -73,17 +81,17 @@ type CodecRequest struct {
 // Method returns the RPC method for the current request.
 //
 // The method uses a dotted notation as in "Service.Method".
-func (c *CodecRequest) Method(r *http.Request) (string, error) {
-	if err := c.createServerRequest(r); err != nil {
-		return "", err
+func (c *CodecRequest) Method() (string, error) {
+	if c.err != nil {
+		return "", c.err
 	}
 	return c.request.Method, nil
 }
 
 // ReadRequest fills the request object for the RPC method.
-func (c *CodecRequest) ReadRequest(r *http.Request, args interface{}) error {
-	if err := c.createServerRequest(r); err != nil {
-		return err
+func (c *CodecRequest) ReadRequest(args interface{}) error {
+	if c.err != nil {
+		return c.err
 	}
 	// JSON params is array value. RPC params is struct.
 	// Unmarshal into array containing the request struct.
@@ -113,23 +121,6 @@ func (c *CodecRequest) WriteResponse(w http.ResponseWriter, reply interface{}, m
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		encoder := json.NewEncoder(w)
 		encoder.Encode(res)
-	}
-	return nil
-}
-
-// createServerRequest pre-process the request
-func (c *CodecRequest) createServerRequest(r *http.Request) error {
-	// Decode the request body and check if RPC method is valid.
-	if c.err != nil {
-		return c.err
-	}
-	if c.request == nil {
-		defer r.Body.Close()
-		req := new(serverRequest)
-		if c.err = json.NewDecoder(r.Body).Decode(req); c.err != nil {
-			return c.err
-		}
-		c.request = req
 	}
 	return nil
 }
