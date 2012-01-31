@@ -73,8 +73,7 @@ to available the ones that follow these rules:
 
 All other methods are ignored.
 
-Gorilla provides packages with common codecs for RPC. Check out their
-documentation:
+Gorilla has packages with common RPC codecs. Check out their documentation:
 
 	JSON: http://gorilla-web.appspot.com/pkg/gorilla/rpc/json
 */
