@@ -58,6 +58,15 @@ type Codec struct {
 // NewRequest returns a CodecRequest.
 func (c *Codec)	NewRequest(w http.ResponseWriter, r *http.Request,
 	s *rpc.Server) (rpc.CodecRequest, error) {
+	return newCodecRequest(w, r, s)
+}
+
+// ----------------------------------------------------------------------------
+// CodecRequest
+// ----------------------------------------------------------------------------
+
+func newCodecRequest(w http.ResponseWriter, r *http.Request,
+	s *rpc.Server) (rpc.CodecRequest, error) {
 	// Decode the request body and check if RPC method is valid.
 	defer r.Body.Close()
 	req := new(serverRequest)
@@ -67,15 +76,13 @@ func (c *Codec)	NewRequest(w http.ResponseWriter, r *http.Request,
 	if !s.HasMethod(req.Method) {
 		return nil, fmt.Errorf("rpc: unrecognized method %q", req.Method)
 	}
-	return &CodecRequest{req}, nil
+	return &CodecRequest{w: w, r: r, request: req}, nil
 }
-
-// ----------------------------------------------------------------------------
-// CodecRequest
-// ----------------------------------------------------------------------------
 
 // CodecRequest decodes and encodes a single request.
 type CodecRequest struct {
+	w       http.ResponseWriter
+	r       *http.Request
 	request *serverRequest
 }
 
@@ -87,7 +94,7 @@ func (c *CodecRequest) Method() string {
 }
 
 // ReadRequest fills the request object for the RPC method.
-func (c *CodecRequest) ReadRequest(r *http.Request, req interface{}) error {
+func (c *CodecRequest) ReadRequest(req interface{}) error {
 	// JSON params is array value. RPC params is struct.
 	// Unmarshal into array containing the request struct.
 	params := [1]interface{}{req}
@@ -98,7 +105,7 @@ func (c *CodecRequest) ReadRequest(r *http.Request, req interface{}) error {
 //
 // The err parameter is the error resulted from calling the RPC method,
 // or nil if there was no error.
-func (c *CodecRequest) WriteResponse(w http.ResponseWriter, res interface{}, err error) error {
+func (c *CodecRequest) WriteResponse(res interface{}, err error) error {
 	response := &serverResponse{
 		Result: res,
 		Error:  err,
@@ -113,8 +120,8 @@ func (c *CodecRequest) WriteResponse(w http.ResponseWriter, res interface{}, err
 		// Id is null for notifications and they don't have a response.
 		response.Id = &null
 	} else {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		encoder := json.NewEncoder(w)
+		c.w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		encoder := json.NewEncoder(c.w)
 		encoder.Encode(response)
 	}
 	return nil

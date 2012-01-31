@@ -25,8 +25,8 @@ type Codec interface {
 // serialization scheme.
 type CodecRequest interface {
 	Method() string
-	ReadRequest(*http.Request, interface{}) error
-	WriteResponse(http.ResponseWriter, interface{}, error) error
+	ReadRequest(interface{}) error
+	WriteResponse(interface{}, error) error
 }
 
 // ----------------------------------------------------------------------------
@@ -111,7 +111,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Decode the args.
 	args := reflect.New(methodSpec.argsType)
-	if err := codecReq.ReadRequest(r, args.Interface()); err != nil {
+	if err := codecReq.ReadRequest(args.Interface()); err != nil {
 		writeError(w, 400, err.Error())
 		return
 	}
@@ -133,7 +133,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// from the declared content-type
 	w.Header().Set("x-content-type-options", "nosniff")
 	// Encode the response.
-	if err := codecReq.WriteResponse(w, reply.Interface(), errResult); err != nil {
+	if err := codecReq.WriteResponse(reply.Interface(), errResult); err != nil {
 		writeError(w, 400, err.Error())
 	}
 }
