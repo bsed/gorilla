@@ -18,16 +18,16 @@ import (
 
 // Codec creates a CodecRequest to process each request.
 type Codec interface {
-	NewRequest() CodecRequest
+	NewRequest(*http.Request) CodecRequest
 }
 
 // CodecRequest decodes a request and encodes a response using a specific
 // serialization scheme.
 type CodecRequest interface {
 	// Reads request and returns the RPC method name.
-	Method(*http.Request) (string, error)
+	Method() (string, error)
 	// Reads request filling the RPC method args.
-	ReadRequest(*http.Request, interface{}) error
+	ReadRequest(interface{}) error
 	// Writes response using the RPC method reply. The error parameter is
 	// the error returned by the method call, if any.
 	WriteResponse(http.ResponseWriter, interface{}, error) error
@@ -102,9 +102,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a new codec request.
-	codecReq := codec.NewRequest()
+	codecReq := codec.NewRequest(r)
 	// Get service method to be called.
-	method, errMethod := codecReq.Method(r)
+	method, errMethod := codecReq.Method()
 	if errMethod != nil {
 		writeError(w, 400, errMethod.Error())
 		return
@@ -116,7 +116,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Decode the args.
 	args := reflect.New(methodSpec.argsType)
-	if errRead := codecReq.ReadRequest(r, args.Interface()); errRead != nil {
+	if errRead := codecReq.ReadRequest(args.Interface()); errRead != nil {
 		writeError(w, 400, errRead.Error())
 		return
 	}
