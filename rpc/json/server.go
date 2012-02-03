@@ -82,21 +82,21 @@ type CodecRequest struct {
 //
 // The method uses a dotted notation as in "Service.Method".
 func (c *CodecRequest) Method() (string, error) {
-	if c.err != nil {
-		return "", c.err
+	if c.err == nil {
+		return c.request.Method, nil
 	}
-	return c.request.Method, nil
+	return "", c.err
 }
 
 // ReadRequest fills the request object for the RPC method.
 func (c *CodecRequest) ReadRequest(args interface{}) error {
-	if c.err != nil {
-		return c.err
+	if c.err == nil {
+		// JSON params is array value. RPC params is struct.
+		// Unmarshal into array containing the request struct.
+		params := [1]interface{}{args}
+		c.err = json.Unmarshal(*c.request.Params, &params)
 	}
-	// JSON params is array value. RPC params is struct.
-	// Unmarshal into array containing the request struct.
-	params := [1]interface{}{args}
-	return json.Unmarshal(*c.request.Params, &params)
+	return c.err
 }
 
 // WriteResponse encodes the response and writes it to the ResponseWriter.
@@ -104,6 +104,9 @@ func (c *CodecRequest) ReadRequest(args interface{}) error {
 // The err parameter is the error resulted from calling the RPC method,
 // or nil if there was no error.
 func (c *CodecRequest) WriteResponse(w http.ResponseWriter, reply interface{}, methodErr error) error {
+	if c.err != nil {
+		return c.err
+	}
 	res := &serverResponse{
 		Result: reply,
 		Error:  methodErr,
