@@ -276,6 +276,27 @@ func TestSubRouter(t *testing.T) {
 	//route = subrouter.NewRoute().Path("/{v2:[0-9]+}/{v3:[0-9]+}")
 }
 
+func TestNamedRoutes(t *testing.T) {
+	r1 := new(Router)
+	r1.NewRoute().Name("a")
+	r1.NewRoute().Name("b")
+	r1.NewRoute().Name("c")
+
+	r2 := r1.NewRoute().Subrouter()
+	r2.NewRoute().Name("d")
+	r2.NewRoute().Name("e")
+	r2.NewRoute().Name("f")
+
+	r3 := r2.NewRoute().Subrouter()
+	r3.NewRoute().Name("g")
+	r3.NewRoute().Name("h")
+	r3.NewRoute().Name("i")
+
+	if r1.namedRoutes == nil || len(r1.namedRoutes) != 9 {
+		t.Errorf("Expected 9 named routes, got %v", r1.namedRoutes)
+	}
+}
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
@@ -295,10 +316,8 @@ func getRouteTemplate(route *Route) string {
 
 func testRoute(t *testing.T, id int, shouldMatch bool, route *Route,
 	request *http.Request, vars map[string]string, host, path, url string) {
-	router := new(Router)
-	router.AddRoute(route)
 	var match RouteMatch
-	ok := router.Match(request, &match)
+	ok := route.Match(request, &match)
 	if ok != shouldMatch {
 		msg := "Should match"
 		if !shouldMatch {

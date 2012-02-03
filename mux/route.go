@@ -6,23 +6,17 @@ package mux
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
-// RouteMatch stores information about a matched route.
-type RouteMatch struct {
-	Route   *Route
-	Handler http.Handler
-	Vars    map[string]string
-}
-
-// Route stores information to match a request.
+// Route stores information to match a request and build URLs.
 type Route struct {
-	// Reference to the router.
+	// Reference to the router where the route was registered.
 	router      *Router
-	// Request handler for this route.
+	// Request handler for the route.
 	handler     http.Handler
 	// List of matchers.
 	matchers    []matcher
@@ -31,18 +25,18 @@ type Route struct {
 	// If true, when the path pattern is "/path/", accessing "/path" will
 	// redirect to the former and vice-versa.
 	strictSlash bool
-	// The name associated with this route.
+	// The name used to build URLs.
 	name        string
 	// Error resulted from building a route.
 	err         error
 }
 
-// match matches this route against the request.
+// Match matches the route against the request.
 func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	return r.match(req, match)
 }
 
-// match matches this route against the request.
+// match matches the route against the request.
 func (r *Route) match(req *http.Request, match *RouteMatch) bool {
 	// Match everything.
 	for _, m := range r.matchers {
@@ -67,12 +61,16 @@ func (r *Route) match(req *http.Request, match *RouteMatch) bool {
 	return true
 }
 
-// Err returns an error resulted from building the route, or nil.
-func (r *Route) Err() error {
+// ----------------------------------------------------------------------------
+// Route attributes
+// ----------------------------------------------------------------------------
+
+// GetError returns an error resulted from building the route, if any.
+func (r *Route) GetError() error {
 	return r.err
 }
 
-// Route predicates -----------------------------------------------------------
+// Handler --------------------------------------------------------------------
 
 // Handler sets a handler for the route.
 func (r *Route) Handler(handler http.Handler) *Route {
@@ -81,52 +79,38 @@ func (r *Route) Handler(handler http.Handler) *Route {
 }
 
 // HandlerFunc sets a handler function for the route.
-func (r *Route) HandlerFunc(handler func(http.ResponseWriter,
-	*http.Request)) *Route {
-	return r.Handler(http.HandlerFunc(handler))
+func (r *Route) HandlerFunc(f func(http.ResponseWriter,	*http.Request)) *Route {
+	r.handler = http.HandlerFunc(f)
+	return r
 }
 
-// Handle sets a path and handler for the route.
-func (r *Route) Handle(path string, handler http.Handler) *Route {
-	return r.Path(path).Handler(handler)
+// GetHandler returns the handler for the route, if any.
+func (r *Route) GetHandler() http.Handler {
+	return r.handler
 }
 
-// HandleFunc sets a path and handler function for the route.
-func (r *Route) HandleFunc(path string, handler func(http.ResponseWriter,
-	*http.Request)) *Route {
-	return r.Path(path).Handler(http.HandlerFunc(handler))
-}
+// Name -----------------------------------------------------------------------
 
-// Name sets the route name, used to build URLs.
-//
-// A name must be unique for a router. If the name was registered already
-// it will be overwritten.
+// Name sets the name for the route, used to build URLs.
+// If the name was registered already it will be overwritten.
 func (r *Route) Name(name string) *Route {
+	if r.name != "" {
+		r.err = fmt.Errorf("mux: route already has name %q, can't set %q",
+			r.name, name)
+		return r
+	}
 	if r.router == nil {
 		// During tests router is not always set.
 		r.router = new(Router)
 	}
-	router := r.router.getRoot()
-	if router.NamedRoutes == nil {
-		router.NamedRoutes = make(map[string]*Route)
-	}
 	r.name = name
-	router.NamedRoutes[name] = r
+	r.router.getNamedRoutes()[name] = r
 	return r
 }
 
-// GetName returns the name associated with a route, if any.
+// GetName returns the name for the route, if any.
 func (r *Route) GetName() string {
 	return r.name
-}
-
-// RedirectSlash defines the strictSlash behavior for this route.
-//
-// When true, if the route path is /path/, accessing /path will redirect to
-// /path/, and vice versa.
-func (r *Route) RedirectSlash(value bool) *Route {
-	r.strictSlash = value
-	return r
 }
 
 // ----------------------------------------------------------------------------
@@ -181,13 +165,12 @@ func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchMap(m, r.Header, true)
 }
 
-// Headers adds a matcher to match the request against header values.
-//
+// Headers adds a matcher for header values.
 // It accepts a sequence of key/value pairs to be matched. For example:
 //
 //     r := new(mux.Router)
-//     r.NewRoute().Headers("Content-Type", "application/json",
-//                          "X-Requested-With", "XMLHttpRequest")
+//     r.Headers("Content-Type", "application/json",
+//               "X-Requested-With", "XMLHttpRequest")
 //
 // The above route will only match if both request header values match.
 //
@@ -206,8 +189,7 @@ func (r *Route) Headers(pairs ...string) *Route {
 
 // Host -----------------------------------------------------------------------
 
-// Host adds a matcher to match the request against the URL host.
-//
+// Host adds a matcher for the URL host.
 // It accepts a template with zero or more URL variables enclosed by {}.
 // Variables can define an optional regexp pattern to me matched:
 //
@@ -254,8 +236,7 @@ func (m methodMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchInArray(m, r.Method)
 }
 
-// Methods adds a matcher to match the request against HTTP methods.
-//
+// Methods adds a matcher for HTTP methods.
 // It accepts a sequence of one or more methods to be matched, e.g.:
 // "GET", "POST", "PUT".
 func (r *Route) Methods(methods ...string) *Route {
@@ -270,8 +251,7 @@ func (r *Route) Methods(methods ...string) *Route {
 
 // Path -----------------------------------------------------------------------
 
-// Path adds a matcher to match the request against the URL path.
-//
+// Path adds a matcher for the URL path.
 // It accepts a template with zero or more URL variables enclosed by {}.
 // Variables can define an optional regexp pattern to me matched:
 //
@@ -298,7 +278,7 @@ func (r *Route) Path(tpl string) *Route {
 
 // PathPrefix -----------------------------------------------------------------
 
-// PathPrefix adds a matcher to match the request against a URL path prefix.
+// PathPrefix adds a matcher for the URL path prefix.
 func (r *Route) PathPrefix(tpl string) *Route {
 	if r.err == nil {
 		r.err = r.addRegexpMatcher(tpl, false, true)
@@ -315,13 +295,11 @@ func (m queryMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchMap(m, r.URL.Query(), false)
 }
 
-// Queries adds a matcher to match the request against URL query values.
-//
-// It accepts a sequence of key/value pairs to be matched. For example:
+// Queries adds a matcher for URL query values.
+// It accepts a sequence of key/value pairs. For example:
 //
 //     r := new(mux.Router)
-//     r.NewRoute().Queries("foo", "bar",
-//                          "baz", "ding")
+//     r.Queries("foo", "bar", "baz", "ding")
 //
 // The above route will only match if the URL contains the defined queries
 // values, e.g.: ?foo=bar&baz=ding.
@@ -348,10 +326,8 @@ func (m schemeMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchInArray(m, r.URL.Scheme)
 }
 
-// Schemes adds a matcher to match the request against URL schemes.
-//
-// It accepts a sequence of one or more schemes to be matched, e.g.:
-// "http", "https".
+// Schemes adds a matcher for URL schemes.
+// It accepts a sequence schemes to be matched, e.g.: "http", "https".
 func (r *Route) Schemes(schemes ...string) *Route {
 	if len(schemes) == 0 || r.err != nil {
 		return r
@@ -364,12 +340,12 @@ func (r *Route) Schemes(schemes ...string) *Route {
 
 // Subrouter ------------------------------------------------------------------
 
-// Subrouter creates a subrouter for this route.
+// Subrouter creates a subrouter for the route.
 //
 // It will test the inner routes only if the parent route matched. For example:
 //
 //     r := new(mux.Router)
-//     subrouter := r.NewRoute().Host("www.domain.com").Subrouter()
+//     subrouter := r.Host("www.domain.com").Subrouter()
 //     subrouter.HandleFunc("/products/", ProductsHandler)
 //     subrouter.HandleFunc("/products/{key}", ProductHandler)
 //     subrouter.HandleFunc("/articles/{category}/{id:[0-9]+}"),
@@ -382,12 +358,9 @@ func (r *Route) Subrouter() *Router {
 		// During tests router is not always set.
 		r.router = new(Router)
 	}
-	router := &Router{root: r.router.getRoot()}
-	if r.regexp != nil {
-		router.regexp = &routeRegexpGroup{
-			host: r.regexp.host,
-			path: r.regexp.path,
-		}
+	router := &Router{
+		namedRoutes: r.router.getNamedRoutes(),
+		regexp:      copyRouteRegexpGroup(r.regexp),
 	}
 	r.addMatcher(router)
 	return router
@@ -408,8 +381,8 @@ func (r *Route) Subrouter() *Router {
 //
 // ...a URL for it can be built using:
 //
-//     url := r.NamedRoutes["article"].URL("category", "technology",
-//                                         "id", "42")
+//     url := r.NamedRoute("article").URL("category", "technology",
+//                                        "id", "42")
 //
 // ...which will return an url.URL with the following path:
 //
@@ -423,9 +396,9 @@ func (r *Route) Subrouter() *Router {
 //       Name("article")
 //
 //     // url.String() will be "http://news.domain.com/articles/technology/42"
-//     url := r.NamedRoutes["article"].URL("subdomain", "news",
-//                                         "category", "technology",
-//                                         "id", "42")
+//     url := r.NamedRoute("article").URL("subdomain", "news",
+//                                        "category", "technology",
+//                                        "id", "42")
 //
 // All variable names defined in the route are required, and their values must
 // conform to the corresponding patterns, if any.

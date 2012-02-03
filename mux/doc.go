@@ -24,8 +24,8 @@ matches. This allows defining groups of routes that share common conditions
 like a host, a path prefix or other repeated attributes. As a bonus, this
 optimizes request matching.
 
-* It is compatible with http.ServeMux: it can register handlers that implement
-the http.Handler interface or the signature accepted by http.HandleFunc().
+* It implements the http.Handler interface so it is compatible with the
+standard http.ServeMux.
 
 The most basic example is to register a couple of URL paths and handlers:
 
@@ -39,8 +39,8 @@ equivalent to how http.HandleFunc() works: if an incoming request URL matches
 one of the paths, the corresponding handler is called passing
 (http.ResponseWriter, *http.Request) as parameters.
 
-Paths can have variables. They are defined using the notation {name} or
-{name:pattern}. If a regular expression pattern is not defined, the variable
+Paths can have variables. They are defined using the format {name} or
+{name:pattern}. If a pattern is not defined, the matched variable
 will be anything until the next slash. For example:
 
 	r := new(mux.Router)
@@ -65,7 +65,7 @@ pattern to be matched. They can also have variables:
 	r.HandleFunc("/products", ProductsHandler).Host("www.domain.com")
 	// Matches a dynamic subdomain.
 	r.HandleFunc("/products", ProductsHandler).
-		Host("{subdomain:[a-z]+}.domain.com")
+	  Host("{subdomain:[a-z]+}.domain.com")
 
 There are several other matchers that can be added. To match HTTP methods:
 
@@ -86,7 +86,7 @@ There are several other matchers that can be added. To match HTTP methods:
 
 ...or to use a custom matcher function:
 
-	r.HandleFunc("/products", ProductsHandler).Matcher(MatcherFunc)
+	r.HandleFunc("/products", ProductsHandler).MatcherFunc(myFunc)
 
 ...and finally, it is possible to combine several matchers in a single route:
 
@@ -99,13 +99,13 @@ a way to group several routes that share the same requirements.
 We call it "subrouting".
 
 For example, let's say we have several URLs that should only match when the
-host is "www.domain.com". We create a route for that host, then add a
-"subrouter" to that route:
+host is "www.domain.com". We create a route for that host, then get a
+"subrouter" from that route:
 
 	r := new(mux.Router)
-	subrouter := r.NewRoute().Host("www.domain.com").NewRouter()
+	subrouter := r.Host("www.domain.com").Subrouter()
 
-Then register routes for the host subrouter:
+Then register routes for the subrouter:
 
 	subrouter.HandleFunc("/products/", ProductsHandler)
 	subrouter.HandleFunc("/products/{key}", ProductHandler)
@@ -125,11 +125,10 @@ or "reversed". We define a name calling Name() on a route. For example:
 	r.HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).
 	  Name("article")
 
-Named routes are available in the NamedRoutes field from a router. To build
-a URL, get the route and call the URL() method, passing a sequence of
+To build a URL, get the route and call the URL() method, passing a sequence of
 key/value pairs for the route variables. For the previous route, we would do:
 
-	url := r.NamedRoutes["article"].URL("category", "technology", "id", "42")
+	url := r.GetRoute("article").URL("category", "technology", "id", "42")
 
 ...and the result will be a url.URL with the following path:
 
@@ -138,15 +137,15 @@ key/value pairs for the route variables. For the previous route, we would do:
 This also works for host variables:
 
 	r := new(mux.Router)
-	r.NewRoute().
-	  Host("{subdomain}.domain.com").
-	  HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).
+	r.Host("{subdomain}.domain.com").
+	  Path("/articles/{category}/{id:[0-9]+}").
+	  HandlerFunc(ArticleHandler).
 	  Name("article")
 
 	// url.String() will be "http://news.domain.com/articles/technology/42"
-	url := r.NamedRoutes["article"].URL("subdomain", "news",
-										"category", "technology",
-										"id", "42")
+	url := r.GetRoute("article").URL("subdomain", "news",
+									 "category", "technology",
+									 "id", "42")
 
 All variable names defined in the route are required, and their values must
 conform to the corresponding patterns, if any.
@@ -156,10 +155,10 @@ use the methods URLHost() or URLPath() instead. For the previous route,
 we would do:
 
 	// "http://news.domain.com/"
-	host := r.NamedRoutes["article"].URLHost("subdomain", "news").String()
+	host := r.GetRoute("article").URLHost("subdomain", "news").String()
 
 	// "/articles/technology/42"
-	path := r.NamedRoutes["article"].URLPath("category", "technology",
-											 "id", "42").String()
+	path := r.GetRoute("article").URLPath("category", "technology",
+										  "id", "42").String()
 */
 package mux
