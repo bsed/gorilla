@@ -5,6 +5,7 @@ TARG=code.google.com/p/gorilla/mux
 GOFILES=\
 	doc.go\
 	mux.go\
+	regexp.go\
 
 DEPS=\
 	code.google.com/p/gorilla/context\
