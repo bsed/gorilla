@@ -6,7 +6,6 @@ package mux
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -38,11 +37,16 @@ type Route struct {
 	err         error
 }
 
-// Match matches this route against the request.
+// match matches this route against the request.
 func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
+	return r.match(req, match)
+}
+
+// match matches this route against the request.
+func (r *Route) match(req *http.Request, match *RouteMatch) bool {
 	// Match everything.
 	for _, m := range r.matchers {
-		if matched := m.Match(req, match); !matched {
+		if matched := m.match(req, match); !matched {
 			return false
 		}
 	}
@@ -61,13 +65,6 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 		r.regexp.setMatch(req, match, r)
 	}
 	return true
-}
-
-// Clone clones the route.
-func (r *Route) Clone() *Route {
-	// Shallow copy is enough.
-	c := *r
-	return &c
 }
 
 // Err returns an error resulted from building the route, or nil.
@@ -109,7 +106,7 @@ func (r *Route) Name(name string) *Route {
 		// During tests router is not always set.
 		r.router = new(Router)
 	}
-	router := r.router.root()
+	router := r.router.getRoot()
 	if router.NamedRoutes == nil {
 		router.NamedRoutes = make(map[string]*Route)
 	}
@@ -133,8 +130,81 @@ func (r *Route) RedirectSlash(value bool) *Route {
 }
 
 // ----------------------------------------------------------------------------
-// Host and Path matchers
+// Matchers
 // ----------------------------------------------------------------------------
+
+// matcher types try to match a request.
+type matcher interface {
+	match(*http.Request, *RouteMatch) bool
+}
+
+// addMatcher adds a matcher to the route.
+func (r *Route) addMatcher(m matcher) *Route {
+	r.matchers = append(r.matchers, m)
+	return r
+}
+
+// addRegexpMatcher adds a host or path matcher and builder to a route.
+func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error {
+	if r.regexp == nil {
+		r.regexp = new(routeRegexpGroup)
+	}
+	rr, err := newRouteRegexp(tpl, matchHost, matchPrefix, r.strictSlash)
+	if err != nil {
+		return err
+	}
+	if matchHost {
+		if r.regexp.path != nil {
+			if err = uniqueVars(rr.varsN, r.regexp.path.varsN); err != nil {
+				return err
+			}
+		}
+		r.regexp.host = rr
+	} else {
+		if r.regexp.host != nil {
+			if err = uniqueVars(rr.varsN, r.regexp.host.varsN); err != nil {
+				return err
+			}
+		}
+		r.regexp.path = rr
+	}
+	r.addMatcher(rr)
+	return nil
+}
+
+// Headers --------------------------------------------------------------------
+
+// headerMatcher matches the request against header values.
+type headerMatcher map[string]string
+
+func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
+	return matchMap(m, r.Header, true)
+}
+
+// Headers adds a matcher to match the request against header values.
+//
+// It accepts a sequence of key/value pairs to be matched. For example:
+//
+//     r := new(mux.Router)
+//     r.NewRoute().Headers("Content-Type", "application/json",
+//                          "X-Requested-With", "XMLHttpRequest")
+//
+// The above route will only match if both request header values match.
+//
+// It the value is an empty string, it will match any value if the key is set.
+func (r *Route) Headers(pairs ...string) *Route {
+	if len(pairs) == 0 || r.err != nil {
+		return r
+	}
+	headers, err := mapFromPairs(pairs...)
+	if err != nil {
+		r.err = err
+		return r
+	}
+	return r.addMatcher(headerMatcher(headers))
+}
+
+// Host -----------------------------------------------------------------------
 
 // Host adds a matcher to match the request against the URL host.
 //
@@ -156,10 +226,49 @@ func (r *Route) RedirectSlash(value bool) *Route {
 // calling mux.Vars(request).
 func (r *Route) Host(tpl string) *Route {
 	if r.err == nil {
-		r.err = r.newRegexp(tpl, true, false)
+		r.err = r.addRegexpMatcher(tpl, true, false)
 	}
 	return r
 }
+
+// MatcherFunc ----------------------------------------------------------------
+
+// MatcherFunc is the function signature used by custom matchers.
+type MatcherFunc func(*http.Request, *RouteMatch) bool
+
+func (m MatcherFunc) match(r *http.Request, match *RouteMatch) bool {
+	return m(r, match)
+}
+
+// MatcherFunc adds a custom function to be used as request matcher.
+func (r *Route) MatcherFunc(f MatcherFunc) *Route {
+	return r.addMatcher(f)
+}
+
+// Methods --------------------------------------------------------------------
+
+// methodMatcher matches the request against HTTP methods.
+type methodMatcher []string
+
+func (m methodMatcher) match(r *http.Request, match *RouteMatch) bool {
+	return matchInArray(m, r.Method)
+}
+
+// Methods adds a matcher to match the request against HTTP methods.
+//
+// It accepts a sequence of one or more methods to be matched, e.g.:
+// "GET", "POST", "PUT".
+func (r *Route) Methods(methods ...string) *Route {
+	if len(methods) == 0 || r.err != nil {
+		return r
+	}
+	for k, v := range methods {
+		methods[k] = strings.ToUpper(v)
+	}
+	return r.addMatcher(methodMatcher(methods))
+}
+
+// Path -----------------------------------------------------------------------
 
 // Path adds a matcher to match the request against the URL path.
 //
@@ -182,162 +291,19 @@ func (r *Route) Host(tpl string) *Route {
 // calling mux.Vars(request).
 func (r *Route) Path(tpl string) *Route {
 	if r.err == nil {
-		r.err = r.newRegexp(tpl, false, false)
+		r.err = r.addRegexpMatcher(tpl, false, false)
 	}
 	return r
 }
+
+// PathPrefix -----------------------------------------------------------------
 
 // PathPrefix adds a matcher to match the request against a URL path prefix.
 func (r *Route) PathPrefix(tpl string) *Route {
 	if r.err == nil {
-		r.err = r.newRegexp(tpl, false, true)
+		r.err = r.addRegexpMatcher(tpl, false, true)
 	}
 	return r
-}
-
-// newRegexp adds a host or path matcher and builder to the route.
-func (r *Route) newRegexp(tpl string, matchHost, matchPrefix bool) error {
-	if r.regexp == nil {
-		r.regexp = new(routeRegexpGroup)
-	}
-	rr, err := newRouteRegexp(tpl, matchHost, matchPrefix, r.strictSlash)
-	if err != nil {
-		return err
-	}
-	if matchHost {
-		if r.regexp.host != nil {
-			return fmt.Errorf("mux: host already defined for %q", tpl)
-		}
-		if r.regexp.path != nil {
-			if err = uniqueVars(rr.varsN, r.regexp.path.varsN); err != nil {
-				return err
-			}
-		}
-		r.regexp.host = rr
-	} else {
-		if r.regexp.path != nil {
-			return fmt.Errorf("mux: path already defined for %q", tpl)
-		}
-		if r.regexp.host != nil {
-			if err = uniqueVars(rr.varsN, r.regexp.host.varsN); err != nil {
-				return err
-			}
-		}
-		r.regexp.path = rr
-	}
-	r.addMatcher(rr)
-	return nil
-}
-
-// ----------------------------------------------------------------------------
-// Other matchers
-// ----------------------------------------------------------------------------
-
-// matcher types try to match a request.
-type matcher interface {
-	Match(*http.Request, *RouteMatch) bool
-}
-
-// addMatcher adds a matcher to the route.
-func (r *Route) addMatcher(m matcher) *Route {
-	r.matchers = append(r.matchers, m)
-	return r
-}
-
-// Subrouting -----------------------------------------------------------------
-
-// NewRouter creates a new router and adds it as a matcher for this route.
-//
-// This is used for subrouting: it will test the inner routes if the
-// route matched. For example:
-//
-//     r := new(mux.Router)
-//     subrouter := r.NewRoute().Host("www.domain.com").NewRouter()
-//     subrouter.HandleFunc("/products/", ProductsHandler)
-//     subrouter.HandleFunc("/products/{key}", ProductHandler)
-//     subrouter.HandleFunc("/articles/{category}/{id:[0-9]+}"),
-//                          ArticleHandler)
-//
-// In this example, the routes registered in the subrouter will only be tested
-// if the host matches.
-func (r *Route) NewRouter() *Router {
-	if r.router == nil {
-		// During tests router is not always set.
-		r.router = new(Router)
-	}
-	router := &Router{rootRouter: r.router.root(), regexp: r.regexp}
-	r.addMatcher(router)
-	return router
-}
-
-// Custom matcher -------------------------------------------------------------
-
-// MatcherFunc is the type used by custom matchers.
-type MatcherFunc func(*http.Request) bool
-
-// Match matches the request using a custom matcher function.
-func (m MatcherFunc) Match(r *http.Request, match *RouteMatch) bool {
-	return m(r)
-}
-
-// Matcher adds a matcher to match the request using a custom function.
-func (r *Route) Matcher(matcherFunc MatcherFunc) *Route {
-	return r.addMatcher(matcherFunc)
-}
-
-// Headers --------------------------------------------------------------------
-
-// headerMatcher matches the request against header values.
-type headerMatcher map[string]string
-
-func (m headerMatcher) Match(r *http.Request, match *RouteMatch) bool {
-	return matchMap(m, r.Header, true)
-}
-
-// Headers adds a matcher to match the request against header values.
-//
-// It accepts a sequence of key/value pairs to be matched. For example:
-//
-//     r := new(mux.Router)
-//     r.NewRoute().Headers("Content-Type", "application/json",
-//                          "X-Requested-With", "XMLHttpRequest")
-//
-// The above route will only match if both request header values match.
-//
-// It the value is an empty string, it will match any value if the key is set.
-func (r *Route) Headers(pairs ...string) *Route {
-	if len(pairs) == 0 || r.err != nil {
-		return r
-	}
-	headers, err := stringMapFromPairs(pairs...)
-	if err != nil {
-		r.err = err
-		return r
-	}
-	return r.addMatcher(headerMatcher(headers))
-}
-
-// Methods --------------------------------------------------------------------
-
-// methodMatcher matches the request against HTTP methods.
-type methodMatcher []string
-
-func (m methodMatcher) Match(r *http.Request, match *RouteMatch) bool {
-	return matchInArray(m, r.Method)
-}
-
-// Methods adds a matcher to match the request against HTTP methods.
-//
-// It accepts a sequence of one or more methods to be matched, e.g.:
-// "GET", "POST", "PUT".
-func (r *Route) Methods(methods ...string) *Route {
-	if len(methods) == 0 || r.err != nil {
-		return r
-	}
-	for k, v := range methods {
-		methods[k] = strings.ToUpper(v)
-	}
-	return r.addMatcher(methodMatcher(methods))
 }
 
 // Query ----------------------------------------------------------------------
@@ -345,7 +311,7 @@ func (r *Route) Methods(methods ...string) *Route {
 // queryMatcher matches the request against URL queries.
 type queryMatcher map[string]string
 
-func (m queryMatcher) Match(r *http.Request, match *RouteMatch) bool {
+func (m queryMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchMap(m, r.URL.Query(), false)
 }
 
@@ -365,7 +331,7 @@ func (r *Route) Queries(pairs ...string) *Route {
 	if len(pairs) == 0 || r.err != nil {
 		return r
 	}
-	queries, err := stringMapFromPairs(pairs...)
+	queries, err := mapFromPairs(pairs...)
 	if err != nil {
 		r.err = err
 		return r
@@ -378,7 +344,7 @@ func (r *Route) Queries(pairs ...string) *Route {
 // schemeMatcher matches the request against URL schemes.
 type schemeMatcher []string
 
-func (m schemeMatcher) Match(r *http.Request, match *RouteMatch) bool {
+func (m schemeMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchInArray(m, r.URL.Scheme)
 }
 
@@ -394,6 +360,37 @@ func (r *Route) Schemes(schemes ...string) *Route {
 		schemes[k] = strings.ToLower(v)
 	}
 	return r.addMatcher(schemeMatcher(schemes))
+}
+
+// Subrouter ------------------------------------------------------------------
+
+// Subrouter creates a subrouter for this route.
+//
+// It will test the inner routes only if the parent route matched. For example:
+//
+//     r := new(mux.Router)
+//     subrouter := r.NewRoute().Host("www.domain.com").Subrouter()
+//     subrouter.HandleFunc("/products/", ProductsHandler)
+//     subrouter.HandleFunc("/products/{key}", ProductHandler)
+//     subrouter.HandleFunc("/articles/{category}/{id:[0-9]+}"),
+//                          ArticleHandler)
+//
+// In this example, the routes registered in the subrouter won't be tested
+// if the host doesn't match.
+func (r *Route) Subrouter() *Router {
+	if r.router == nil {
+		// During tests router is not always set.
+		r.router = new(Router)
+	}
+	router := &Router{root: r.router.getRoot()}
+	if r.regexp != nil {
+		router.regexp = &routeRegexpGroup{
+			host: r.regexp.host,
+			path: r.regexp.path,
+		}
+	}
+	r.addMatcher(router)
+	return router
 }
 
 // ----------------------------------------------------------------------------

@@ -121,8 +121,8 @@ type routeRegexp struct {
 	varsR []*regexp.Regexp
 }
 
-// Match matches this regexp against the URL host or path.
-func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
+// match matches this regexp against the URL host or path.
+func (r *routeRegexp) match(req *http.Request, match *RouteMatch) bool {
 	if !r.matchHost {
 		return r.regexp.MatchString(req.URL.Path)
 	}
@@ -131,7 +131,7 @@ func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
 
 // url builds a URL part using the given values.
 func (r *routeRegexp) url(pairs ...string) (string, error) {
-	values, err := stringMapFromPairs(pairs...)
+	values, err := mapFromPairs(pairs...)
 	if err != nil {
 		return "", err
 	}
