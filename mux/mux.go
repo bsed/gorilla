@@ -13,43 +13,6 @@ import (
 )
 
 // ----------------------------------------------------------------------------
-// Context
-// ----------------------------------------------------------------------------
-
-type RouteVars map[string]string
-
-type contextKey int
-
-const (
-   varsKey contextKey = iota
-   routeKey
-)
-
-// Vars returns the route variables for the current request, if any.
-func Vars(r *http.Request) RouteVars {
-	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
-		return rv.(RouteVars)
-	}
-	return nil
-}
-
-// CurrentRoute returns the matched route for the current request, if any.
-func CurrentRoute(r *http.Request) *Route {
-	if rv := context.DefaultContext.Get(r, routeKey); rv != nil {
-		return rv.(*Route)
-	}
-	return nil
-}
-
-func setVars(r *http.Request, val interface{}) {
-	context.DefaultContext.Set(r, varsKey, val)
-}
-
-func setCurrentRoute(r *http.Request, val interface{}) {
-	context.DefaultContext.Set(r, routeKey, val)
-}
-
-// ----------------------------------------------------------------------------
 // Router
 // ----------------------------------------------------------------------------
 
@@ -81,7 +44,7 @@ type Router struct {
 	// Routes to be matched, in order.
 	routes []*Route
 	// Reference to the root router, where named routes are stored.
-	rootRouter *Router
+	root *Router
 	// See Route.strictSlash. This defines the default flag for new routes.
 	strictSlash bool
 	// Manager for the variables from host and path.
@@ -90,9 +53,14 @@ type Router struct {
 
 // Match matches registered routes against the request.
 func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
+	return r.match(req, match)
+}
+
+// match matches registered routes against the request.
+func (r *Router) match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.err == nil {
-			if matched := route.Match(req, match); matched {
+			if matched := route.match(req, match); matched {
 				setVars(req, match.Vars)
 				setCurrentRoute(req, match.Route)
 				return true
@@ -116,7 +84,7 @@ func (r *Router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 	var match RouteMatch
 	var handler http.Handler
-	if matched := r.Match(request, &match); matched {
+	if matched := r.match(request, &match); matched {
 		handler = match.Handler
 	}
 	if handler == nil {
@@ -148,11 +116,11 @@ func (r *Router) RedirectSlash(value bool) *Router {
 }
 
 // root returns the root router, where named routes are stored.
-func (r *Router) root() *Router {
-	if r.rootRouter == nil {
+func (r *Router) getRoot() *Router {
+	if r.root == nil {
 		return r
 	}
-	return r.rootRouter
+	return r.root
 }
 
 // Convenience route factories ------------------------------------------------
@@ -185,13 +153,10 @@ func (r *Router) HandleFunc(path string, handler func(http.ResponseWriter,
 	return r.NewRoute().HandleFunc(path, handler)
 }
 
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
+// Helpers --------------------------------------------------------------------
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
-//
-// Extracted from the http package.
+// Borrowed from the net/http package.
 func cleanPath(p string) string {
 	if p == "" {
 		return "/"
@@ -222,8 +187,8 @@ func uniqueVars(s1, s2 []string) error {
 	return nil
 }
 
-// stringMapFromPairs converts variadic string parameters to a string map.
-func stringMapFromPairs(pairs ...string) (map[string]string, error) {
+// mapFromPairs converts variadic string parameters to a string map.
+func mapFromPairs(pairs ...string) (map[string]string, error) {
 	length := len(pairs)
 	if length%2 != 0 {
 		return nil, fmt.Errorf("mux: parameters must be multiple of 2, got %v",
@@ -272,4 +237,41 @@ func matchMap(toCheck map[string]string, toMatch map[string][]string,
 		}
 	}
 	return true
+}
+
+// ----------------------------------------------------------------------------
+// Context
+// ----------------------------------------------------------------------------
+
+type RouteVars map[string]string
+
+type contextKey int
+
+const (
+   varsKey contextKey = iota
+   routeKey
+)
+
+// Vars returns the route variables for the current request, if any.
+func Vars(r *http.Request) RouteVars {
+	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
+		return rv.(RouteVars)
+	}
+	return nil
+}
+
+// CurrentRoute returns the matched route for the current request, if any.
+func CurrentRoute(r *http.Request) *Route {
+	if rv := context.DefaultContext.Get(r, routeKey); rv != nil {
+		return rv.(*Route)
+	}
+	return nil
+}
+
+func setVars(r *http.Request, val interface{}) {
+	context.DefaultContext.Set(r, varsKey, val)
+}
+
+func setCurrentRoute(r *http.Request, val interface{}) {
+	context.DefaultContext.Set(r, routeKey, val)
 }

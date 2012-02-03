@@ -222,6 +222,25 @@ func TestRoute(t *testing.T) {
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost", nil)
 	testRoute(t, id(), false, route, request, vars, host, path, url)
+
+	// Custom -----------------------------------------------------------------
+
+	m := func(r *http.Request, m *RouteMatch) bool {
+		if r.URL.Host == "aaa.bbb.ccc" {
+			return true
+		}
+		return false
+	}
+	route = new(Route).MatcherFunc(m)
+	request, _ = http.NewRequest("GET", "http://aaa.bbb.ccc", nil)
+	vars = map[string]string{}
+	host = ""
+	path = ""
+	url = ""
+	testRoute(t, id(), true, route, request, vars, host, path, url)
+	// Non-match for the same config.
+	request, _ = http.NewRequest("GET", "http://aaa.ccc.bbb", nil)
+	testRoute(t, id(), false, route, request, vars, host, path, url)
 }
 
 func TestSubRouter(t *testing.T) {
@@ -230,7 +249,7 @@ func TestSubRouter(t *testing.T) {
 	var vars map[string]string
 	var host, path, url string
 
-	subrouter := new(Route).Host("{v1}.google.com").NewRouter()
+	subrouter := new(Route).Host("{v1:[a-z]+}.google.com").Subrouter()
 
 	// Setup an id so we can see which test failed. :)
 	var idValue int
@@ -249,7 +268,7 @@ func TestSubRouter(t *testing.T) {
 	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
-	request, _ = http.NewRequest("GET", "http://aaa.google.com/111", nil)
+	request, _ = http.NewRequest("GET", "http://111.google.com/111", nil)
 	testRoute(t, id(), false, route, request, vars, host, path, url)
 
 	//route = subrouter.NewRoute().Path("/{v2:[a-z]+}/{v3:[a-z]+}")
