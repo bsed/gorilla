@@ -12,6 +12,9 @@ Go1 development version
 		define custom types to avoid name collisions. As a result,
 		Namespaces became irrelevant and were dropped.
 	- Usage is much simpler. See updated documentation.
+- mux:
+	- URL(), URLHost() and URLPath() now return (url, error).
+		URLDebug(), URLHostDebug() and URLPathDebug() were removed.
 
 September 25, 2010
 ------------------
