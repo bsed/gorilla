@@ -12,9 +12,12 @@ import (
 	"code.google.com/p/gorilla/context"
 )
 
-// ----------------------------------------------------------------------------
-// Router
-// ----------------------------------------------------------------------------
+// RouteMatch stores information about a matched route.
+type RouteMatch struct {
+	Route   *Route
+	Handler http.Handler
+	Vars    map[string]string
+}
 
 // Router registers routes to be matched and dispatches a handler.
 //
@@ -27,9 +30,7 @@ import (
 //         http.Handle("/", router)
 //     }
 //
-// Or, for Google App Engine, register it in a init() function:
-//
-//     var router = new(mux.Router)
+// For Google App Engine, register it in a init() function:
 //
 //     func init() {
 //         http.Handle("/", router)
@@ -37,14 +38,12 @@ import (
 //
 // This will send all incoming requests to the router.
 type Router struct {
-	// Routes by name, for URL building.
-	NamedRoutes map[string]*Route
 	// Configurable Handler to be used when no route matches.
 	NotFoundHandler http.Handler
 	// Routes to be matched, in order.
 	routes []*Route
-	// Reference to the root router, where named routes are stored.
-	root *Router
+	// Routes by name for URL building.
+	namedRoutes map[string]*Route
 	// See Route.strictSlash. This defines the default flag for new routes.
 	strictSlash bool
 	// Manager for the variables from host and path.
@@ -61,8 +60,6 @@ func (r *Router) match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.err == nil {
 			if matched := route.match(req, match); matched {
-				setVars(req, match.Vars)
-				setCurrentRoute(req, match.Route)
 				return true
 			}
 		}
@@ -74,18 +71,19 @@ func (r *Router) match(req *http.Request, match *RouteMatch) bool {
 //
 // When there is a match, the route variables can be retrieved calling
 // mux.Vars(request).
-func (r *Router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Clean path to canonical form and redirect.
-	// (this comes from the http package)
-	if p := cleanPath(request.URL.Path); p != request.URL.Path {
-		writer.Header().Set("Location", p)
-		writer.WriteHeader(http.StatusMovedPermanently)
+	if p := cleanPath(req.URL.Path); p != req.URL.Path {
+		w.Header().Set("Location", p)
+		w.WriteHeader(http.StatusMovedPermanently)
 		return
 	}
 	var match RouteMatch
 	var handler http.Handler
-	if matched := r.match(request, &match); matched {
+	if matched := r.match(req, &match); matched {
 		handler = match.Handler
+		setVars(req, match.Vars)
+		setCurrentRoute(req, match.Route)
 	}
 	if handler == nil {
 		if r.NotFoundHandler == nil {
@@ -93,67 +91,146 @@ func (r *Router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		}
 		handler = r.NotFoundHandler
 	}
-	defer context.DefaultContext.Clear(request)
-	handler.ServeHTTP(writer, request)
+	defer context.DefaultContext.Clear(req)
+	handler.ServeHTTP(w, req)
 }
 
-// AddRoute registers a route in the router.
-func (r *Router) AddRoute(route *Route) *Router {
-	if r.routes == nil {
-		r.routes = make([]*Route, 0)
-	}
-	route.router = r
-	r.routes = append(r.routes, route)
-	return r
+// GetRoute returns a route registered with the given name.
+func (r *Router) GetRoute(name string) *Route {
+	return r.namedRoutes[name]
 }
 
-// RedirectSlash defines the default RedirectSlash behavior for new routes.
+// StrictSlash defines the slash behavior for new routes.
 //
-// See Route.RedirectSlash.
-func (r *Router) RedirectSlash(value bool) *Router {
+// When true, if the route path is /path/, accessing /path will redirect to
+// /path/, and vice versa.
+func (r *Router) StrictSlash(value bool) *Router {
 	r.strictSlash = value
 	return r
 }
 
-// root returns the root router, where named routes are stored.
-func (r *Router) getRoot() *Router {
-	if r.root == nil {
-		return r
+// getNamedRoutes returns the registered named routes, creating them if needed.
+func (r *Router) getNamedRoutes() map[string]*Route {
+	if r.namedRoutes == nil {
+		r.namedRoutes = make(map[string]*Route)
 	}
-	return r.root
+	return r.namedRoutes
 }
 
-// Convenience route factories ------------------------------------------------
+// ----------------------------------------------------------------------------
+// Route factories
+// ----------------------------------------------------------------------------
 
 // NewRoute creates an empty route and registers it in the router.
 func (r *Router) NewRoute() *Route {
-	route := new(Route)
-	route.strictSlash = r.strictSlash
-	if r.regexp != nil {
-		route.regexp = new(routeRegexpGroup)
-		route.regexp.host = r.regexp.host
-		route.regexp.path = r.regexp.path
+	route := &Route{
+		router:      r,
+		regexp: 	 copyRouteRegexpGroup(r.regexp),
+		strictSlash: r.strictSlash,
 	}
-	r.AddRoute(route)
+	r.routes = append(r.routes, route)
 	return route
 }
 
-// Handle registers a new route and sets a path and handler.
-//
-// See also: Route.Handle().
+// Handle returns a new route with a matcher for the URL path
+// and a handler set. See Route.Path.
 func (r *Router) Handle(path string, handler http.Handler) *Route {
-	return r.NewRoute().Handle(path, handler)
+	return r.NewRoute().Path(path).Handler(handler)
 }
 
-// HandleFunc registers a new route and sets a path and handler function.
-//
-// See also: Route.HandleFunc().
-func (r *Router) HandleFunc(path string, handler func(http.ResponseWriter,
+// HandleFunc returns a new route with a matcher for the URL path
+// and a handler function set. See Route.Path.
+func (r *Router) HandleFunc(path string, f func(http.ResponseWriter,
 	*http.Request)) *Route {
-	return r.NewRoute().HandleFunc(path, handler)
+	return r.NewRoute().Path(path).HandlerFunc(f)
 }
 
-// Helpers --------------------------------------------------------------------
+// Headers returns a new route with a matcher for request headers.
+// See Route.Headers.
+func (r *Router) Headers(pairs ...string) *Route {
+	return r.NewRoute().Headers(pairs...)
+}
+
+// Host returns a new route with a matcher for the URL host.
+// See Route.Host.
+func (r *Router) Host(tpl string) *Route {
+	return r.NewRoute().Host(tpl)
+}
+
+// MatcherFunc returns a new route with a custom matcher function.
+// See Route.MatcherFunc.
+func (r *Router) MatcherFunc(f MatcherFunc) *Route {
+	return r.NewRoute().MatcherFunc(f)
+}
+
+// Methods returns a new route with a matcher for HTTP methods.
+// See Route.Methods.
+func (r *Router) Methods(methods ...string) *Route {
+	return r.NewRoute().Methods(methods...)
+}
+
+// Path returns a new route with a matcher for the URL path.
+// See Route.Path.
+func (r *Router) Path(tpl string) *Route {
+	return r.NewRoute().Path(tpl)
+}
+
+// PathPrefix returns a new route with a matcher for the URL path prefix.
+// See Route.PathPrefix.
+func (r *Router) PathPrefix(tpl string) *Route {
+	return r.NewRoute().PathPrefix(tpl)
+}
+
+// Queries returns a new route with a matcher for URL queries.
+// See Route.Queries.
+func (r *Router) Queries(pairs ...string) *Route {
+	return r.NewRoute().Queries(pairs...)
+}
+
+// Schemes returns a new route with a matcher for URL schemes.
+// See Route.Schemes.
+func (r *Router) Schemes(schemes ...string) *Route {
+	return r.NewRoute().Schemes(schemes...)
+}
+
+// ----------------------------------------------------------------------------
+// Context
+// ----------------------------------------------------------------------------
+
+type contextKey int
+
+const (
+   varsKey contextKey = iota
+   routeKey
+)
+
+// Vars returns the route variables for the current request, if any.
+func Vars(r *http.Request) map[string]string {
+	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
+		return rv.(map[string]string)
+	}
+	return nil
+}
+
+// CurrentRoute returns the matched route for the current request, if any.
+func CurrentRoute(r *http.Request) *Route {
+	if rv := context.DefaultContext.Get(r, routeKey); rv != nil {
+		return rv.(*Route)
+	}
+	return nil
+}
+
+func setVars(r *http.Request, val interface{}) {
+	context.DefaultContext.Set(r, varsKey, val)
+}
+
+func setCurrentRoute(r *http.Request, val interface{}) {
+	context.DefaultContext.Set(r, routeKey, val)
+}
+
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
 // Borrowed from the net/http package.
@@ -239,39 +316,14 @@ func matchMap(toCheck map[string]string, toMatch map[string][]string,
 	return true
 }
 
-// ----------------------------------------------------------------------------
-// Context
-// ----------------------------------------------------------------------------
-
-type RouteVars map[string]string
-
-type contextKey int
-
-const (
-   varsKey contextKey = iota
-   routeKey
-)
-
-// Vars returns the route variables for the current request, if any.
-func Vars(r *http.Request) RouteVars {
-	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
-		return rv.(RouteVars)
+// copyRouteRegexpGroup copies a regexp group to make a route aware of
+// parent rules.
+func copyRouteRegexpGroup(r *routeRegexpGroup) *routeRegexpGroup {
+	if r == nil {
+		return nil
 	}
-	return nil
-}
-
-// CurrentRoute returns the matched route for the current request, if any.
-func CurrentRoute(r *http.Request) *Route {
-	if rv := context.DefaultContext.Get(r, routeKey); rv != nil {
-		return rv.(*Route)
+	return &routeRegexpGroup{
+		host: r.host,
+		path: r.path,
 	}
-	return nil
-}
-
-func setVars(r *http.Request, val interface{}) {
-	context.DefaultContext.Set(r, varsKey, val)
-}
-
-func setCurrentRoute(r *http.Request, val interface{}) {
-	context.DefaultContext.Set(r, routeKey, val)
 }
