@@ -12,13 +12,6 @@ import (
 	"code.google.com/p/gorilla/context"
 )
 
-// RouteMatch stores information about a matched route.
-type RouteMatch struct {
-	Route   *Route
-	Handler http.Handler
-	Vars    map[string]string
-}
-
 // Router registers routes to be matched and dispatches a handler.
 //
 // It implements the http.Handler interface, so it can be registered to serve
@@ -125,7 +118,7 @@ func (r *Router) getNamedRoutes() map[string]*Route {
 func (r *Router) NewRoute() *Route {
 	route := &Route{
 		router:      r,
-		regexp: 	 copyRouteRegexpGroup(r.regexp),
+		regexp:      copyRouteRegexpGroup(r.regexp),
 		strictSlash: r.strictSlash,
 	}
 	r.routes = append(r.routes, route)
@@ -141,7 +134,7 @@ func (r *Router) Handle(path string, handler http.Handler) *Route {
 // HandleFunc returns a new route with a matcher for the URL path
 // and a handler function set. See Route.Path.
 func (r *Router) HandleFunc(path string, f func(http.ResponseWriter,
-	*http.Request)) *Route {
+	*http.Request),) *Route {
 	return r.NewRoute().Path(path).HandlerFunc(f)
 }
 
@@ -197,11 +190,18 @@ func (r *Router) Schemes(schemes ...string) *Route {
 // Context
 // ----------------------------------------------------------------------------
 
+// RouteMatch stores information about a matched route.
+type RouteMatch struct {
+	Route   *Route
+	Handler http.Handler
+	Vars    map[string]string
+}
+
 type contextKey int
 
 const (
-   varsKey contextKey = iota
-   routeKey
+	varsKey contextKey = iota
+	routeKey
 )
 
 // Vars returns the route variables for the current request, if any.

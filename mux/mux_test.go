@@ -347,8 +347,8 @@ func testRoute(t *testing.T, id int, shouldMatch bool, route *Route,
 		}
 		if url != "" {
 			u, _ := route.URL(mapToPairs(match.Vars)...)
-			if url != u.Host + u.Path {
-				t.Errorf("(%v) URL not equal: expected %v, got %v -- %v", id, url, u.Host + u.Path, getRouteTemplate(route))
+			if url != u.Host+u.Path {
+				t.Errorf("(%v) URL not equal: expected %v, got %v -- %v", id, url, u.Host+u.Path, getRouteTemplate(route))
 				return
 			}
 		}

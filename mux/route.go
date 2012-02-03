@@ -15,20 +15,20 @@ import (
 // Route stores information to match a request and build URLs.
 type Route struct {
 	// Reference to the router where the route was registered.
-	router      *Router
+	router *Router
 	// Request handler for the route.
-	handler     http.Handler
+	handler http.Handler
 	// List of matchers.
-	matchers    []matcher
+	matchers []matcher
 	// Manager for the variables from host and path.
-	regexp      *routeRegexpGroup
+	regexp *routeRegexpGroup
 	// If true, when the path pattern is "/path/", accessing "/path" will
 	// redirect to the former and vice-versa.
 	strictSlash bool
 	// The name used to build URLs.
-	name        string
+	name string
 	// Error resulted from building a route.
-	err         error
+	err error
 }
 
 // Match matches the route against the request.
@@ -79,7 +79,7 @@ func (r *Route) Handler(handler http.Handler) *Route {
 }
 
 // HandlerFunc sets a handler function for the route.
-func (r *Route) HandlerFunc(f func(http.ResponseWriter,	*http.Request)) *Route {
+func (r *Route) HandlerFunc(f func(http.ResponseWriter, *http.Request)) *Route {
 	r.handler = http.HandlerFunc(f)
 	return r
 }
