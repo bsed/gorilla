@@ -260,7 +260,7 @@ func TestSubRouter(t *testing.T) {
 
 	// ------------------------------------------------------------------------
 
-	route = subrouter.NewRoute().Path("/{v2:[a-z]+}")
+	route = subrouter.Path("/{v2:[a-z]+}")
 	request, _ = http.NewRequest("GET", "http://aaa.google.com/bbb", nil)
 	vars = map[string]string{"v1": "aaa", "v2": "bbb"}
 	host = "aaa.google.com"
@@ -271,9 +271,9 @@ func TestSubRouter(t *testing.T) {
 	request, _ = http.NewRequest("GET", "http://111.google.com/111", nil)
 	testRoute(t, id(), false, route, request, vars, host, path, url)
 
-	//route = subrouter.NewRoute().Path("/{v2:[a-z]+}/{v3:[a-z]+}")
-	//route = subrouter.NewRoute().Path("/{v2:[0-9]+}")
-	//route = subrouter.NewRoute().Path("/{v2:[0-9]+}/{v3:[0-9]+}")
+	//route = subrouter.Path("/{v2:[a-z]+}/{v3:[a-z]+}")
+	//route = subrouter.Path("/{v2:[0-9]+}")
+	//route = subrouter.Path("/{v2:[0-9]+}/{v3:[0-9]+}")
 }
 
 func TestNamedRoutes(t *testing.T) {
