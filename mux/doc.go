@@ -19,20 +19,23 @@ references to resources.
 * Requests can also be matched based on HTTP methods, URL schemes, header and
 query values or using custom matchers.
 
-* Routes can be nested, so that they are only tested if the parent route
-matches. This allows defining groups of routes that share common conditions
-like a host, a path prefix or other repeated attributes. As a bonus, this
-optimizes request matching.
+* Routes can be used as subrouters: nested routes are only tested if the
+parent route matches. This is usefult o define groups of routes that share
+common conditions like a host, a path prefix or other repeated attributes.
+As a bonus, this optimizes request matching.
 
 * It implements the http.Handler interface so it is compatible with the
 standard http.ServeMux.
 
-The most basic example is to register a couple of URL paths and handlers:
+Let's start registering a couple of URL paths and handlers:
 
-	r := new(mux.Router)
-	r.HandleFunc("/", HomeHandler)
-	r.HandleFunc("/products", ProductsHandler)
-	r.HandleFunc("/articles", ArticlesHandler)
+	func main() {
+		r := new(mux.Router)
+		r.HandleFunc("/", HomeHandler)
+		r.HandleFunc("/products", ProductsHandler)
+		r.HandleFunc("/articles", ArticlesHandler)
+		http.Handle("/", r)
+	}
 
 Here we register three routes mapping URL paths to handlers. This is
 equivalent to how http.HandleFunc() works: if an incoming request URL matches
@@ -71,15 +74,15 @@ There are several other matchers that can be added. To match HTTP methods:
 
 	r.Methods("GET", "POST")
 
-...or to match a given URL scheme:
+...or a given URL scheme:
 
 	r.Schemes("https")
 
-...or to match specific header values:
+...or specific header values:
 
 	r.Headers("X-Requested-With", "XMLHttpRequest")
 
-...or to match specific URL query values:
+...or specific URL query values:
 
 	r.Queries("key", "value")
 
@@ -98,8 +101,8 @@ a way to group several routes that share the same requirements.
 We call it "subrouting".
 
 For example, let's say we have several URLs that should only match when the
-host is "www.domain.com". We create a route for that host, then get a
-"subrouter" from that route:
+host is "www.domain.com". Create a route for that host and get a "subrouter"
+from the route:
 
 	r := new(mux.Router)
 	subrouter := r.Host("www.domain.com").Subrouter()

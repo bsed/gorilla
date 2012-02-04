@@ -382,8 +382,8 @@ func (r *Route) Subrouter() *Router {
 //
 // ...a URL for it can be built using:
 //
-//     url := r.NamedRoute("article").URL("category", "technology",
-//                                        "id", "42")
+//     url, err := r.NamedRoute("article").URL("category", "technology",
+//                                             "id", "42")
 //
 // ...which will return an url.URL with the following path:
 //
@@ -397,9 +397,9 @@ func (r *Route) Subrouter() *Router {
 //       Name("article")
 //
 //     // url.String() will be "http://news.domain.com/articles/technology/42"
-//     url := r.NamedRoute("article").URL("subdomain", "news",
-//                                        "category", "technology",
-//                                        "id", "42")
+//     url, err := r.NamedRoute("article").URL("subdomain", "news",
+//                                             "category", "technology",
+//                                             "id", "42")
 //
 // All variable names defined in the route are required, and their values must
 // conform to the corresponding patterns, if any.

@@ -23,7 +23,7 @@ import (
 //         http.Handle("/", router)
 //     }
 //
-// For Google App Engine, register it in a init() function:
+// Or, for Google App Engine, register it in a init() function:
 //
 //     func init() {
 //         http.Handle("/", router)
@@ -114,7 +114,7 @@ func (r *Router) getNamedRoutes() map[string]*Route {
 // Route factories
 // ----------------------------------------------------------------------------
 
-// NewRoute creates an empty route and registers it in the router.
+// NewRoute registers an empty route.
 func (r *Router) NewRoute() *Route {
 	route := &Route{
 		router:      r,
@@ -125,62 +125,62 @@ func (r *Router) NewRoute() *Route {
 	return route
 }
 
-// Handle returns a new route with a matcher for the URL path
-// and a handler set. See Route.Path.
+// Handle registers a new route with a matcher for the URL path.
+// See Route.Path.
 func (r *Router) Handle(path string, handler http.Handler) *Route {
 	return r.NewRoute().Path(path).Handler(handler)
 }
 
-// HandleFunc returns a new route with a matcher for the URL path
-// and a handler function set. See Route.Path.
+// HandleFunc registers a new route with a matcher for the URL path.
+// See Route.Path.
 func (r *Router) HandleFunc(path string, f func(http.ResponseWriter,
 	*http.Request),) *Route {
 	return r.NewRoute().Path(path).HandlerFunc(f)
 }
 
-// Headers returns a new route with a matcher for request headers.
+// Headers registers a new route with a matcher for request headers.
 // See Route.Headers.
 func (r *Router) Headers(pairs ...string) *Route {
 	return r.NewRoute().Headers(pairs...)
 }
 
-// Host returns a new route with a matcher for the URL host.
+// Host registers a new route with a matcher for the URL host.
 // See Route.Host.
 func (r *Router) Host(tpl string) *Route {
 	return r.NewRoute().Host(tpl)
 }
 
-// MatcherFunc returns a new route with a custom matcher function.
+// MatcherFunc registers a new route with a custom matcher function.
 // See Route.MatcherFunc.
 func (r *Router) MatcherFunc(f MatcherFunc) *Route {
 	return r.NewRoute().MatcherFunc(f)
 }
 
-// Methods returns a new route with a matcher for HTTP methods.
+// Methods registers a new route with a matcher for HTTP methods.
 // See Route.Methods.
 func (r *Router) Methods(methods ...string) *Route {
 	return r.NewRoute().Methods(methods...)
 }
 
-// Path returns a new route with a matcher for the URL path.
+// Path registers a new route with a matcher for the URL path.
 // See Route.Path.
 func (r *Router) Path(tpl string) *Route {
 	return r.NewRoute().Path(tpl)
 }
 
-// PathPrefix returns a new route with a matcher for the URL path prefix.
+// PathPrefix registers a new route with a matcher for the URL path prefix.
 // See Route.PathPrefix.
 func (r *Router) PathPrefix(tpl string) *Route {
 	return r.NewRoute().PathPrefix(tpl)
 }
 
-// Queries returns a new route with a matcher for URL queries.
+// Queries registers a new route with a matcher for URL queries.
 // See Route.Queries.
 func (r *Router) Queries(pairs ...string) *Route {
 	return r.NewRoute().Queries(pairs...)
 }
 
-// Schemes returns a new route with a matcher for URL schemes.
+// Schemes registers a new route with a matcher for URL schemes.
 // See Route.Schemes.
 func (r *Router) Schemes(schemes ...string) *Route {
 	return r.NewRoute().Schemes(schemes...)
