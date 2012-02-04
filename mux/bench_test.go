@@ -5,13 +5,13 @@
 package mux
 
 import (
-	"testing"
 	"net/http"
+	"testing"
 )
 
 func BenchmarkMux(b *testing.B) {
 	router := new(Router)
-	handler := func(w http.ResponseWriter, r *http.Request){}
+	handler := func(w http.ResponseWriter, r *http.Request) {}
 	router.HandleFunc("/v1/{v1}", handler)
 
 	request, _ := http.NewRequest("GET", "/v1/anything", nil)

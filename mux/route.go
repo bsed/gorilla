@@ -74,14 +74,15 @@ func (r *Route) GetError() error {
 
 // Handler sets a handler for the route.
 func (r *Route) Handler(handler http.Handler) *Route {
-	r.handler = handler
+	if r.err == nil {
+		r.handler = handler
+	}
 	return r
 }
 
 // HandlerFunc sets a handler function for the route.
 func (r *Route) HandlerFunc(f func(http.ResponseWriter, *http.Request)) *Route {
-	r.handler = http.HandlerFunc(f)
-	return r
+	return r.Handler(http.HandlerFunc(f))
 }
 
 // GetHandler returns the handler for the route, if any.
@@ -97,14 +98,15 @@ func (r *Route) Name(name string) *Route {
 	if r.name != "" {
 		r.err = fmt.Errorf("mux: route already has name %q, can't set %q",
 			r.name, name)
-		return r
 	}
-	if r.router == nil {
-		// During tests router is not always set.
-		r.router = new(Router)
+	if r.err == nil {
+		if r.router == nil {
+			// During tests router is not always set.
+			r.router = new(Router)
+		}
+		r.name = name
+		r.router.getNamedRoutes()[name] = r
 	}
-	r.name = name
-	r.router.getNamedRoutes()[name] = r
 	return r
 }
 
@@ -124,12 +126,17 @@ type matcher interface {
 
 // addMatcher adds a matcher to the route.
 func (r *Route) addMatcher(m matcher) *Route {
-	r.matchers = append(r.matchers, m)
+	if r.err == nil {
+		r.matchers = append(r.matchers, m)
+	}
 	return r
 }
 
 // addRegexpMatcher adds a host or path matcher and builder to a route.
 func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error {
+	if r.err != nil {
+		return r.err
+	}
 	if r.regexp == nil {
 		r.regexp = new(routeRegexpGroup)
 	}
@@ -176,7 +183,7 @@ func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Headers(pairs ...string) *Route {
-	if len(pairs) == 0 || r.err != nil {
+	if len(pairs) == 0 {
 		return r
 	}
 	headers, err := mapFromPairs(pairs...)
@@ -207,9 +214,7 @@ func (r *Route) Headers(pairs ...string) *Route {
 // Variable names must be unique in a given route. They can be retrieved
 // calling mux.Vars(request).
 func (r *Route) Host(tpl string) *Route {
-	if r.err == nil {
-		r.err = r.addRegexpMatcher(tpl, true, false)
-	}
+	r.err = r.addRegexpMatcher(tpl, true, false)
 	return r
 }
 
@@ -240,7 +245,7 @@ func (m methodMatcher) match(r *http.Request, match *RouteMatch) bool {
 // It accepts a sequence of one or more methods to be matched, e.g.:
 // "GET", "POST", "PUT".
 func (r *Route) Methods(methods ...string) *Route {
-	if len(methods) == 0 || r.err != nil {
+	if len(methods) == 0 {
 		return r
 	}
 	for k, v := range methods {
@@ -270,9 +275,7 @@ func (r *Route) Methods(methods ...string) *Route {
 // Variable names must be unique in a given route. They can be retrieved
 // calling mux.Vars(request).
 func (r *Route) Path(tpl string) *Route {
-	if r.err == nil {
-		r.err = r.addRegexpMatcher(tpl, false, false)
-	}
+	r.err = r.addRegexpMatcher(tpl, false, false)
 	return r
 }
 
@@ -280,9 +283,7 @@ func (r *Route) Path(tpl string) *Route {
 
 // PathPrefix adds a matcher for the URL path prefix.
 func (r *Route) PathPrefix(tpl string) *Route {
-	if r.err == nil {
-		r.err = r.addRegexpMatcher(tpl, false, true)
-	}
+	r.err = r.addRegexpMatcher(tpl, false, true)
 	return r
 }
 
@@ -306,7 +307,7 @@ func (m queryMatcher) match(r *http.Request, match *RouteMatch) bool {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Queries(pairs ...string) *Route {
-	if len(pairs) == 0 || r.err != nil {
+	if len(pairs) == 0 {
 		return r
 	}
 	queries, err := mapFromPairs(pairs...)
@@ -329,7 +330,7 @@ func (m schemeMatcher) match(r *http.Request, match *RouteMatch) bool {
 // Schemes adds a matcher for URL schemes.
 // It accepts a sequence schemes to be matched, e.g.: "http", "https".
 func (r *Route) Schemes(schemes ...string) *Route {
-	if len(schemes) == 0 || r.err != nil {
+	if len(schemes) == 0 {
 		return r
 	}
 	for k, v := range schemes {
