@@ -138,7 +138,7 @@ func (r *Router) HandleFunc(path string, f func(http.ResponseWriter,
 	return r.NewRoute().Path(path).HandlerFunc(f)
 }
 
-// Headers registers a new route with a matcher for request headers.
+// Headers registers a new route with a matcher for request header values.
 // See Route.Headers.
 func (r *Router) Headers(pairs ...string) *Route {
 	return r.NewRoute().Headers(pairs...)
@@ -174,7 +174,7 @@ func (r *Router) PathPrefix(tpl string) *Route {
 	return r.NewRoute().PathPrefix(tpl)
 }
 
-// Queries registers a new route with a matcher for URL queries.
+// Queries registers a new route with a matcher for URL query values.
 // See Route.Queries.
 func (r *Router) Queries(pairs ...string) *Route {
 	return r.NewRoute().Queries(pairs...)

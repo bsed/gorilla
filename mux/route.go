@@ -172,7 +172,7 @@ func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchMap(m, r.Header, true)
 }
 
-// Headers adds a matcher for header values.
+// Headers adds a matcher for request header values.
 // It accepts a sequence of key/value pairs to be matched. For example:
 //
 //     r := new(mux.Router)
