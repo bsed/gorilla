@@ -69,24 +69,23 @@ pattern to be matched. They can also have variables:
 
 There are several other matchers that can be added. To match HTTP methods:
 
-	r.HandleFunc("/products", ProductsHandler).Methods("GET", "POST")
+	r.Methods("GET", "POST")
 
 ...or to match a given URL scheme:
 
-	r.HandleFunc("/products", ProductsHandler).Schemes("https")
+	r.Schemes("https")
 
 ...or to match specific header values:
 
-	r.HandleFunc("/products", ProductsHandler).
-	  Headers("X-Requested-With", "XMLHttpRequest")
+	r.Headers("X-Requested-With", "XMLHttpRequest")
 
 ...or to match specific URL query values:
 
-	r.HandleFunc("/products", ProductsHandler).Queries("key", "value")
+	r.Queries("key", "value")
 
 ...or to use a custom matcher function:
 
-	r.HandleFunc("/products", ProductsHandler).MatcherFunc(myFunc)
+	r.MatcherFunc(myFunc)
 
 ...and finally, it is possible to combine several matchers in a single route:
 
@@ -128,7 +127,7 @@ or "reversed". We define a name calling Name() on a route. For example:
 To build a URL, get the route and call the URL() method, passing a sequence of
 key/value pairs for the route variables. For the previous route, we would do:
 
-	url := r.GetRoute("article").URL("category", "technology", "id", "42")
+	url, err := r.GetRoute("article").URL("category", "technology", "id", "42")
 
 ...and the result will be a url.URL with the following path:
 
@@ -143,9 +142,9 @@ This also works for host variables:
 	  Name("article")
 
 	// url.String() will be "http://news.domain.com/articles/technology/42"
-	url := r.GetRoute("article").URL("subdomain", "news",
-									 "category", "technology",
-									 "id", "42")
+	url, err := r.GetRoute("article").URL("subdomain", "news",
+										  "category", "technology",
+										  "id", "42")
 
 All variable names defined in the route are required, and their values must
 conform to the corresponding patterns, if any.
@@ -155,10 +154,10 @@ use the methods URLHost() or URLPath() instead. For the previous route,
 we would do:
 
 	// "http://news.domain.com/"
-	host := r.GetRoute("article").URLHost("subdomain", "news").String()
+	host, err := r.GetRoute("article").URLHost("subdomain", "news").String()
 
 	// "/articles/technology/42"
-	path := r.GetRoute("article").URLPath("category", "technology",
-										  "id", "42").String()
+	path, err := r.GetRoute("article").URLPath("category", "technology",
+											   "id", "42").String()
 */
 package mux
