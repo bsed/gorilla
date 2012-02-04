@@ -30,7 +30,7 @@ standard http.ServeMux.
 Let's start registering a couple of URL paths and handlers:
 
 	func main() {
-		r := new(mux.Router)
+		r := mux.NewRouter()
 		r.HandleFunc("/", HomeHandler)
 		r.HandleFunc("/products", ProductsHandler)
 		r.HandleFunc("/articles", ArticlesHandler)
@@ -46,7 +46,7 @@ Paths can have variables. They are defined using the format {name} or
 {name:pattern}. If a pattern is not defined, the matched variable
 will be anything until the next slash. For example:
 
-	r := new(mux.Router)
+	r := mux.NewRouter()
 	r.HandleFunc("/products/{key}", ProductHandler)
 	r.HandleFunc("/articles/{category}/", ArticlesCategoryHandler)
 	r.HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler)
@@ -63,7 +63,7 @@ are explained below.
 Routes can also be restricted to a domain or subdomain. Just define a host
 pattern to be matched. They can also have variables:
 
-	r := new(mux.Router)
+	r := mux.NewRouter()
 	// Only matches if domain is "www.domain.com".
 	r.Host("www.domain.com")
 	// Matches a dynamic subdomain.
@@ -103,7 +103,7 @@ For example, let's say we have several URLs that should only match when the
 host is "www.domain.com". Create a route for that host and get a "subrouter"
 from the route:
 
-	r := new(mux.Router)
+	r := mux.NewRouter()
 	s := r.Host("www.domain.com").Subrouter()
 
 Then register routes for the subrouter:
@@ -122,7 +122,7 @@ Now let's see how to build registered URLs.
 Routes can be named. All routes that define a name can have their URLs built,
 or "reversed". We define a name calling Name() on a route. For example:
 
-	r := new(mux.Router)
+	r := mux.NewRouter()
 	r.HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).
 	  Name("article")
 
@@ -137,7 +137,7 @@ key/value pairs for the route variables. For the previous route, we would do:
 
 This also works for host variables:
 
-	r := new(mux.Router)
+	r := mux.NewRouter()
 	r.Host("{subdomain}.domain.com").
 	  Path("/articles/{category}/{id:[0-9]+}").
 	  HandlerFunc(ArticleHandler).
@@ -165,7 +165,7 @@ we would do:
 And if you use subrouters, gorilla/mux is smart enough to join host and path
 variables defined separately:
 
-	r := new(mux.Router)
+	r := mux.NewRouter()
 	s := r.Host("{subdomain}.domain.com").Subrouter()
 	s.Path("/articles/{category}/{id:[0-9]+}").
 	  HandlerFunc(ArticleHandler).

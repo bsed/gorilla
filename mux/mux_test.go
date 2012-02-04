@@ -277,7 +277,7 @@ func TestSubRouter(t *testing.T) {
 }
 
 func TestNamedRoutes(t *testing.T) {
-	r1 := new(Router)
+	r1 := NewRouter()
 	r1.NewRoute().Name("a")
 	r1.NewRoute().Name("b")
 	r1.NewRoute().Name("c")
@@ -294,6 +294,8 @@ func TestNamedRoutes(t *testing.T) {
 
 	if r1.namedRoutes == nil || len(r1.namedRoutes) != 9 {
 		t.Errorf("Expected 9 named routes, got %v", r1.namedRoutes)
+	} else if r1.GetRoute("i") == nil {
+		t.Errorf("Subroute name not registered")
 	}
 }
 

@@ -102,10 +102,13 @@ func (r *Route) Name(name string) *Route {
 	if r.err == nil {
 		if r.router == nil {
 			// During tests router is not always set.
-			r.router = new(Router)
+			r.router = NewRouter()
+		}
+		if r.router.namedRoutes == nil {
+			r.router.namedRoutes = make(map[string]*Route)
 		}
 		r.name = name
-		r.router.getNamedRoutes()[name] = r
+		r.router.namedRoutes[name] = r
 	}
 	return r
 }
@@ -175,7 +178,7 @@ func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
 // Headers adds a matcher for request header values.
 // It accepts a sequence of key/value pairs to be matched. For example:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     r.Headers("Content-Type", "application/json",
 //               "X-Requested-With", "XMLHttpRequest")
 //
@@ -206,7 +209,7 @@ func (r *Route) Headers(pairs ...string) *Route {
 //
 // For example:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     r.Host("www.domain.com")
 //     r.Host("{subdomain}.domain.com")
 //     r.Host("{subdomain:[a-z]+}.domain.com")
@@ -266,7 +269,7 @@ func (r *Route) Methods(methods ...string) *Route {
 //
 // For example:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     r.Path("/products/").Handler(ProductsHandler)
 //     r.Path("/products/{key}").Handler(ProductsHandler)
 //     r.Path("/articles/{category}/{id:[0-9]+}").
@@ -299,7 +302,7 @@ func (m queryMatcher) match(r *http.Request, match *RouteMatch) bool {
 // Queries adds a matcher for URL query values.
 // It accepts a sequence of key/value pairs. For example:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     r.Queries("foo", "bar", "baz", "ding")
 //
 // The above route will only match if the URL contains the defined queries
@@ -345,7 +348,7 @@ func (r *Route) Schemes(schemes ...string) *Route {
 //
 // It will test the inner routes only if the parent route matched. For example:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     subrouter := r.Host("www.domain.com").Subrouter()
 //     subrouter.HandleFunc("/products/", ProductsHandler)
 //     subrouter.HandleFunc("/products/{key}", ProductHandler)
@@ -357,10 +360,13 @@ func (r *Route) Schemes(schemes ...string) *Route {
 func (r *Route) Subrouter() *Router {
 	if r.router == nil {
 		// During tests router is not always set.
-		r.router = new(Router)
+		r.router = NewRouter()
+	}
+	if r.router.namedRoutes == nil {
+		r.router.namedRoutes = make(map[string]*Route)
 	}
 	router := &Router{
-		namedRoutes: r.router.getNamedRoutes(),
+		namedRoutes: r.router.namedRoutes,
 		regexp:      copyRouteRegexpGroup(r.regexp),
 	}
 	r.addMatcher(router)
@@ -376,7 +382,7 @@ func (r *Route) Subrouter() *Router {
 // It accepts a sequence of key/value pairs for the route variables. For
 // example, given this route:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     r.HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).
 //       Name("article")
 //
@@ -391,7 +397,7 @@ func (r *Route) Subrouter() *Router {
 //
 // This also works for host variables:
 //
-//     r := new(mux.Router)
+//     r := mux.NewRouter()
 //     r.Host("{subdomain}.domain.com").
 //       HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).
 //       Name("article")
