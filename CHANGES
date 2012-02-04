@@ -15,6 +15,8 @@ Go1 development version
 - mux:
 	- URL(), URLHost() and URLPath() now return (url, error).
 		URLDebug(), URLHostDebug() and URLPathDebug() were removed.
+	- Routes from subrouters can now build URLs using the information
+		from the parent router.
 
 September 25, 2010
 ------------------
