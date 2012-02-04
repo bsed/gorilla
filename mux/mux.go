@@ -12,12 +12,17 @@ import (
 	"code.google.com/p/gorilla/context"
 )
 
+// NewRouter returns a new router instance.
+func NewRouter() *Router {
+	return &Router{namedRoutes: make(map[string]*Route)}
+}
+
 // Router registers routes to be matched and dispatches a handler.
 //
 // It implements the http.Handler interface, so it can be registered to serve
 // requests:
 //
-//     var router = new(mux.Router)
+//     var router = mux.NewRouter()
 //
 //     func main() {
 //         http.Handle("/", router)
@@ -90,6 +95,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // GetRoute returns a route registered with the given name.
 func (r *Router) GetRoute(name string) *Route {
+	if r.namedRoutes == nil {
+		r.namedRoutes = make(map[string]*Route)
+	}
 	return r.namedRoutes[name]
 }
 
@@ -100,14 +108,6 @@ func (r *Router) GetRoute(name string) *Route {
 func (r *Router) StrictSlash(value bool) *Router {
 	r.strictSlash = value
 	return r
-}
-
-// getNamedRoutes returns the registered named routes, creating them if needed.
-func (r *Router) getNamedRoutes() map[string]*Route {
-	if r.namedRoutes == nil {
-		r.namedRoutes = make(map[string]*Route)
-	}
-	return r.namedRoutes
 }
 
 // ----------------------------------------------------------------------------

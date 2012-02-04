@@ -74,7 +74,7 @@ func TestRouteMatchers(t *testing.T) {
 	var headers map[string]string
 	var resultVars map[bool]map[string]string
 
-	router := new(Router)
+	router := NewRouter()
 	router.NewRoute().Host("{var1}.google.com").
 		Path("/{var2:[a-z]+}/{var3:[0-9]+}").
 		Queries("foo", "bar").
@@ -266,13 +266,13 @@ type hostMatcherTest struct {
 
 var hostMatcherTests = []hostMatcherTest{
 	{
-		matcher: new(Router).NewRoute().Host("{foo:[a-z][a-z][a-z]}.{bar:[a-z][a-z][a-z]}.{baz:[a-z][a-z][a-z]}"),
+		matcher: NewRouter().NewRoute().Host("{foo:[a-z][a-z][a-z]}.{bar:[a-z][a-z][a-z]}.{baz:[a-z][a-z][a-z]}"),
 		url:     "http://abc.def.ghi/",
 		vars:    map[string]string{"foo": "abc", "bar": "def", "baz": "ghi"},
 		result:  true,
 	},
 	{
-		matcher: new(Router).NewRoute().Host("{foo:[a-z][a-z][a-z]}.{bar:[a-z][a-z][a-z]}.{baz:[a-z][a-z][a-z]}"),
+		matcher: NewRouter().NewRoute().Host("{foo:[a-z][a-z][a-z]}.{bar:[a-z][a-z][a-z]}.{baz:[a-z][a-z][a-z]}"),
 		url:     "http://a.b.c/",
 		vars:    map[string]string{"foo": "abc", "bar": "def", "baz": "ghi"},
 		result:  false,
@@ -317,13 +317,13 @@ type pathMatcherTest struct {
 
 var pathMatcherTests = []pathMatcherTest{
 	{
-		matcher: new(Router).NewRoute().Path("/{foo:[0-9][0-9][0-9]}/{bar:[0-9][0-9][0-9]}/{baz:[0-9][0-9][0-9]}"),
+		matcher: NewRouter().NewRoute().Path("/{foo:[0-9][0-9][0-9]}/{bar:[0-9][0-9][0-9]}/{baz:[0-9][0-9][0-9]}"),
 		url:     "http://localhost:8080/123/456/789",
 		vars:    map[string]string{"foo": "123", "bar": "456", "baz": "789"},
 		result:  true,
 	},
 	{
-		matcher: new(Router).NewRoute().Path("/{foo:[0-9][0-9][0-9]}/{bar:[0-9][0-9][0-9]}/{baz:[0-9][0-9][0-9]}"),
+		matcher: NewRouter().NewRoute().Path("/{foo:[0-9][0-9][0-9]}/{bar:[0-9][0-9][0-9]}/{baz:[0-9][0-9][0-9]}"),
 		url:     "http://localhost:8080/1/2/3",
 		vars:    map[string]string{"foo": "123", "bar": "456", "baz": "789"},
 		result:  false,
@@ -575,7 +575,7 @@ func TestUrlBuilding(t *testing.T) {
 	ArticleHandler := func(w http.ResponseWriter, r *http.Request) {
 	}
 
-	router := new(Router)
+	router := NewRouter()
 	router.HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).Name("article")
 
 	url, _ := router.GetRoute("article").URL("category", "technology", "id", "42")
@@ -587,7 +587,7 @@ func TestUrlBuilding(t *testing.T) {
 
 func TestMatchedRouteName(t *testing.T) {
 	routeName := "stock"
-	router := new(Router)
+	router := NewRouter()
 	route := router.NewRoute().Path("/products/").Name(routeName)
 
 	url := "http://www.domain.com/products/"
@@ -607,7 +607,7 @@ func TestMatchedRouteName(t *testing.T) {
 
 func TestSubRouting(t *testing.T) {
 	// Example from docs.
-	router := new(Router)
+	router := NewRouter()
 	subrouter := router.NewRoute().Host("www.domain.com").Subrouter()
 	route := subrouter.NewRoute().Path("/products/").Name("products")
 
@@ -638,7 +638,7 @@ func TestVariableNames(t *testing.T) {
 func TestRedirectSlash(t *testing.T) {
 	var route *Route
 	var routeMatch RouteMatch
-	r := new(Router)
+	r := NewRouter()
 
 	r.StrictSlash(false)
 	route = r.NewRoute()
