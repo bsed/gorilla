@@ -20,7 +20,7 @@ references to resources.
 query values or using custom matchers.
 
 * Routes can be used as subrouters: nested routes are only tested if the
-parent route matches. This is usefult o define groups of routes that share
+parent route matches. This is useful to define groups of routes that share
 common conditions like a host, a path prefix or other repeated attributes.
 As a bonus, this optimizes request matching.
 
@@ -65,10 +65,9 @@ pattern to be matched. They can also have variables:
 
 	r := new(mux.Router)
 	// Only matches if domain is "www.domain.com".
-	r.HandleFunc("/products", ProductsHandler).Host("www.domain.com")
+	r.Host("www.domain.com")
 	// Matches a dynamic subdomain.
-	r.HandleFunc("/products", ProductsHandler).
-	  Host("{subdomain:[a-z]+}.domain.com")
+	r.Host("{subdomain:[a-z]+}.domain.com")
 
 There are several other matchers that can be added. To match HTTP methods:
 
@@ -105,13 +104,13 @@ host is "www.domain.com". Create a route for that host and get a "subrouter"
 from the route:
 
 	r := new(mux.Router)
-	subrouter := r.Host("www.domain.com").Subrouter()
+	s := r.Host("www.domain.com").Subrouter()
 
 Then register routes for the subrouter:
 
-	subrouter.HandleFunc("/products/", ProductsHandler)
-	subrouter.HandleFunc("/products/{key}", ProductHandler)
-	subrouter.HandleFunc("/articles/{category}/{id:[0-9]+}"), ArticleHandler)
+	s.HandleFunc("/products/", ProductsHandler)
+	s.HandleFunc("/products/{key}", ProductHandler)
+	s.HandleFunc("/articles/{category}/{id:[0-9]+}"), ArticleHandler)
 
 The three URL paths we registered above will only be tested if the domain is
 "www.domain.com", because the subrouter is tested first. This is not
@@ -162,5 +161,19 @@ we would do:
 	// "/articles/technology/42"
 	path, err := r.GetRoute("article").URLPath("category", "technology",
 											   "id", "42").String()
+
+And if you use subrouters, gorilla/mux is smart enough to join host and path
+variables defined separately:
+
+	r := new(mux.Router)
+	s := r.Host("{subdomain}.domain.com").Subrouter()
+	s.Path("/articles/{category}/{id:[0-9]+}").
+	  HandlerFunc(ArticleHandler).
+	  Name("article")
+
+	// "http://news.domain.com/articles/technology/42"
+	url, err := r.GetRoute("article").URL("subdomain", "news",
+										  "category", "technology",
+										  "id", "42")
 */
 package mux
