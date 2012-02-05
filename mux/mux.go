@@ -78,7 +78,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	var match RouteMatch
 	var handler http.Handler
-	if matched := r.match(req, &match); matched {
+	if matched := r.Match(req, &match); matched {
 		handler = match.Handler
 		setVars(req, match.Vars)
 		setCurrentRoute(req, match.Route)

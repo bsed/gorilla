@@ -10,22 +10,18 @@ http.ServeMux, mux.Router matches incoming requests against a list of
 registered routes and calls a handler for the route that matches the URL
 or other conditions. The main features are:
 
-* URL hosts and paths can be defined using named variables with an optional
-regexp.
-
-* Registered URLs can be built, or "reversed", which helps maintaining
-references to resources.
-
-* Requests can also be matched based on HTTP methods, URL schemes, header and
-query values or using custom matchers.
-
-* Routes can be used as subrouters: nested routes are only tested if the
-parent route matches. This is useful to define groups of routes that share
-common conditions like a host, a path prefix or other repeated attributes.
-As a bonus, this optimizes request matching.
-
-* It implements the http.Handler interface so it is compatible with the
-standard http.ServeMux.
+	* Requests can be matched based on URL host, path, path prefix, schemes,
+	  header and query values, HTTP methods or using custom matchers.
+	* URL hosts and paths can have variables with an optional regular
+	  expression.
+	* Registered URLs can be built, or "reversed", which helps maintaining
+	  references to resources.
+	* Routes can be used as subrouters: nested routes are only tested if the
+	  parent route matches. This is useful to define groups of routes that
+	  share common conditions like a host, a path prefix or other repeated
+	  attributes. As a bonus, this optimizes request matching.
+	* It implements the http.Handler interface so it is compatible with the
+	  standard http.ServeMux.
 
 Let's start registering a couple of URL paths and handlers:
 
@@ -69,19 +65,23 @@ pattern to be matched. They can also have variables:
 	// Matches a dynamic subdomain.
 	r.Host("{subdomain:[a-z]+}.domain.com")
 
-There are several other matchers that can be added. To match HTTP methods:
+There are several other matchers that can be added. To match path prefixes:
+
+	r.PathPrefix("/products/")
+
+...or HTTP methods:
 
 	r.Methods("GET", "POST")
 
-...or a given URL scheme:
+...or URL schemes:
 
 	r.Schemes("https")
 
-...or specific header values:
+...or header values:
 
 	r.Headers("X-Requested-With", "XMLHttpRequest")
 
-...or specific URL query values:
+...or query values:
 
 	r.Queries("key", "value")
 
@@ -106,7 +106,7 @@ from the route:
 	r := mux.NewRouter()
 	s := r.Host("www.domain.com").Subrouter()
 
-Then register routes for the subrouter:
+Then register routes in the subrouter:
 
 	s.HandleFunc("/products/", ProductsHandler)
 	s.HandleFunc("/products/{key}", ProductHandler)
@@ -162,8 +162,8 @@ we would do:
 	path, err := r.GetRoute("article").URLPath("category", "technology",
 											   "id", "42").String()
 
-And if you use subrouters, gorilla/mux is smart enough to join host and path
-variables defined separately:
+And if you use subrouters, host and path defined separately are correctly
+built:
 
 	r := mux.NewRouter()
 	s := r.Host("{subdomain}.domain.com").Subrouter()
