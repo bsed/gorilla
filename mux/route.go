@@ -143,6 +143,9 @@ func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error 
 	if r.regexp == nil {
 		r.regexp = new(routeRegexpGroup)
 	}
+	if !matchHost && r.regexp.path != nil && r.regexp.path.matchPrefix {
+		tpl = strings.TrimRight(r.regexp.path.template, "/") + tpl
+	}
 	rr, err := newRouteRegexp(tpl, matchHost, matchPrefix, r.strictSlash)
 	if err != nil {
 		return err
