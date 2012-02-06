@@ -117,11 +117,11 @@ The three URL paths we registered above will only be tested if the domain is
 only convenient, but also optimizes request matching. You can create
 subrouters combining any attribute matchers accepted by a route.
 
-There's one more thing about subroutes. When a subrouter has a path prefix,
-the inner routes use that prefix as base for their paths:
+There's one more thing about subroutes. When a subrouter has a path,
+the inner routes use it as prefix for their paths:
 
 	r := mux.NewRouter()
-	s := r.PathPrefix("/products").Subrouter()
+	s := r.Path("/products").Subrouter()
 	// "/products/"
 	s.HandleFunc("/", ProductsHandler)
 	// "/products/{key}/"

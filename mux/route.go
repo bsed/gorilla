@@ -133,15 +133,17 @@ func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error 
 	if r.err != nil {
 		return r.err
 	}
+	r.regexp = r.getRegexpGroup()
 	if tpl == "" {
 		return errors.New("mux: host and path templates can't be empty")
 	}
-	if !matchHost && tpl[0] != '/' {
-		return fmt.Errorf("mux: path must start with a slash, got %q", tpl)
-	}
-	r.regexp = r.getRegexpGroup()
-	if !matchHost && r.regexp.path != nil && r.regexp.path.matchPrefix {
-		tpl = strings.TrimRight(r.regexp.path.template, "/") + tpl
+	if !matchHost {
+		if tpl[0] != '/' {
+			return fmt.Errorf("mux: path must start with a slash, got %q", tpl)
+		}
+		if r.regexp.path != nil {
+			tpl = strings.TrimRight(r.regexp.path.template, "/") + tpl
+		}
 	}
 	rr, err := newRouteRegexp(tpl, matchHost, matchPrefix, r.strictSlash)
 	if err != nil {
