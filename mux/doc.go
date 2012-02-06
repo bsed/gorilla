@@ -117,6 +117,18 @@ The three URL paths we registered above will only be tested if the domain is
 only convenient, but also optimizes request matching. You can create
 subrouters combining any attribute matchers accepted by a route.
 
+There's one more thing about subroutes. When a subrouter has a path prefix,
+the inner routes use that prefix as base for their paths:
+
+	r := mux.NewRouter()
+	s := r.PathPrefix("/products").Subrouter()
+	// "/products/"
+	s.HandleFunc("/", ProductsHandler)
+	// "/products/{key}/"
+	s.HandleFunc("/{key}/", ProductHandler)
+	// "/products/{key}/details"
+	s.HandleFunc("/{key}/details"), ProductDetailsHandler)
+
 Now let's see how to build registered URLs.
 
 Routes can be named. All routes that define a name can have their URLs built,
