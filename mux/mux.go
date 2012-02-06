@@ -110,6 +110,10 @@ func (r *Router) StrictSlash(value bool) *Router {
 	return r
 }
 
+// ----------------------------------------------------------------------------
+// parentRoute
+// ----------------------------------------------------------------------------
+
 // getNamedRoutes returns the map where named routes are registered.
 func (r *Router) getNamedRoutes() map[string]*Route {
 	if r.namedRoutes == nil {
