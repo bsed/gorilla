@@ -14,8 +14,8 @@ import (
 
 // Route stores information to match a request and build URLs.
 type Route struct {
-	// Reference to the router where the route was registered.
-	router *Router
+	// Parent where the route was registered (a Router).
+	parent parentRoute
 	// Request handler for the route.
 	handler http.Handler
 	// List of matchers.
@@ -100,15 +100,8 @@ func (r *Route) Name(name string) *Route {
 			r.name, name)
 	}
 	if r.err == nil {
-		if r.router == nil {
-			// During tests router is not always set.
-			r.router = NewRouter()
-		}
-		if r.router.namedRoutes == nil {
-			r.router.namedRoutes = make(map[string]*Route)
-		}
 		r.name = name
-		r.router.namedRoutes[name] = r
+		r.getNamedRoutes()[name] = r
 	}
 	return r
 }
@@ -146,9 +139,7 @@ func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error 
 	if !matchHost && tpl[0] != '/' {
 		return fmt.Errorf("mux: path must start with a slash, got %q", tpl)
 	}
-	if r.regexp == nil {
-		r.regexp = new(routeRegexpGroup)
-	}
+	r.regexp = r.getRegexpGroup()
 	if !matchHost && r.regexp.path != nil && r.regexp.path.matchPrefix {
 		tpl = strings.TrimRight(r.regexp.path.template, "/") + tpl
 	}
@@ -355,17 +346,7 @@ func (r *Route) Schemes(schemes ...string) *Route {
 // In this example, the routes registered in the subrouter won't be tested
 // if the host doesn't match.
 func (r *Route) Subrouter() *Router {
-	if r.router == nil {
-		// During tests router is not always set.
-		r.router = NewRouter()
-	}
-	if r.router.namedRoutes == nil {
-		r.router.namedRoutes = make(map[string]*Route)
-	}
-	router := &Router{
-		namedRoutes: r.router.namedRoutes,
-		regexp:      copyRouteRegexpGroup(r.regexp),
-	}
+	router := &Router{parent: r}
 	r.addMatcher(router)
 	return router
 }
@@ -408,7 +389,7 @@ func (r *Route) Subrouter() *Router {
 // conform to the corresponding patterns, if any.
 func (r *Route) URL(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil {
-		return nil, errors.New("mux: route doesn't have a host or path.")
+		return nil, errors.New("mux: route doesn't have a host or path")
 	}
 	var scheme, host, path string
 	var err error
@@ -436,7 +417,7 @@ func (r *Route) URL(pairs ...string) (*url.URL, error) {
 // The route must have a host defined.
 func (r *Route) URLHost(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil || r.regexp.host == nil {
-		return nil, errors.New("mux: route doesn't have a host.")
+		return nil, errors.New("mux: route doesn't have a host")
 	}
 	host, err := r.regexp.host.url(pairs...)
 	if err != nil {
@@ -453,7 +434,7 @@ func (r *Route) URLHost(pairs ...string) (*url.URL, error) {
 // The route must have a path defined.
 func (r *Route) URLPath(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil || r.regexp.path == nil {
-		return nil, errors.New("mux: route doesn't have a path.")
+		return nil, errors.New("mux: route doesn't have a path")
 	}
 	path, err := r.regexp.path.url(pairs...)
 	if err != nil {
@@ -462,4 +443,44 @@ func (r *Route) URLPath(pairs ...string) (*url.URL, error) {
 	return &url.URL{
 		Path: path,
 	}, nil
+}
+
+// ----------------------------------------------------------------------------
+// parentRoute
+// ----------------------------------------------------------------------------
+
+// parentRoute allows routes to know about parent host and path definitions.
+type parentRoute interface {
+	getNamedRoutes() map[string]*Route
+	getRegexpGroup() *routeRegexpGroup
+}
+
+// getNamedRoutes returns the map where named routes are registered.
+func (r *Route) getNamedRoutes() map[string]*Route {
+	if r.parent == nil {
+		// During tests router is not always set.
+		r.parent = NewRouter()
+	}
+	return r.parent.getNamedRoutes()
+}
+
+// getRegexpGroup returns regexp definitions from this route.
+func (r *Route) getRegexpGroup() *routeRegexpGroup {
+	if r.regexp == nil {
+		if r.parent == nil {
+			// During tests router is not always set.
+			r.parent = NewRouter()
+		}
+		regexp := r.parent.getRegexpGroup()
+		if regexp == nil {
+			r.regexp = new(routeRegexpGroup)
+		} else {
+			// Copy.
+			r.regexp = &routeRegexpGroup{
+				host: regexp.host,
+				path: regexp.path,
+			}
+		}
+	}
+	return r.regexp
 }
