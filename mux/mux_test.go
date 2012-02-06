@@ -273,16 +273,16 @@ func TestSubRouter(t *testing.T) {
 
 	// ------------------------------------------------------------------------
 
-	subrouter = new(Route).PathPrefix("/foo/{v1}/").Subrouter()
-	route = subrouter.Path("/baz")
-	request, _ = http.NewRequest("GET", "http://localhost/foo/bar/baz", nil)
-	vars = map[string]string{"v1": "bar"}
+	subrouter = new(Route).PathPrefix("/foo/{v1}").Subrouter()
+	route = subrouter.Path("/baz/{v2}")
+	request, _ = http.NewRequest("GET", "http://localhost/foo/bar/baz/ding", nil)
+	vars = map[string]string{"v1": "bar", "v2": "ding"}
 	host = ""
-	path = "/foo/bar/baz"
+	path = "/foo/bar/baz/ding"
 	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
-	request, _ = http.NewRequest("GET", "http://localhost/baz", nil)
+	request, _ = http.NewRequest("GET", "http://localhost/foo/bar", nil)
 	testRoute(t, id(), false, route, request, vars, host, path, url)
 
 	//route = subrouter.Path("/{v2:[a-z]+}/{v3:[a-z]+}")
