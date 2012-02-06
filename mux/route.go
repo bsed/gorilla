@@ -189,15 +189,12 @@ func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Headers(pairs ...string) *Route {
-	if len(pairs) == 0 {
-		return r
+	if r.err == nil {
+		var headers map[string]string
+		headers, r.err = mapFromPairs(pairs...)
+		return r.addMatcher(headerMatcher(headers))
 	}
-	headers, err := mapFromPairs(pairs...)
-	if err != nil {
-		r.err = err
-		return r
-	}
-	return r.addMatcher(headerMatcher(headers))
+	return r
 }
 
 // Host -----------------------------------------------------------------------
@@ -251,9 +248,6 @@ func (m methodMatcher) match(r *http.Request, match *RouteMatch) bool {
 // It accepts a sequence of one or more methods to be matched, e.g.:
 // "GET", "POST", "PUT".
 func (r *Route) Methods(methods ...string) *Route {
-	if len(methods) == 0 {
-		return r
-	}
 	for k, v := range methods {
 		methods[k] = strings.ToUpper(v)
 	}
@@ -313,15 +307,12 @@ func (m queryMatcher) match(r *http.Request, match *RouteMatch) bool {
 //
 // It the value is an empty string, it will match any value if the key is set.
 func (r *Route) Queries(pairs ...string) *Route {
-	if len(pairs) == 0 {
-		return r
+	if r.err == nil {
+		var queries map[string]string
+		queries, r.err = mapFromPairs(pairs...)
+		return r.addMatcher(queryMatcher(queries))
 	}
-	queries, err := mapFromPairs(pairs...)
-	if err != nil {
-		r.err = err
-		return r
-	}
-	return r.addMatcher(queryMatcher(queries))
+	return r
 }
 
 // Schemes --------------------------------------------------------------------
@@ -336,9 +327,6 @@ func (m schemeMatcher) match(r *http.Request, match *RouteMatch) bool {
 // Schemes adds a matcher for URL schemes.
 // It accepts a sequence schemes to be matched, e.g.: "http", "https".
 func (r *Route) Schemes(schemes ...string) *Route {
-	if len(schemes) == 0 {
-		return r
-	}
 	for k, v := range schemes {
 		schemes[k] = strings.ToLower(v)
 	}
