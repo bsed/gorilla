@@ -284,10 +284,6 @@ func TestSubRouter(t *testing.T) {
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/foo/bar", nil)
 	testRoute(t, id(), false, route, request, vars, host, path, url)
-
-	//route = subrouter.Path("/{v2:[a-z]+}/{v3:[a-z]+}")
-	//route = subrouter.Path("/{v2:[0-9]+}")
-	//route = subrouter.Path("/{v2:[0-9]+}/{v3:[0-9]+}")
 }
 
 func TestNamedRoutes(t *testing.T) {

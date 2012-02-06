@@ -6,7 +6,6 @@ package mux
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,12 +24,6 @@ import (
 // names ([a-zA-Z_][a-zA-Z0-9_]*), but currently the only restriction is that
 // name and pattern can't be empty, and names can't contain a colon.
 func newRouteRegexp(tpl string, matchHost, matchPrefix, strictSlash bool) (*routeRegexp, error) {
-	if tpl == "" {
-		return nil, errors.New("mux: host and path templates can't be empty")
-	}
-	if !matchHost && tpl[0] != '/' {
-		return nil, fmt.Errorf("mux: path must start with a slash, got %q", tpl)
-	}
 	// Check if it is well-formed.
 	idxs, errBraces := braceIndices(tpl)
 	if errBraces != nil {
