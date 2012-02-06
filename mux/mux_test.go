@@ -271,9 +271,19 @@ func TestSubRouter(t *testing.T) {
 	request, _ = http.NewRequest("GET", "http://111.google.com/111", nil)
 	testRoute(t, id(), false, route, request, vars, host, path, url)
 
-	//route = subrouter.Path("/{v2:[a-z]+}/{v3:[a-z]+}")
-	//route = subrouter.Path("/{v2:[0-9]+}")
-	//route = subrouter.Path("/{v2:[0-9]+}/{v3:[0-9]+}")
+	// ------------------------------------------------------------------------
+
+	subrouter = new(Route).PathPrefix("/foo/{v1}").Subrouter()
+	route = subrouter.Path("/baz/{v2}")
+	request, _ = http.NewRequest("GET", "http://localhost/foo/bar/baz/ding", nil)
+	vars = map[string]string{"v1": "bar", "v2": "ding"}
+	host = ""
+	path = "/foo/bar/baz/ding"
+	url = host + path
+	testRoute(t, id(), true, route, request, vars, host, path, url)
+	// Non-match for the same config.
+	request, _ = http.NewRequest("GET", "http://localhost/foo/bar", nil)
+	testRoute(t, id(), false, route, request, vars, host, path, url)
 }
 
 func TestNamedRoutes(t *testing.T) {

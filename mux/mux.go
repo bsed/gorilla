@@ -38,14 +38,14 @@ func NewRouter() *Router {
 type Router struct {
 	// Configurable Handler to be used when no route matches.
 	NotFoundHandler http.Handler
+	// Parent route, if this is a subrouter.
+	parent parentRoute
 	// Routes to be matched, in order.
 	routes []*Route
 	// Routes by name for URL building.
 	namedRoutes map[string]*Route
 	// See Route.strictSlash. This defines the default flag for new routes.
 	strictSlash bool
-	// Manager for the variables from host and path.
-	regexp *routeRegexpGroup
 }
 
 // Match matches registered routes against the request.
@@ -78,7 +78,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	var match RouteMatch
 	var handler http.Handler
-	if matched := r.match(req, &match); matched {
+	if matched := r.Match(req, &match); matched {
 		handler = match.Handler
 		setVars(req, match.Vars)
 		setCurrentRoute(req, match.Route)
@@ -111,16 +111,36 @@ func (r *Router) StrictSlash(value bool) *Router {
 }
 
 // ----------------------------------------------------------------------------
+// parentRoute
+// ----------------------------------------------------------------------------
+
+// getNamedRoutes returns the map where named routes are registered.
+func (r *Router) getNamedRoutes() map[string]*Route {
+	if r.namedRoutes == nil {
+		if r.parent != nil {
+			r.namedRoutes = r.parent.getNamedRoutes()
+		} else {
+			r.namedRoutes = make(map[string]*Route)
+		}
+	}
+	return r.namedRoutes
+}
+
+// getRegexpGroup returns regexp definitions from the parent route, if any.
+func (r *Router) getRegexpGroup() *routeRegexpGroup {
+	if r.parent != nil {
+		return r.parent.getRegexpGroup()
+	}
+	return nil
+}
+
+// ----------------------------------------------------------------------------
 // Route factories
 // ----------------------------------------------------------------------------
 
 // NewRoute registers an empty route.
 func (r *Router) NewRoute() *Route {
-	route := &Route{
-		router:      r,
-		regexp:      copyRouteRegexpGroup(r.regexp),
-		strictSlash: r.strictSlash,
-	}
+	route := &Route{parent: r, strictSlash: r.strictSlash}
 	r.routes = append(r.routes, route)
 	return route
 }
@@ -314,16 +334,4 @@ func matchMap(toCheck map[string]string, toMatch map[string][]string,
 		}
 	}
 	return true
-}
-
-// copyRouteRegexpGroup copies a regexp group to make a route aware of
-// parent rules.
-func copyRouteRegexpGroup(r *routeRegexpGroup) *routeRegexpGroup {
-	if r == nil {
-		return nil
-	}
-	return &routeRegexpGroup{
-		host: r.host,
-		path: r.path,
-	}
 }
