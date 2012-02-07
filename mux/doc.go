@@ -93,7 +93,8 @@ There are several other matchers that can be added. To match path prefixes:
 
 	r.HandleFunc("/products", ProductsHandler).
 	  Host("www.domain.com").
-	  Methods("GET").Schemes("http")
+	  Methods("GET").
+	  Schemes("http")
 
 Setting the same matching conditions again and again can be boring, so we have
 a way to group several routes that share the same requirements.
@@ -101,7 +102,7 @@ We call it "subrouting".
 
 For example, let's say we have several URLs that should only match when the
 host is "www.domain.com". Create a route for that host and get a "subrouter"
-from the route:
+from it:
 
 	r := mux.NewRouter()
 	s := r.Host("www.domain.com").Subrouter()
@@ -117,8 +118,8 @@ The three URL paths we registered above will only be tested if the domain is
 only convenient, but also optimizes request matching. You can create
 subrouters combining any attribute matchers accepted by a route.
 
-There's one more thing about subroutes. When a subrouter has a path,
-the inner routes use it as prefix for their paths:
+There's one more thing about subroutes. When a subrouter has a path or path
+prefix, the inner routes use it as base for their paths:
 
 	r := mux.NewRouter()
 	s := r.Path("/products").Subrouter()
@@ -168,14 +169,14 @@ use the methods URLHost() or URLPath() instead. For the previous route,
 we would do:
 
 	// "http://news.domain.com/"
-	host, err := r.GetRoute("article").URLHost("subdomain", "news").String()
+	host, err := r.GetRoute("article").URLHost("subdomain", "news")
 
 	// "/articles/technology/42"
 	path, err := r.GetRoute("article").URLPath("category", "technology",
-											   "id", "42").String()
+											   "id", "42")
 
-And if you use subrouters, host and path defined separately are correctly
-built:
+And if you use subrouters, host and path defined separately can be built
+as well:
 
 	r := mux.NewRouter()
 	s := r.Host("{subdomain}.domain.com").Subrouter()
