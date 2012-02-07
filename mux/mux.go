@@ -50,14 +50,9 @@ type Router struct {
 
 // Match matches registered routes against the request.
 func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
-	return r.match(req, match)
-}
-
-// match matches registered routes against the request.
-func (r *Router) match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.err == nil {
-			if matched := route.match(req, match); matched {
+			if matched := route.Match(req, match); matched {
 				return true
 			}
 		}

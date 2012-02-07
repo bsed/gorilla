@@ -95,12 +95,12 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, strictSlash bool) (*rout
 	}
 	// Done!
 	return &routeRegexp{
-		template:    template,
-		matchHost:   matchHost,
-		regexp:      reg,
-		reverse:     reverse.String(),
-		varsN:       varsN,
-		varsR:       varsR,
+		template:  template,
+		matchHost: matchHost,
+		regexp:    reg,
+		reverse:   reverse.String(),
+		varsN:     varsN,
+		varsR:     varsR,
 	}, nil
 }
 
@@ -122,7 +122,7 @@ type routeRegexp struct {
 }
 
 // match matches the regexp against the URL host or path.
-func (r *routeRegexp) match(req *http.Request, match *RouteMatch) bool {
+func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
 	if !r.matchHost {
 		return r.regexp.MatchString(req.URL.Path)
 	}
