@@ -4,6 +4,6 @@ TARG=code.google.com/p/gorilla/schema
 
 GOFILES=\
 	cache.go\
-	schema.go\
+	load.go\
 
 include ${GOROOT}/src/Make.pkg
