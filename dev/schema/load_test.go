@@ -59,7 +59,7 @@ func TestBasicValue(t *testing.T) {
 		F14: 46,
 	}
 	s := &S1{}
-	_ = NewStructLoader().Load(s, v)
+	_ = NewDecoder().Decode(s, v)
 	if s.F01 != e.F01 {	t.Errorf("F01: expected %v, got %v", e.F01, s.F01) }
 	if s.F02 != e.F02 {	t.Errorf("F02: expected %v, got %v", e.F02, s.F02) }
 	if s.F03 != e.F03 {	t.Errorf("F03: expected %v, got %v", e.F03, s.F03) }
@@ -129,7 +129,7 @@ func TestSlice(t *testing.T) {
 		F14: []uint64{54, 55, 56},
 	}
 	s := &S2{}
-	_ = NewStructLoader().Load(s, v)
+	_ = NewDecoder().Decode(s, v)
 	if s.F01 == nil || len(s.F01) != 3 || s.F01[0] != e.F01[0] || s.F01[1] != e.F01[1] || s.F01[2] != e.F01[2] { t.Errorf("F01: expected %v, got %v", e.F01, s.F01) }
 	if s.F02 == nil || len(s.F02) != 3 || s.F02[0] != e.F02[0] || s.F02[1] != e.F02[1] || s.F02[2] != e.F02[2] { t.Errorf("F02: expected %v, got %v", e.F02, s.F02) }
 	if s.F03 == nil || len(s.F03) != 3 || s.F03[0] != e.F03[0] || s.F03[1] != e.F03[1] || s.F03[2] != e.F03[2] { t.Errorf("F03: expected %v, got %v", e.F03, s.F03) }
@@ -204,7 +204,7 @@ func TestNestedStruct(t *testing.T) {
 		},
 	}
 	s := &S3{}
-	_ = NewStructLoader().Load(s, v)
+	_ = NewDecoder().Decode(s, v)
 
 	if s.F01.F01 != e.F01.F01 {
 		t.Errorf("name1.F01: expected %v, got %v", e.F01.F01, s.F01.F01)

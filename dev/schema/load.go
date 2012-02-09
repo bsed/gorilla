@@ -10,25 +10,30 @@ import (
 	"strconv"
 )
 
-var invalidValue = reflect.Value{}
-
-func NewStructLoader() *StructLoader {
-	s := &StructLoader{
+// NewDecoder returns a new Decoder.
+func NewDecoder() *Decoder {
+	d := &Decoder{
 		cache: structCache{m: make(map[string]*structInfo)},
 		conv:  make(map[reflect.Type]Converter),
 	}
 	for k, v := range converters {
-		s.conv[k] = v
+		d.conv[k] = v
 	}
-	return s
+	return d
 }
 
-type StructLoader struct {
+// Decoder decodes values from a map[string][]string to a struct.
+type Decoder struct {
 	cache structCache
 	conv  map[reflect.Type]Converter
 }
 
-// Load fills a struct with values from a map.
+// RegisterConverter registers a converter function for a custom type.
+func (d *Decoder) RegisterConverter(value interface{}, converterFunc Converter) {
+	d.conv[reflect.TypeOf(value)] = converterFunc
+}
+
+// Decode decodes a map[string][]string to a struct.
 //
 // The first parameter must be a pointer to a struct.
 //
@@ -36,7 +41,7 @@ type StructLoader struct {
 // Keys are "paths" in dotted notation to the struct fields and nested structs.
 //
 // See the package documentation for a full explanation of the mechanics.
-func (s *StructLoader) Load(dst interface{}, src map[string][]string) error {
+func (d *Decoder) Decode(dst interface{}, src map[string][]string) error {
 	v := reflect.ValueOf(dst)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return errors.New("schema: interface must be a pointer to struct")
@@ -44,15 +49,15 @@ func (s *StructLoader) Load(dst interface{}, src map[string][]string) error {
 	v = v.Elem()
 	t := v.Type()
 	for path, values := range src {
-		if parts, err := s.cache.parsePath(path, t); err == nil {
-			s.loadPath(v, parts, values)
+		if parts, err := d.cache.parsePath(path, t); err == nil {
+			d.decode(v, parts, values)
 		}
 	}
 	return nil
 }
 
-// loadPath loads a parsed path.
-func (s *StructLoader) loadPath(v reflect.Value, parts []pathPart, values []string) {
+// decode fills a struct field using a parsed path.
+func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 	field := v.FieldByIndex(parts[0].path)
 	if len(parts) == 1 {
 		// Simple case.
@@ -61,7 +66,7 @@ func (s *StructLoader) loadPath(v reflect.Value, parts []pathPart, values []stri
 			items := make([]reflect.Value, len(values))
 			elemT := field.Type().Elem()
 			for key, value := range values {
-				if conv := s.conv[elemT]; conv != nil {
+				if conv := d.conv[elemT]; conv != nil {
 					if item := conv(value); item.IsValid() {
 						items[key] = item
 					} else {
@@ -79,7 +84,7 @@ func (s *StructLoader) loadPath(v reflect.Value, parts []pathPart, values []stri
 				field.Set(reflect.Append(slice, items...))
 			}
 		default:
-			if conv := s.conv[field.Type()]; conv != nil {
+			if conv := d.conv[field.Type()]; conv != nil {
 				if v := conv(values[0]); v.IsValid() {
 					field.Set(v)
 				}
@@ -98,7 +103,7 @@ func (s *StructLoader) loadPath(v reflect.Value, parts []pathPart, values []stri
 		reflect.Copy(slice, field)
 		field.Set(slice)
 	}
-	s.loadPath(field.Index(idx), parts[1:], values)
+	d.decode(field.Index(idx), parts[1:], values)
 }
 
 // ----------------------------------------------------------------------------
@@ -108,20 +113,21 @@ func (s *StructLoader) loadPath(v reflect.Value, parts []pathPart, values []stri
 type Converter func(string) reflect.Value
 
 var (
-	boolType    = reflect.TypeOf(false)
-	float32Type = reflect.TypeOf(float32(0))
-	float64Type = reflect.TypeOf(float64(0))
-	intType     = reflect.TypeOf(int(0))
-	int8Type    = reflect.TypeOf(int8(0))
-	int16Type   = reflect.TypeOf(int16(0))
-	int32Type   = reflect.TypeOf(int32(0))
-	int64Type   = reflect.TypeOf(int64(0))
-	stringType  = reflect.TypeOf("")
-	uintType    = reflect.TypeOf(uint(0))
-	uint8Type   = reflect.TypeOf(uint8(0))
-	uint16Type  = reflect.TypeOf(uint16(0))
-	uint32Type  = reflect.TypeOf(uint32(0))
-	uint64Type  = reflect.TypeOf(uint64(0))
+	invalidValue = reflect.Value{}
+	boolType     = reflect.TypeOf(false)
+	float32Type  = reflect.TypeOf(float32(0))
+	float64Type  = reflect.TypeOf(float64(0))
+	intType      = reflect.TypeOf(int(0))
+	int8Type     = reflect.TypeOf(int8(0))
+	int16Type    = reflect.TypeOf(int16(0))
+	int32Type    = reflect.TypeOf(int32(0))
+	int64Type    = reflect.TypeOf(int64(0))
+	stringType   = reflect.TypeOf("")
+	uintType     = reflect.TypeOf(uint(0))
+	uint8Type    = reflect.TypeOf(uint8(0))
+	uint16Type   = reflect.TypeOf(uint16(0))
+	uint32Type   = reflect.TypeOf(uint32(0))
+	uint64Type   = reflect.TypeOf(uint64(0))
 )
 
 // Default converters for basic types.
