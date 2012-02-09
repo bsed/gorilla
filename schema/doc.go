@@ -19,37 +19,42 @@ The basic usage is really simple. Given this struct:
 		"Phone": {"999-999-999"},
 	}
 	person := new(Person)
-	schema.Load(person, values)
+	decoder := NewDecoder()
+	decoder.Decode(person, values)
 
 This is just a simple example and it doesn't make a lot of sense to create
 the map manually. Typically it will come from a http.Request object and
 will be of type url.Values: http.Request.Form or http.Request.MultipartForm.
 
+Note: it is a good idea to set a StructLoader instance as a package global,
+because it caches meta-data about structs, and a instance can be shared safely:
+
+	var decoder = NewDecoder()
+
+To define custom names for fields, use a struct tag "schema". To not populate
+certain fields, use a dash as the name and it will be ignored:
+
+	type Person struct {
+		Name  string `schema:"name"`  // custom name
+		Phone string `schema:"phone"` // custom name
+		Admin bool   `schema:"-"`     // this field is never set
+	}
+
 The supported field types in the destination struct are:
 
-- bool;
-
-- float variants (float32, float64);
-
-- int variants (int, int8, int16, int32, int64);
-
-- string;
-
-- uint variants (uint, uint8, uint16, uint32, uint64);
-
-- structs;
-
-- slices of any of the above types or maps with string keys and any of the
-above types;
-
-- types with one of the above underlying types.
-
-- a pointer to any of the above types.
+	* bool
+	* float variants (float32, float64)
+	* int variants (int, int8, int16, int32, int64)
+	* string
+	* uint variants (uint, uint8, uint16, uint32, uint64)
+	* structs
+	* slices of any of the above types
+	* a pointer to one of the above types
 
 Non-supported types are simply ignored.
 
-Nested structs are scanned recursivelly and the source keys must use dotted
-notation for that. So for example, when filling the struct Person below:
+To fill nested structs, keys must use a dotted notation as the "path" for the
+field. So for example, to fill the struct Person below:
 
 	type Phone struct {
 		Label  string
@@ -61,9 +66,8 @@ notation for that. So for example, when filling the struct Person below:
 		Phone Phone
 	}
 
-...it will search for keys "Name", "Phone.Label" and "Phone.Number" in the
-source map. Dotted names are needed to avoid name clashes. This means that
-an HTML form to fill a Person struct must look like this:
+...the source map must have the keys "Name", "Phone.Label" and "Phone.Number".
+This means that an HTML form to fill a Person struct must look like this:
 
 	<form>
 		<input type="text" name="Name">
@@ -84,39 +88,16 @@ a Person with multiple Phone values, like:
 
 	<form>
 		<input type="text" name="Name">
-		<input type="text" name="Phones.Label">
-		<input type="text" name="Phones.Number">
-		<input type="text" name="Phones.Label">
-		<input type="text" name="Phones.Number">
-		<input type="text" name="Phones.Label">
-		<input type="text" name="Phones.Number">
+		<input type="text" name="Phones.0.Label">
+		<input type="text" name="Phones.0.Number">
+		<input type="text" name="Phones.1.Label">
+		<input type="text" name="Phones.1.Number">
+		<input type="text" name="Phones.2.Label">
+		<input type="text" name="Phones.2.Number">
 	</form>
 
-Maps can only have a string as key, and use the same dotted notation. So for
-the struct:
-
-	type Person struct {
-		Name   string
-		Scores map[string]int
-	}
-
-...we can define a form like:
-
-	<form>
-		<input type="text" name="Name">
-		<input type="text" name="Scores.Math" value="7">
-		<input type="text" name="Scores.RocketScience" value="1">
-		<input type="text" name="Scores.Go" value="9">
-	</form>
-
-...and the resulting Scores map will be:
-
-	map[string]int{
-		"Math":          7,
-		"RocketScience": 1,
-		"Go":            9,
-	}
-
-As you see, not everybody is good at rocket science!
+Notice that only for slices of structs the slice index is required.
+This is needed for disambiguation: if the nested struct also has a slice
+field, we could not represent it.
 */
 package schema
