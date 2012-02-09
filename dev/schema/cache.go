@@ -14,10 +14,23 @@ import (
 
 var invalidPath = errors.New("schema: invalid path")
 
-// structCache caches meta-data about a struct.
-type structCache struct {
-	l sync.Mutex
-	m map[string]*structInfo
+// newCache returns a new cache.
+func newCache() *cache {
+	c := cache{
+		m:    make(map[string]*structInfo),
+		conv: make(map[reflect.Type]Converter),
+	}
+	for k, v := range converters {
+		c.conv[k] = v
+	}
+	return &c
+}
+
+// cache caches meta-data about a struct.
+type cache struct {
+	l    sync.Mutex
+	m    map[string]*structInfo
+	conv map[reflect.Type]Converter
 }
 
 // parsePath parses a path in dotted notation verifying that it is a valid
@@ -26,7 +39,7 @@ type structCache struct {
 // It returns "path parts" which contain indices to fields to be used by
 // reflect.Value.FieldByIndex(). Multiple parts are required for slices of
 // structs.
-func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
+func (c *cache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 	var struc *structInfo
 	var field *fieldInfo
 	var index64 int64
@@ -44,8 +57,13 @@ func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 		}
 		path = append(path, field.index)
 		switch field.mainType.Kind() {
-		case reflect.Struct:
-			t = field.mainType
+		case reflect.Ptr:
+			if field.elemType.Kind() != reflect.Struct {
+				if conv := c.conv[field.elemType]; conv == nil {
+					// Unsupported type.
+					return nil, invalidPath
+				}
+			}
 		case reflect.Slice:
 			if field.elemType.Kind() == reflect.Struct {
 				// i+1 must be the index, and i+2 must exist.
@@ -64,6 +82,16 @@ func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 				})
 				path = make([]int, 0)
 				t = field.elemType
+			} else if conv := c.conv[field.elemType]; conv == nil {
+				// Unsupported type.
+				return nil, invalidPath
+			}
+		case reflect.Struct:
+			t = field.mainType
+		default:
+			if conv := c.conv[field.mainType]; conv == nil {
+				// Unsupported type.
+				return nil, invalidPath
 			}
 		}
 	}
@@ -76,7 +104,7 @@ func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 }
 
 // get returns a cached structInfo, creating it if necessary.
-func (c *structCache) get(t reflect.Type) *structInfo {
+func (c *cache) get(t reflect.Type) *structInfo {
 	id := typeID(t)
 	c.l.Lock()
 	info := c.m[id]
@@ -90,7 +118,7 @@ func (c *structCache) get(t reflect.Type) *structInfo {
 }
 
 // creat creates a structInfo with meta-data about a struct.
-func (c *structCache) create(t reflect.Type) *structInfo {
+func (c *cache) create(t reflect.Type) *structInfo {
 	info := &structInfo{
 		fields: make(map[string]*fieldInfo),
 	}
@@ -106,7 +134,8 @@ func (c *structCache) create(t reflect.Type) *structInfo {
 				name:     field.Name,
 				mainType: field.Type,
 			}
-			if field.Type.Kind() == reflect.Slice {
+			kind := field.Type.Kind()
+			if kind == reflect.Slice || kind == reflect.Ptr {
 				info.fields[alias].elemType = field.Type.Elem()
 			}
 		}
@@ -143,10 +172,6 @@ type pathPart struct {
 // typeID returns a string identifier for a type.
 func typeID(t reflect.Type) string {
 	// Borrowed from gob package.
-	// We don't care about pointers.
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
 	// Default to printed representation for unnamed types.
 	name := t.String()
 	// But for named types, qualify with import path.

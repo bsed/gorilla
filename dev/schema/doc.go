@@ -49,6 +49,7 @@ The supported field types in the destination struct are:
 	* uint variants (uint, uint8, uint16, uint32, uint64)
 	* structs
 	* slices of any of the above types
+	* a pointer to one of the above types
 
 Non-supported types are simply ignored.
 
