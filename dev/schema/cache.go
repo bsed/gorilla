@@ -14,11 +14,18 @@ import (
 
 var invalidPath = errors.New("schema: invalid path")
 
+// structCache caches meta-data about a struct.
 type structCache struct {
 	l sync.Mutex
 	m map[string]*structInfo
 }
 
+// parsePath parses a path in dotted notation verifying that it is a valid
+// path to a struct field.
+//
+// It returns "path parts" which contain indices to fields to be used by
+// reflect.Value.FieldByIndex(). Multiple parts are required for slices of
+// structs.
 func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 	var struc *structInfo
 	var field *fieldInfo
@@ -51,7 +58,7 @@ func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 				}
 				index = int(index64)
 				res = append(res, pathPart{
-					path: path,
+					path:  path,
 					field: field,
 					index: index,
 				})
@@ -61,13 +68,14 @@ func (c *structCache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 		}
 	}
 	res = append(res, pathPart{
-		path: path,
+		path:  path,
 		field: field,
 		index: -1,
 	})
 	return res, nil
 }
 
+// get returns a cached structInfo, creating it if necessary.
 func (c *structCache) get(t reflect.Type) *structInfo {
 	id := typeID(t)
 	c.l.Lock()
@@ -81,6 +89,7 @@ func (c *structCache) get(t reflect.Type) *structInfo {
 	return info
 }
 
+// creat creates a structInfo with meta-data about a struct.
 func (c *structCache) create(t reflect.Type) *structInfo {
 	info := &structInfo{
 		fields: make(map[string]*fieldInfo),
@@ -115,8 +124,6 @@ func (i *structInfo) get(alias string) *fieldInfo {
 	return i.fields[alias]
 }
 
-// ----------------------------------------------------------------------------
-
 type fieldInfo struct {
 	index    int
 	alias    string
@@ -124,8 +131,6 @@ type fieldInfo struct {
 	mainType reflect.Type
 	elemType reflect.Type
 }
-
-// ----------------------------------------------------------------------------
 
 type pathPart struct {
 	path  []int

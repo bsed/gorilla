@@ -12,18 +12,31 @@ import (
 
 var invalidValue = reflect.Value{}
 
-// TODO: make cache part of a loader instance
-var cache = structCache{m: make(map[string]*structInfo)}
+func NewStructLoader() *StructLoader {
+	s := &StructLoader{
+		cache: structCache{m: make(map[string]*structInfo)},
+		conv:  make(map[reflect.Type]Converter),
+	}
+	for k, v := range converters {
+		s.conv[k] = v
+	}
+	return s
+}
 
-// LoadStruct fills a struct with values from a map.
+type StructLoader struct {
+	cache structCache
+	conv  map[reflect.Type]Converter
+}
+
+// Load fills a struct with values from a map.
 //
-// The first parameter is a map, typically url.Values from an HTTP request.
+// The first parameter must be a pointer to a struct.
+//
+// The second parameter is a map, typically url.Values from an HTTP request.
 // Keys are "paths" in dotted notation to the struct fields and nested structs.
 //
-// The second parameter must be a pointer to a struct.
-//
 // See the package documentation for a full explanation of the mechanics.
-func LoadStruct(src map[string][]string, dst interface{}) error {
+func (s *StructLoader) Load(dst interface{}, src map[string][]string) error {
 	v := reflect.ValueOf(dst)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return errors.New("schema: interface must be a pointer to struct")
@@ -31,28 +44,33 @@ func LoadStruct(src map[string][]string, dst interface{}) error {
 	v = v.Elem()
 	t := v.Type()
 	for path, values := range src {
-		if parts, err := cache.parsePath(path, t); err == nil {
-			loadPath(v, parts, values)
+		if parts, err := s.cache.parsePath(path, t); err == nil {
+			s.loadPath(v, parts, values)
 		}
 	}
 	return nil
 }
 
-func loadPath(v reflect.Value, parts []pathPart, values []string) {
+// loadPath loads a parsed path.
+func (s *StructLoader) loadPath(v reflect.Value, parts []pathPart, values []string) {
 	field := v.FieldByIndex(parts[0].path)
 	if len(parts) == 1 {
 		// Simple case.
 		switch field.Kind() {
 		case reflect.Slice:
-			kind := field.Type().Elem().Kind()
 			items := make([]reflect.Value, len(values))
+			elemT := field.Type().Elem()
 			for key, value := range values {
-				if item := getBasicValue(kind, value); item.IsValid() {
-					items[key] = item
+				if conv := s.conv[elemT]; conv != nil {
+					if item := conv(value); item.IsValid() {
+						items[key] = item
+					} else {
+						// If a single element is invalid should we give up
+						// or set a zero value?
+						// items[key] = reflect.New(elem)
+						break
+					}
 				} else {
-					// If a single element is invalid should we give up
-					// or set a zero value?
-					// items[key] = reflect.New(elem)
 					break
 				}
 			}
@@ -61,8 +79,10 @@ func loadPath(v reflect.Value, parts []pathPart, values []string) {
 				field.Set(reflect.Append(slice, items...))
 			}
 		default:
-			if v := getBasicValue(field.Kind(), values[0]); v.IsValid() {
-				field.Set(v)
+			if conv := s.conv[field.Type()]; conv != nil {
+				if v := conv(values[0]); v.IsValid() {
+					field.Set(v)
+				}
 			}
 		}
 		return
@@ -78,66 +98,141 @@ func loadPath(v reflect.Value, parts []pathPart, values []string) {
 		reflect.Copy(slice, field)
 		field.Set(slice)
 	}
-	loadPath(field.Index(idx), parts[1:], values)
+	s.loadPath(field.Index(idx), parts[1:], values)
 }
 
-// getBasicValue returns a reflect.Value for a basic type.
-func getBasicValue(kind reflect.Kind, value string) reflect.Value {
-	switch kind {
-	case reflect.Bool:
-		if v, err := strconv.ParseBool(value); err == nil {
-			return reflect.ValueOf(v)
-		}
-	case reflect.Float32:
-		if v, err := strconv.ParseFloat(value, 32); err == nil {
-			return reflect.ValueOf(float32(v))
-		}
-	case reflect.Float64:
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			return reflect.ValueOf(v)
-		}
-	case reflect.Int:
-		if v, err := strconv.ParseInt(value, 10, 0); err == nil {
-			return reflect.ValueOf(int(v))
-		}
-	case reflect.Int8:
-		if v, err := strconv.ParseInt(value, 10, 8); err == nil {
-			return reflect.ValueOf(int8(v))
-		}
-	case reflect.Int16:
-		if v, err := strconv.ParseInt(value, 10, 16); err == nil {
-			return reflect.ValueOf(int16(v))
-		}
-	case reflect.Int32:
-		if v, err := strconv.ParseInt(value, 10, 32); err == nil {
-			return reflect.ValueOf(int32(v))
-		}
-	case reflect.Int64:
-		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return reflect.ValueOf(v)
-		}
-	case reflect.String:
-		return reflect.ValueOf(value)
-	case reflect.Uint:
-		if v, err := strconv.ParseUint(value, 10, 0); err == nil {
-			return reflect.ValueOf(uint(v))
-		}
-	case reflect.Uint8:
-		if v, err := strconv.ParseUint(value, 10, 8); err == nil {
-			return reflect.ValueOf(uint8(v))
-		}
-	case reflect.Uint16:
-		if v, err := strconv.ParseUint(value, 10, 16); err == nil {
-			return reflect.ValueOf(uint16(v))
-		}
-	case reflect.Uint32:
-		if v, err := strconv.ParseUint(value, 10, 32); err == nil {
-			return reflect.ValueOf(uint32(v))
-		}
-	case reflect.Uint64:
-		if v, err := strconv.ParseUint(value, 10, 64); err == nil {
-			return reflect.ValueOf(v)
-		}
+// ----------------------------------------------------------------------------
+// Default converters
+// ----------------------------------------------------------------------------
+
+type Converter func(string) reflect.Value
+
+var (
+	boolType    = reflect.TypeOf(false)
+	float32Type = reflect.TypeOf(float32(0))
+	float64Type = reflect.TypeOf(float64(0))
+	intType     = reflect.TypeOf(int(0))
+	int8Type    = reflect.TypeOf(int8(0))
+	int16Type   = reflect.TypeOf(int16(0))
+	int32Type   = reflect.TypeOf(int32(0))
+	int64Type   = reflect.TypeOf(int64(0))
+	stringType  = reflect.TypeOf("")
+	uintType    = reflect.TypeOf(uint(0))
+	uint8Type   = reflect.TypeOf(uint8(0))
+	uint16Type  = reflect.TypeOf(uint16(0))
+	uint32Type  = reflect.TypeOf(uint32(0))
+	uint64Type  = reflect.TypeOf(uint64(0))
+)
+
+// Default converters for basic types.
+var converters = map[reflect.Type]Converter{
+	boolType:    convertBool,
+	float32Type: convertFloat32,
+	float64Type: convertFloat64,
+	intType:     convertInt,
+	int8Type:    convertInt8,
+	int16Type:   convertInt16,
+	int32Type:   convertInt32,
+	int64Type:   convertInt64,
+	stringType:  convertString,
+	uintType:    convertUint,
+	uint8Type:   convertUint8,
+	uint16Type:  convertUint16,
+	uint32Type:  convertUint32,
+	uint64Type:  convertUint64,
+}
+
+func convertBool(value string) reflect.Value {
+	if v, err := strconv.ParseBool(value); err == nil {
+		return reflect.ValueOf(v)
+	}
+	return invalidValue
+}
+
+func convertFloat32(value string) reflect.Value {
+	if v, err := strconv.ParseFloat(value, 32); err == nil {
+		return reflect.ValueOf(float32(v))
+	}
+	return invalidValue
+}
+
+func convertFloat64(value string) reflect.Value {
+	if v, err := strconv.ParseFloat(value, 64); err == nil {
+		return reflect.ValueOf(v)
+	}
+	return invalidValue
+}
+
+func convertInt(value string) reflect.Value {
+	if v, err := strconv.ParseInt(value, 10, 0); err == nil {
+		return reflect.ValueOf(int(v))
+	}
+	return invalidValue
+}
+
+func convertInt8(value string) reflect.Value {
+	if v, err := strconv.ParseInt(value, 10, 8); err == nil {
+		return reflect.ValueOf(int8(v))
+	}
+	return invalidValue
+}
+
+func convertInt16(value string) reflect.Value {
+	if v, err := strconv.ParseInt(value, 10, 16); err == nil {
+		return reflect.ValueOf(int16(v))
+	}
+	return invalidValue
+}
+
+func convertInt32(value string) reflect.Value {
+	if v, err := strconv.ParseInt(value, 10, 32); err == nil {
+		return reflect.ValueOf(int32(v))
+	}
+	return invalidValue
+}
+
+func convertInt64(value string) reflect.Value {
+	if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return reflect.ValueOf(v)
+	}
+	return invalidValue
+}
+
+func convertString(value string) reflect.Value {
+	return reflect.ValueOf(value)
+}
+
+func convertUint(value string) reflect.Value {
+	if v, err := strconv.ParseUint(value, 10, 0); err == nil {
+		return reflect.ValueOf(uint(v))
+	}
+	return invalidValue
+}
+
+func convertUint8(value string) reflect.Value {
+	if v, err := strconv.ParseUint(value, 10, 8); err == nil {
+		return reflect.ValueOf(uint8(v))
+	}
+	return invalidValue
+}
+
+func convertUint16(value string) reflect.Value {
+	if v, err := strconv.ParseUint(value, 10, 16); err == nil {
+		return reflect.ValueOf(uint16(v))
+	}
+	return invalidValue
+}
+
+func convertUint32(value string) reflect.Value {
+	if v, err := strconv.ParseUint(value, 10, 32); err == nil {
+		return reflect.ValueOf(uint32(v))
+	}
+	return invalidValue
+}
+
+func convertUint64(value string) reflect.Value {
+	if v, err := strconv.ParseUint(value, 10, 64); err == nil {
+		return reflect.ValueOf(v)
 	}
 	return invalidValue
 }
