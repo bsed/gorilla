@@ -122,7 +122,7 @@ type routeRegexp struct {
 }
 
 // match matches the regexp against the URL host or path.
-func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
+func (r *routeRegexp) match(req *http.Request, match *RouteMatch) bool {
 	if !r.matchHost {
 		return r.regexp.MatchString(req.URL.Path)
 	}

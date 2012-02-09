@@ -33,9 +33,14 @@ type Route struct {
 
 // Match matches the route against the request.
 func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
+	return r.match(req, match)
+}
+
+// Match matches the route against the request.
+func (r *Route) match(req *http.Request, match *RouteMatch) bool {
 	// Match everything.
 	for _, m := range r.matchers {
-		if matched := m.Match(req, match); !matched {
+		if matched := m.match(req, match); !matched {
 			return false
 		}
 	}
@@ -112,7 +117,7 @@ func (r *Route) GetName() string {
 
 // matcher types try to match a request.
 type matcher interface {
-	Match(*http.Request, *RouteMatch) bool
+	match(*http.Request, *RouteMatch) bool
 }
 
 // addMatcher adds a matcher to the route.
@@ -168,7 +173,7 @@ func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error 
 // headerMatcher matches the request against header values.
 type headerMatcher map[string]string
 
-func (m headerMatcher) Match(r *http.Request, match *RouteMatch) bool {
+func (m headerMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchMap(m, r.Header, true)
 }
 
@@ -220,7 +225,7 @@ func (r *Route) Host(tpl string) *Route {
 // MatcherFunc is the function signature used by custom matchers.
 type MatcherFunc func(*http.Request, *RouteMatch) bool
 
-func (m MatcherFunc) Match(r *http.Request, match *RouteMatch) bool {
+func (m MatcherFunc) match(r *http.Request, match *RouteMatch) bool {
 	return m(r, match)
 }
 
@@ -234,7 +239,7 @@ func (r *Route) MatcherFunc(f MatcherFunc) *Route {
 // methodMatcher matches the request against HTTP methods.
 type methodMatcher []string
 
-func (m methodMatcher) Match(r *http.Request, match *RouteMatch) bool {
+func (m methodMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchInArray(m, r.Method)
 }
 
@@ -286,7 +291,7 @@ func (r *Route) PathPrefix(tpl string) *Route {
 // queryMatcher matches the request against URL queries.
 type queryMatcher map[string]string
 
-func (m queryMatcher) Match(r *http.Request, match *RouteMatch) bool {
+func (m queryMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchMap(m, r.URL.Query(), false)
 }
 
@@ -314,7 +319,7 @@ func (r *Route) Queries(pairs ...string) *Route {
 // schemeMatcher matches the request against URL schemes.
 type schemeMatcher []string
 
-func (m schemeMatcher) Match(r *http.Request, match *RouteMatch) bool {
+func (m schemeMatcher) match(r *http.Request, match *RouteMatch) bool {
 	return matchInArray(m, r.URL.Scheme)
 }
 
