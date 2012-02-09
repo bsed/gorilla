@@ -8,10 +8,12 @@ import (
 	"errors"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
 var invalidValue = reflect.Value{}
+
+// TODO: make cache part of a loader instance
+var cache = structCache{m: make(map[string]*structInfo)}
 
 // LoadStruct fills a struct with values from a map.
 //
@@ -22,118 +24,61 @@ var invalidValue = reflect.Value{}
 //
 // See the package documentation for a full explanation of the mechanics.
 func LoadStruct(src map[string][]string, dst interface{}) error {
-	rv := reflect.ValueOf(dst)
-	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+	v := reflect.ValueOf(dst)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return errors.New("schema: interface must be a pointer to struct")
 	}
-	rv = rv.Elem()
+	v = v.Elem()
+	t := v.Type()
 	for path, values := range src {
-		loadStructPath(rv, path, values)
+		if parts, err := cache.parsePath(path, t); err == nil {
+			loadPath(v, parts, values)
+		}
 	}
 	return nil
 }
 
-// loadStructPath
-func loadStructPath(rv reflect.Value, path string, values []string) {
-	field, rest := getFieldByPath(rv, path)
-	switch field.Kind() {
-	case reflect.Map:
-		loadMap(field, values, rest)
-	case reflect.Slice:
-		loadSlice(field, values, rest)
-	default:
-		if len(rest) == 0 {
-			// Nothing should be remaining in the path.
+func loadPath(v reflect.Value, parts []pathPart, values []string) {
+	field := v.FieldByIndex(parts[0].path)
+	if len(parts) == 1 {
+		// Simple case.
+		switch field.Kind() {
+		case reflect.Slice:
+			kind := field.Type().Elem().Kind()
+			items := make([]reflect.Value, len(values))
+			for key, value := range values {
+				if item := getBasicValue(kind, value); item.IsValid() {
+					items[key] = item
+				} else {
+					// If a single element is invalid should we give up
+					// or set a zero value?
+					// items[key] = reflect.New(elem)
+					break
+				}
+			}
+			if len(values) == len(items) {
+				slice := reflect.MakeSlice(field.Type(), 0, 0)
+				field.Set(reflect.Append(slice, items...))
+			}
+		default:
 			if v := getBasicValue(field.Kind(), values[0]); v.IsValid() {
 				field.Set(v)
 			}
 		}
+		return
 	}
-}
-
-// getFieldByPath returns the last valid struct field corresponding to a path
-// in dotted notation.
-//
-// The returned slice contains the path parts that could not be retrieved as
-// struct fields. It is empty for fully valid paths.
-func getFieldByPath(v reflect.Value, path string) (reflect.Value, []string) {
-	parts := strings.Split(path, ".")
-	for _, part := range parts {
-		if v.Kind() != reflect.Struct {
-			break
-		}
-		name := cache.getNameByAlias(v.Type(), part)
-		if name == "" {
-			break
-		}
-		if v = v.FieldByName(name); v.IsValid() {
-			parts = parts[1:]
-		}
+	// Slice of structs. Let's go recursive.
+	idx := parts[0].index
+	if field.IsNil() {
+		slice := reflect.MakeSlice(field.Type(), idx+1, idx+1)
+		field.Set(slice)
+	} else if field.Len() < idx+1 {
+		// Resize it.
+		slice := reflect.MakeSlice(field.Type(), idx+1, idx+1)
+		reflect.Copy(slice, field)
+		field.Set(slice)
 	}
-	return v, parts
-}
-
-// loadMap
-func loadMap(field reflect.Value, values []string, path []string) {
-	fieldType := field.Type()
-	elemType := fieldType.Elem()
-	elemKind := elemType.Kind()
-	if len(path) == 1 {
-		// For maps there's at least a rest of 1, the key.
-		mapKey := path[0]
-		if mapKey == "" {
-			return
-		}
-		if v := getBasicValue(elemKind, values[0]); v.IsValid() {
-			if field.IsNil() {
-				field.Set(reflect.MakeMap(fieldType))
-			}
-			field.SetMapIndex(reflect.ValueOf(mapKey), v)
-		}
-	} else {
-		// If there's more path to load, map elem must be struct.
-		if elemKind != reflect.Struct {
-			return
-		}
-		if field.IsNil() {
-			//...
-			//field.Set(...)
-		}
-	}
-}
-
-// loadSlice
-func loadSlice(field reflect.Value, values []string, path []string) {
-	fieldType := field.Type()
-	elemType := fieldType.Elem()
-	elemKind := elemType.Kind()
-	if len(path) == 0 {
-		// Simplest case: a slice of basic values.
-		items := make([]reflect.Value, len(values))
-		for key, value := range values {
-			if item := getBasicValue(elemKind, value); item.IsValid() {
-				items[key] = item
-			} else {
-				// If a single element is invalid should we give up
-				// or set a zero value?
-				// items[key] = reflect.New(elem)
-				break
-			}
-		}
-		if len(values) == len(items) {
-			slice := reflect.MakeSlice(fieldType, 0, 0)
-			field.Set(reflect.Append(slice, items...))
-		}
-	} else {
-		// If there's more path to load, slice elem must be struct.
-		if elemKind != reflect.Struct {
-			return
-		}
-		if field.IsNil() {
-			//slice := reflect.MakeSlice(fieldType, 0, 0)
-			//field.Set(...)
-		}
-	}
+	loadPath(field.Index(idx), parts[1:], values)
 }
 
 // getBasicValue returns a reflect.Value for a basic type.
@@ -195,9 +140,4 @@ func getBasicValue(kind reflect.Kind, value string) reflect.Value {
 		}
 	}
 	return invalidValue
-}
-
-// Load is deprecated. Use LoadStruct instead.
-func Load(i interface{}, data map[string][]string) error {
-	return LoadStruct(data, i)
 }
