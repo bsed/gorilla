@@ -8,18 +8,17 @@ custom session back-ends.
 
 The key features are:
 
-* Dead simple basic API: use it as an easy way to set signed (and optionally
-encrypted) cookies.
-
-* Advanced API for custom back-ends: built-in support for custom storage
-systems; session store interface and helper functions; encoder interface
-and default implementation with customizable cryptography methods (thanks to
-Go interfaces).
-
-* Conveniences: flash messages (session values that last until read);
-built-in mechanism to rotate authentication and encryption keys;
-multiple sessions per request, even using different back-ends; easy way to
-switch session persistency (aka "remember me") and set other attributes.
+	* Dead simple basic API: use it as an easy way to set signed (and
+	  optionally encrypted) cookies.
+	* Advanced API for custom back-ends: built-in support for custom storage
+	  systems; session store interface and helper functions; encoder interface
+	  and default implementation with customizable cryptography methods
+	  (thanks to Go interfaces).
+	* Conveniences: flash messages (session values that last until read);
+	  built-in mechanism to rotate authentication and encryption keys;
+	  multiple sessions per request, even using different back-ends;
+	  easy way to switch session persistency (aka "remember me") and set
+	  other attributes.
 
 The most basic example to retrieve a session is to call sessions.Session()
 passing the current request. For example, in a handler:
