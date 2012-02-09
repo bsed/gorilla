@@ -36,7 +36,7 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	return r.match(req, match)
 }
 
-// match matches the route against the request.
+// Match matches the route against the request.
 func (r *Route) match(req *http.Request, match *RouteMatch) bool {
 	// Match everything.
 	for _, m := range r.matchers {
@@ -339,14 +339,13 @@ func (r *Route) Schemes(schemes ...string) *Route {
 // It will test the inner routes only if the parent route matched. For example:
 //
 //     r := mux.NewRouter()
-//     subrouter := r.Host("www.domain.com").Subrouter()
-//     subrouter.HandleFunc("/products/", ProductsHandler)
-//     subrouter.HandleFunc("/products/{key}", ProductHandler)
-//     subrouter.HandleFunc("/articles/{category}/{id:[0-9]+}"),
-//                          ArticleHandler)
+//     s := r.Host("www.domain.com").Subrouter()
+//     s.HandleFunc("/products/", ProductsHandler)
+//     s.HandleFunc("/products/{key}", ProductHandler)
+//     s.HandleFunc("/articles/{category}/{id:[0-9]+}"), ArticleHandler)
 //
-// In this example, the routes registered in the subrouter won't be tested
-// if the host doesn't match.
+// Here, the routes registered in the subrouter won't be tested if the host
+// doesn't match.
 func (r *Route) Subrouter() *Router {
 	router := &Router{parent: r}
 	r.addMatcher(router)

@@ -9,7 +9,6 @@ package mux
 import (
 	"bytes"
 	"net/http"
-	//"os"
 	"testing"
 )
 

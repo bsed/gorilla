@@ -95,12 +95,12 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, strictSlash bool) (*rout
 	}
 	// Done!
 	return &routeRegexp{
-		template:    template,
-		matchHost:   matchHost,
-		regexp:      reg,
-		reverse:     reverse.String(),
-		varsN:       varsN,
-		varsR:       varsR,
+		template:  template,
+		matchHost: matchHost,
+		regexp:    reg,
+		reverse:   reverse.String(),
+		varsN:     varsN,
+		varsR:     varsR,
 	}, nil
 }
 

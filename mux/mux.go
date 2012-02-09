@@ -53,7 +53,7 @@ func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
 	return r.match(req, match)
 }
 
-// match matches registered routes against the request.
+// Match matches registered routes against the request.
 func (r *Router) match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.err == nil {
