@@ -25,7 +25,7 @@ type S1 struct {
 	F14 uint64
 }
 
-func TestBasicValues(t *testing.T) {
+func TestBasicValue(t *testing.T) {
 	v := map[string][]string{
 		"F01": {"true"},
 		"F02": {"4.2"},
@@ -95,7 +95,7 @@ type S2 struct {
 	F14 []uint64
 }
 
-func TestSlices(t *testing.T) {
+func TestSlice(t *testing.T) {
 	v := map[string][]string{
 		"F01": {"true", "false", "true"},
 		"F02": {"4.2", "4.3", "4.4"},
@@ -130,190 +130,142 @@ func TestSlices(t *testing.T) {
 	}
 	s := &S2{}
 	_ = LoadStruct(v, s)
-	if len(s.F01) != 3 || s.F01[0] != e.F01[0] { t.Errorf("F01: expected %v, got %v", e.F01, s.F01) }
-	if len(s.F02) != 3 || s.F02[0] != e.F02[0] { t.Errorf("F02: expected %v, got %v", e.F02, s.F02) }
-	if len(s.F03) != 3 || s.F03[0] != e.F03[0] { t.Errorf("F03: expected %v, got %v", e.F03, s.F03) }
-	if len(s.F04) != 3 || s.F04[0] != e.F04[0] { t.Errorf("F04: expected %v, got %v", e.F04, s.F04) }
-	if len(s.F05) != 3 || s.F05[0] != e.F05[0] { t.Errorf("F05: expected %v, got %v", e.F05, s.F05) }
-	if len(s.F06) != 3 || s.F06[0] != e.F06[0] { t.Errorf("F06: expected %v, got %v", e.F06, s.F06) }
-	if len(s.F07) != 3 || s.F07[0] != e.F07[0] { t.Errorf("F07: expected %v, got %v", e.F07, s.F07) }
-	if len(s.F08) != 3 || s.F08[0] != e.F08[0] { t.Errorf("F08: expected %v, got %v", e.F08, s.F08) }
-	if len(s.F09) != 3 || s.F09[0] != e.F09[0] { t.Errorf("F09: expected %v, got %v", e.F09, s.F09) }
-	if len(s.F10) != 3 || s.F10[0] != e.F10[0] { t.Errorf("F10: expected %v, got %v", e.F10, s.F10) }
-	if len(s.F11) != 3 || s.F11[0] != e.F11[0] { t.Errorf("F11: expected %v, got %v", e.F11, s.F11) }
-	if len(s.F12) != 3 || s.F12[0] != e.F12[0] { t.Errorf("F12: expected %v, got %v", e.F12, s.F12) }
-	if len(s.F13) != 3 || s.F13[0] != e.F13[0] { t.Errorf("F13: expected %v, got %v", e.F13, s.F13) }
-	if len(s.F14) != 3 || s.F14[0] != e.F14[0] { t.Errorf("F14: expected %v, got %v", e.F14, s.F14) }
+	if s.F01 == nil || len(s.F01) != 3 || s.F01[0] != e.F01[0] || s.F01[1] != e.F01[1] || s.F01[2] != e.F01[2] { t.Errorf("F01: expected %v, got %v", e.F01, s.F01) }
+	if s.F02 == nil || len(s.F02) != 3 || s.F02[0] != e.F02[0] || s.F02[1] != e.F02[1] || s.F02[2] != e.F02[2] { t.Errorf("F02: expected %v, got %v", e.F02, s.F02) }
+	if s.F03 == nil || len(s.F03) != 3 || s.F03[0] != e.F03[0] || s.F03[1] != e.F03[1] || s.F03[2] != e.F03[2] { t.Errorf("F03: expected %v, got %v", e.F03, s.F03) }
+	if s.F04 == nil || len(s.F04) != 3 || s.F04[0] != e.F04[0] || s.F04[1] != e.F04[1] || s.F04[2] != e.F04[2] { t.Errorf("F04: expected %v, got %v", e.F04, s.F04) }
+	if s.F05 == nil || len(s.F05) != 3 || s.F05[0] != e.F05[0] || s.F05[1] != e.F05[1] || s.F05[2] != e.F05[2] { t.Errorf("F05: expected %v, got %v", e.F05, s.F05) }
+	if s.F06 == nil || len(s.F06) != 3 || s.F06[0] != e.F06[0] || s.F06[1] != e.F06[1] || s.F06[2] != e.F06[2] { t.Errorf("F06: expected %v, got %v", e.F06, s.F06) }
+	if s.F07 == nil || len(s.F07) != 3 || s.F07[0] != e.F07[0] || s.F07[1] != e.F07[1] || s.F07[2] != e.F07[2] { t.Errorf("F07: expected %v, got %v", e.F07, s.F07) }
+	if s.F08 == nil || len(s.F08) != 3 || s.F08[0] != e.F08[0] || s.F08[1] != e.F08[1] || s.F08[2] != e.F08[2] { t.Errorf("F08: expected %v, got %v", e.F08, s.F08) }
+	if s.F09 == nil || len(s.F09) != 3 || s.F09[0] != e.F09[0] || s.F09[1] != e.F09[1] || s.F09[2] != e.F09[2] { t.Errorf("F09: expected %v, got %v", e.F09, s.F09) }
+	if s.F10 == nil || len(s.F10) != 3 || s.F10[0] != e.F10[0] || s.F10[1] != e.F10[1] || s.F10[2] != e.F10[2] { t.Errorf("F10: expected %v, got %v", e.F10, s.F10) }
+	if s.F11 == nil || len(s.F11) != 3 || s.F11[0] != e.F11[0] || s.F11[1] != e.F11[1] || s.F11[2] != e.F11[2] { t.Errorf("F11: expected %v, got %v", e.F11, s.F11) }
+	if s.F12 == nil || len(s.F12) != 3 || s.F12[0] != e.F12[0] || s.F12[1] != e.F12[1] || s.F12[2] != e.F12[2] { t.Errorf("F12: expected %v, got %v", e.F12, s.F12) }
+	if s.F13 == nil || len(s.F13) != 3 || s.F13[0] != e.F13[0] || s.F13[1] != e.F13[1] || s.F13[2] != e.F13[2] { t.Errorf("F13: expected %v, got %v", e.F13, s.F13) }
+	if s.F14 == nil || len(s.F14) != 3 || s.F14[0] != e.F14[0] || s.F14[1] != e.F14[1] || s.F14[2] != e.F14[2] { t.Errorf("F14: expected %v, got %v", e.F14, s.F14) }
 }
 
 // ----------------------------------------------------------------------------
 
 type S3 struct {
-	F01 map[string]bool
-	F02 map[string]float32
-	F03 map[string]float64
-	F04 map[string]int
-	F05 map[string]int8
-	F06 map[string]int16
-	F07 map[string]int32
-	F08 map[string]int64
-	F09 map[string]string
-	F10 map[string]uint
-	F11 map[string]uint8
-	F12 map[string]uint16
-	F13 map[string]uint32
-	F14 map[string]uint64
+	F01 S1   `schema:"name1"`
+	F02 S2   `schema:"name2"`
+	F03 []S1 `schema:"name3"`
+	F04 []S2 `schema:"name4"`
 }
 
-func TestMaps(t *testing.T) {
+func TestNestedStruct(t *testing.T) {
 	v := map[string][]string{
-		"F01.a": {"true"},
-		"F01.b": {"false"},
-		"F01.c": {"true"},
+		"name1.F01": {"true"},
+		"name1.F14": {"42"},
 
-		"F02.a": {"4.2"},
-		"F02.b": {"4.3"},
-		"F02.c": {"4.4"},
+		"name2.F01": {"false", "true", "false"},
+		"name2.F14": {"43", "44", "45"},
 
-		"F03.a": {"4.5"},
-		"F03.b": {"4.6"},
-		"F03.c": {"4.7"},
+		"name3.0.F01": {"true"},
+		"name3.0.F14": {"42"},
+		"name3.1.F01": {"false"},
+		"name3.1.F14": {"43"},
 
-		"F04.a": {"-42"},
-		"F04.b": {"-43"},
-		"F04.c": {"-44"},
-
-		"F05.a": {"-45"},
-		"F05.b": {"-46"},
-		"F05.c": {"-47"},
-
-		"F06.a": {"-48"},
-		"F06.b": {"-49"},
-		"F06.c": {"-50"},
-
-		"F07.a": {"-51"},
-		"F07.b": {"-52"},
-		"F07.c": {"-53"},
-
-		"F08.a": {"-54"},
-		"F08.b": {"-55"},
-		"F08.c": {"-56"},
-
-		"F09.a": {"foo"},
-		"F09.b": {"bar"},
-		"F09.c": {"baz"},
-
-		"F10.a": {"42"},
-		"F10.b": {"43"},
-		"F10.c": {"44"},
-
-		"F11.a": {"45"},
-		"F11.b": {"46"},
-		"F11.c": {"47"},
-
-		"F12.a": {"48"},
-		"F12.b": {"49"},
-		"F12.c": {"50"},
-
-		"F13.a": {"51"},
-		"F13.b": {"52"},
-		"F13.c": {"53"},
-
-		"F14.a": {"54"},
-		"F14.b": {"55"},
-		"F14.c": {"56"},
+		"name4.0.F01": {"true", "false", "true"},
+		"name4.0.F14": {"42", "43", "44"},
+		"name4.1.F01": {"false", "true", "false"},
+		"name4.1.F14": {"45", "46", "47"},
 	}
 	e := S3{
-		F01: map[string]bool{"a": true, "b": false, "c": true},
-		F02: map[string]float32{"a": 4.2, "b": 4.3, "c": 4.4},
-		F03: map[string]float64{"a": 4.5, "b": 4.6, "c": 4.7},
-		F04: map[string]int{"a": -42, "b": -43, "c": -44},
-		F05: map[string]int8{"a": -45, "b": -46, "c": -47},
-		F06: map[string]int16{"a": -48, "b": -49, "c": -50},
-		F07: map[string]int32{"a": -51, "b": -52, "c": -53},
-		F08: map[string]int64{"a": -54, "b": -55, "c": -56},
-		F09: map[string]string{"a": "foo", "b": "bar", "c": "baz"},
-		F10: map[string]uint{"a": 42, "b": 43, "c": 44},
-		F11: map[string]uint8{"a": 45, "b": 46, "c": 47},
-		F12: map[string]uint16{"a": 48, "b": 49, "c": 50},
-		F13: map[string]uint32{"a": 51, "b": 52, "c": 53},
-		F14: map[string]uint64{"a": 54, "b": 55, "c": 56},
+		F01: S1{
+			F01: true,
+			F14: 42,
+		},
+		F02: S2{
+			F01: []bool{false, true, false},
+			F14: []uint64{43, 44, 45},
+		},
+		F03: []S1{
+			S1{
+				F01: true,
+				F14: 42,
+			},
+			S1{
+				F01: false,
+				F14: 43,
+			},
+		},
+		F04: []S2{
+			S2{
+				F01: []bool{true, false, true},
+				F14: []uint64{42, 43, 44},
+			},
+			S2{
+				F01: []bool{false, true, false},
+				F14: []uint64{45, 46, 47},
+			},
+		},
 	}
 	s := &S3{}
 	_ = LoadStruct(v, s)
-	if len(s.F01) != 3 || s.F01["a"] != e.F01["a"] { t.Errorf("F01: expected %v, got %v", e.F01, s.F01) }
-	if len(s.F02) != 3 || s.F02["a"] != e.F02["a"] { t.Errorf("F02: expected %v, got %v", e.F02, s.F02) }
-	if len(s.F03) != 3 || s.F03["a"] != e.F03["a"] { t.Errorf("F03: expected %v, got %v", e.F03, s.F03) }
-	if len(s.F04) != 3 || s.F04["a"] != e.F04["a"] { t.Errorf("F04: expected %v, got %v", e.F04, s.F04) }
-	if len(s.F05) != 3 || s.F05["a"] != e.F05["a"] { t.Errorf("F05: expected %v, got %v", e.F05, s.F05) }
-	if len(s.F06) != 3 || s.F06["a"] != e.F06["a"] { t.Errorf("F06: expected %v, got %v", e.F06, s.F06) }
-	if len(s.F07) != 3 || s.F07["a"] != e.F07["a"] { t.Errorf("F07: expected %v, got %v", e.F07, s.F07) }
-	if len(s.F08) != 3 || s.F08["a"] != e.F08["a"] { t.Errorf("F08: expected %v, got %v", e.F08, s.F08) }
-	if len(s.F09) != 3 || s.F09["a"] != e.F09["a"] { t.Errorf("F09: expected %v, got %v", e.F09, s.F09) }
-	if len(s.F10) != 3 || s.F10["a"] != e.F10["a"] { t.Errorf("F10: expected %v, got %v", e.F10, s.F10) }
-	if len(s.F11) != 3 || s.F11["a"] != e.F11["a"] { t.Errorf("F11: expected %v, got %v", e.F11, s.F11) }
-	if len(s.F12) != 3 || s.F12["a"] != e.F12["a"] { t.Errorf("F12: expected %v, got %v", e.F12, s.F12) }
-	if len(s.F13) != 3 || s.F13["a"] != e.F13["a"] { t.Errorf("F13: expected %v, got %v", e.F13, s.F13) }
-	if len(s.F14) != 3 || s.F14["a"] != e.F14["a"] { t.Errorf("F14: expected %v, got %v", e.F14, s.F14) }
-}
 
-// ----------------------------------------------------------------------------
-
-type S4 struct {
-	F01 S1 `schema:"foo"`
-	F02 S2 `schema:"bar"`
-	F03 S3 `schema:"baz"`
-}
-
-func TestNestedWithNames(t *testing.T) {
-	v := map[string][]string{
-		"foo.F14": {"46"},
-		"bar.F14": {"54", "55", "56"},
-		"baz.F14.a": {"54"},
-		"baz.F14.b": {"55"},
-		"baz.F14.c": {"56"},
+	if s.F01.F01 != e.F01.F01 {
+		t.Errorf("name1.F01: expected %v, got %v", e.F01.F01, s.F01.F01)
 	}
-	e := S4{
-		F01: S1{F14: 46},
-		F02: S2{F14: []uint64{54, 55, 56}},
-		F03: S3{F14: map[string]uint64{"a": 54, "b": 55, "c": 56}},
+	if s.F01.F14 != e.F01.F14 {
+		t.Errorf("name1.F14: expected %v, got %v", e.F01.F14, s.F01.F14)
 	}
-	s := &S4{}
-	_ = LoadStruct(v, s)
-	if s.F01.F14 != e.F01.F14 {	t.Errorf("F14: expected %v, got %v", e.F01.F14, s.F01.F14) }
-	if len(s.F02.F14) != 3 || s.F02.F14[0] != e.F02.F14[0] { t.Errorf("F14: expected %v, got %v", e.F02.F14, s.F02.F14) }
-	if len(s.F03.F14) != 3 || s.F03.F14["a"] != e.F03.F14["a"] { t.Errorf("F14: expected %v, got %v", e.F03.F14, s.F03.F14) }
-}
 
-// ----------------------------------------------------------------------------
-
-type S5 struct {
-	F02 int
-	F03 int
-}
-
-type S6 struct {
-	F01 []S1
-}
-
-// TODO: slices of structs
-func TestSlicesOfStructs(t *testing.T) {
-	_ = map[string][]string{
-		"F01.F02": {"42", "43", "44"},
-		"F01.F03": {"45", "46", "47"},
+	if s.F02.F01 == nil || len(s.F02.F01) != 3 {
+		t.Errorf("name2.F01: nil or wrong len")
+	} else if s.F02.F01[0] != e.F02.F01[0] || s.F02.F01[1] != e.F02.F01[1] || s.F02.F01[2] != e.F02.F01[2] {
+		t.Errorf("name2.F01: expected %v, got %v", e.F02.F01, s.F02.F01)
 	}
-	_ = &S6{}
-	//_ = LoadStruct(v, s)
-}
+	if s.F02.F14 == nil || len(s.F02.F14) != 3 {
+		t.Errorf("name2.F14: nil or wrong len")
+	} else if s.F02.F14[0] != e.F02.F14[0] || s.F02.F14[1] != e.F02.F14[1] || s.F02.F14[2] != e.F02.F14[2] {
+		t.Errorf("name2.F14: expected %v, got %v", e.F02.F01, s.F02.F14)
+	}
 
-// ----------------------------------------------------------------------------
+	if s.F03 == nil || len(s.F03) != 2 {
+		t.Errorf("name3: nil or wrong len")
+	} else {
+		if s.F03[0].F01 != e.F03[0].F01 {
+			t.Errorf("name3.0.F01: expected %v, got %v", e.F03[0].F01, s.F03[0].F01)
+		}
+		if s.F03[0].F14 != e.F03[0].F14 {
+			t.Errorf("name3.0.F14: expected %v, got %v", e.F03[0].F14, s.F03[0].F14)
+		}
+		if s.F03[1].F01 != e.F03[1].F01 {
+			t.Errorf("name3.1.F01: expected %v, got %v", e.F03[1].F01, s.F03[1].F01)
+		}
+		if s.F03[1].F14 != e.F03[1].F14 {
+			t.Errorf("name3.1.F14: expected %v, got %v", e.F03[1].F14, s.F03[1].F14)
+		}
+	}
 
-// TODO: maps of structs
-func TestMapsOfStructs(t *testing.T) {
-}
+	if s.F04 == nil || len(s.F04) != 2 {
+		t.Errorf("name4: nil or wrong len")
+	} else {
+		if s.F04[0].F01 == nil || len(s.F04[0].F01) != 3 {
+			t.Errorf("name4.0.F01: nil or wrong len")
+		} else if s.F04[0].F01[0] != e.F04[0].F01[0] || s.F04[0].F01[1] != e.F04[0].F01[1] || s.F04[0].F01[2] != e.F04[0].F01[2] {
+			t.Errorf("name4.0.F01: expected %v, got %v", e.F04[0].F01, s.F04[0].F01)
+		}
 
-// ----------------------------------------------------------------------------
+		if s.F04[0].F14 == nil || len(s.F04[0].F14) != 3 {
+			t.Errorf("name4.0.F14: nil or wrong len")
+		} else if s.F04[0].F14[0] != e.F04[0].F14[0] || s.F04[0].F14[1] != e.F04[0].F14[1] || s.F04[0].F14[2] != e.F04[0].F14[2] {
+			t.Errorf("name4.0.F14: expected %v, got %v", e.F04[0].F14, s.F04[0].F14)
+		}
 
-// TODO: custom types
-func TestCustomTypes(t *testing.T) {
+		if s.F04[1].F01 == nil || len(s.F04[1].F01) != 3 {
+			t.Errorf("name4.1.F01: nil or wrong len")
+		} else if s.F04[1].F01[0] != e.F04[1].F01[0] || s.F04[1].F01[1] != e.F04[1].F01[1] || s.F04[1].F01[2] != e.F04[1].F01[2] {
+			t.Errorf("name4.1.F01: expected %v, got %v", e.F04[1].F01, s.F04[1].F01)
+		}
+
+		if s.F04[0].F01 == nil || len(s.F04[0].F01) != 3 {
+			t.Errorf("name4.1.F14: nil or wrong len")
+		} else if s.F04[1].F14[1] != e.F04[1].F14[1] || s.F04[1].F14[1] != e.F04[1].F14[1] || s.F04[1].F14[2] != e.F04[1].F14[2] {
+			t.Errorf("name4.1.F14: expected %v, got %v", e.F04[1].F14, s.F04[1].F14)
+		}
+	}
 }
