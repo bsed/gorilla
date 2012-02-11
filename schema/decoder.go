@@ -56,24 +56,22 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 		case reflect.Slice:
 			items := make([]reflect.Value, len(values))
 			elemT := field.Type().Elem()
+			conv := d.cache.conv[elemT]
+			if conv == nil {
+				return
+			}
 			for key, value := range values {
-				if conv := d.cache.conv[elemT]; conv != nil {
-					if item := conv(value); item.IsValid() {
-						items[key] = item
-					} else {
-						// If a single element is invalid should we give up
-						// or set a zero value?
-						// items[key] = reflect.New(elem)
-						break
-					}
+				if item := conv(value); item.IsValid() {
+					items[key] = item
 				} else {
-					break
+					// If a single element is invalid should we give up
+					// or set a zero value?
+					// items[key] = reflect.New(elemT)
+					return
 				}
 			}
-			if len(values) == len(items) {
-				slice := reflect.MakeSlice(field.Type(), 0, 0)
-				field.Set(reflect.Append(slice, items...))
-			}
+			slice := reflect.MakeSlice(field.Type(), 0, 0)
+			field.Set(reflect.Append(slice, items...))
 		default:
 			if conv := d.cache.conv[field.Type()]; conv != nil {
 				if v := conv(values[0]); v.IsValid() {
@@ -98,7 +96,6 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 }
 
 // fieldByIndex returns the nested field corresponding to index.
-// It panics if v's Kind is not struct.
 func fieldByIndex(v reflect.Value, index []int) reflect.Value {
 	for _, x := range index {
 		if v.Type().Kind() == reflect.Ptr {
