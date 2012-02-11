@@ -347,7 +347,7 @@ func (r *Route) Schemes(schemes ...string) *Route {
 // Here, the routes registered in the subrouter won't be tested if the host
 // doesn't match.
 func (r *Route) Subrouter() *Router {
-	router := &Router{parent: r}
+	router := &Router{parent: r, strictSlash: r.strictSlash}
 	r.addMatcher(router)
 	return router
 }
@@ -367,7 +367,7 @@ func (r *Route) Subrouter() *Router {
 //
 // ...a URL for it can be built using:
 //
-//     url, err := r.NamedRoute("article").URL("category", "technology",
+//     url, err := r.GetRoute("article").URL("category", "technology",
 //                                             "id", "42")
 //
 // ...which will return an url.URL with the following path:
@@ -382,12 +382,12 @@ func (r *Route) Subrouter() *Router {
 //       Name("article")
 //
 //     // url.String() will be "http://news.domain.com/articles/technology/42"
-//     url, err := r.NamedRoute("article").URL("subdomain", "news",
-//                                             "category", "technology",
-//                                             "id", "42")
+//     url, err := r.GetRoute("article").URL("subdomain", "news",
+//                                           "category", "technology",
+//                                           "id", "42")
 //
-// All variable names defined in the route are required, and their values must
-// conform to the corresponding patterns, if any.
+// All variables defined in the route are required, and their values must
+// conform to the corresponding patterns.
 func (r *Route) URL(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil {
 		return nil, errors.New("mux: route doesn't have a host or path")

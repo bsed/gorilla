@@ -44,7 +44,7 @@ type Router struct {
 	routes []*Route
 	// Routes by name for URL building.
 	namedRoutes map[string]*Route
-	// See Route.strictSlash. This defines the default flag for new routes.
+	// See Router.StrictSlash(). This defines the flag for new routes.
 	strictSlash bool
 }
 
@@ -95,10 +95,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // GetRoute returns a route registered with the given name.
 func (r *Router) GetRoute(name string) *Route {
-	if r.namedRoutes == nil {
-		r.namedRoutes = make(map[string]*Route)
-	}
-	return r.namedRoutes[name]
+	return r.getNamedRoutes()[name]
 }
 
 // StrictSlash defines the slash behavior for new routes.
@@ -146,62 +143,62 @@ func (r *Router) NewRoute() *Route {
 }
 
 // Handle registers a new route with a matcher for the URL path.
-// See Route.Path.
+// See Route.Path() and Route.Handler().
 func (r *Router) Handle(path string, handler http.Handler) *Route {
 	return r.NewRoute().Path(path).Handler(handler)
 }
 
 // HandleFunc registers a new route with a matcher for the URL path.
-// See Route.Path.
+// See Route.Path() and Route.HandlerFunc().
 func (r *Router) HandleFunc(path string, f func(http.ResponseWriter,
 	*http.Request),) *Route {
 	return r.NewRoute().Path(path).HandlerFunc(f)
 }
 
 // Headers registers a new route with a matcher for request header values.
-// See Route.Headers.
+// See Route.Headers().
 func (r *Router) Headers(pairs ...string) *Route {
 	return r.NewRoute().Headers(pairs...)
 }
 
 // Host registers a new route with a matcher for the URL host.
-// See Route.Host.
+// See Route.Host().
 func (r *Router) Host(tpl string) *Route {
 	return r.NewRoute().Host(tpl)
 }
 
 // MatcherFunc registers a new route with a custom matcher function.
-// See Route.MatcherFunc.
+// See Route.MatcherFunc().
 func (r *Router) MatcherFunc(f MatcherFunc) *Route {
 	return r.NewRoute().MatcherFunc(f)
 }
 
 // Methods registers a new route with a matcher for HTTP methods.
-// See Route.Methods.
+// See Route.Methods().
 func (r *Router) Methods(methods ...string) *Route {
 	return r.NewRoute().Methods(methods...)
 }
 
 // Path registers a new route with a matcher for the URL path.
-// See Route.Path.
+// See Route.Path().
 func (r *Router) Path(tpl string) *Route {
 	return r.NewRoute().Path(tpl)
 }
 
 // PathPrefix registers a new route with a matcher for the URL path prefix.
-// See Route.PathPrefix.
+// See Route.PathPrefix().
 func (r *Router) PathPrefix(tpl string) *Route {
 	return r.NewRoute().PathPrefix(tpl)
 }
 
 // Queries registers a new route with a matcher for URL query values.
-// See Route.Queries.
+// See Route.Queries().
 func (r *Router) Queries(pairs ...string) *Route {
 	return r.NewRoute().Queries(pairs...)
 }
 
 // Schemes registers a new route with a matcher for URL schemes.
-// See Route.Schemes.
+// See Route.Schemes().
 func (r *Router) Schemes(schemes ...string) *Route {
 	return r.NewRoute().Schemes(schemes...)
 }
