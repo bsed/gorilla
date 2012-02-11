@@ -364,9 +364,11 @@ func TestPointer(t *testing.T) {
 	if s.F02 == nil || len(s.F02.F01) != 3 {
 		t.Errorf("F02.F01: nil or wrong len")
 	} else if s.F02.F01[0] != e.F02.F01[0] || s.F02.F01[1] != e.F02.F01[1] || s.F02.F01[2] != e.F02.F01[2] {
-		t.Errorf("F02: expected %v, got %v", e.F01.F01, s.F01.F01)
+		t.Errorf("F02: expected %v, got %v", e.F02.F01, s.F02.F01)
 	}
-	if s.F03 == nil || s.F03.F03.F01.F01 != e.F03.F03.F01.F01 {
-		t.Errorf("F01.F01: ")
+	if s.F03 == nil || s.F03.F03 == nil || s.F03.F03.F01 == nil {
+		t.Errorf("F03.F03.F01.F01: nil or wrong len")
+	} else if s.F03.F03.F01.F01 != e.F03.F03.F01.F01 {
+		t.Errorf("F03.F03.F01.F01: expected %v, got %v", e.F03.F03.F01.F01, s.F03.F03.F01.F01)
 	}
 }
