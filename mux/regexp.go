@@ -31,17 +31,17 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, strictSlash bool) (*rout
 	}
 	// Backup the original.
 	template := tpl
-	// Set a flag for strictSlash.
-	endSlash := false
-	if strictSlash && strings.HasSuffix(tpl, "/") {
-		tpl = tpl[:len(tpl)-1]
-		endSlash = true
-	}
 	// Now let's parse it.
 	defaultPattern := "[^/]+"
 	if matchHost {
 		defaultPattern = "[^.]+"
 		matchPrefix, strictSlash = false, false
+	}
+	// Set a flag for strictSlash.
+	endSlash := false
+	if strictSlash && strings.HasSuffix(tpl, "/") {
+		tpl = tpl[:len(tpl)-1]
+		endSlash = true
 	}
 	varsN := make([]string, len(idxs)/2)
 	varsR := make([]*regexp.Regexp, len(idxs)/2)
