@@ -92,13 +92,13 @@ func (s *Server) HasMethod(method string) bool {
 // ServeHTTP
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		writeError(w, 405, "rpc: POST method required, received " + r.Method)
+		writeError(w, 405, "rpc: POST method required, received "+r.Method)
 		return
 	}
 	contentType := r.Header.Get("Content-Type")
 	codec := s.codecs[strings.ToLower(contentType)]
 	if codec == nil {
-		writeError(w, 415, "rpc: unrecognized Content-Type: " + contentType)
+		writeError(w, 415, "rpc: unrecognized Content-Type: "+contentType)
 		return
 	}
 	// Create a new codec request.

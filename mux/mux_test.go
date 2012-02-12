@@ -30,7 +30,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = "aaa.bbb.ccc"
 	path = ""
-	url = host
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://aaa.222.ccc/111/222/333", nil)
@@ -41,7 +41,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{"v1": "bbb"}
 	host = "aaa.bbb.ccc"
 	path = ""
-	url = host
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://aaa.222.ccc/111/222/333", nil)
@@ -52,7 +52,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{"v1": "aaa", "v2": "bbb", "v3": "ccc"}
 	host = "aaa.bbb.ccc"
 	path = ""
-	url = host
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://aaa.222.ccc/111/222/333", nil)
@@ -65,7 +65,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = "/111/222/333"
-	url = path
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/1/2/3", nil)
@@ -76,7 +76,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{"v1": "222"}
 	host = ""
 	path = "/111/222/333"
-	url = path
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/111/aaa/333", nil)
@@ -87,7 +87,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{"v1": "111", "v2": "222", "v3": "333"}
 	host = ""
 	path = "/111/222/333"
-	url = path
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/111/aaa/333", nil)
@@ -100,7 +100,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = "/111"
-	url = path
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/1/2/3", nil)
@@ -111,7 +111,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{"v1": "222"}
 	host = ""
 	path = "/111/222"
-	url = path
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/111/aaa/333", nil)
@@ -122,7 +122,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{"v1": "111", "v2": "222"}
 	host = ""
 	path = "/111/222"
-	url = path
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost/111/aaa/333", nil)
@@ -135,7 +135,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = ""
-	url = ""
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://aaa.222.ccc/111/222/333", nil)
@@ -172,7 +172,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = ""
-	url = ""
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost", nil)
@@ -187,7 +187,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = ""
-	url = ""
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	request, _ = http.NewRequest("POST", "http://localhost", nil)
 	testRoute(t, id(), true, route, request, vars, host, path, url)
@@ -202,7 +202,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = ""
-	url = ""
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://localhost?foo=bar&baz=dong", nil)
@@ -215,7 +215,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = ""
-	url = ""
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	request, _ = http.NewRequest("GET", "ftp://localhost", nil)
 	testRoute(t, id(), true, route, request, vars, host, path, url)
@@ -236,7 +236,7 @@ func TestRoute(t *testing.T) {
 	vars = map[string]string{}
 	host = ""
 	path = ""
-	url = ""
+	url = host + path
 	testRoute(t, id(), true, route, request, vars, host, path, url)
 	// Non-match for the same config.
 	request, _ = http.NewRequest("GET", "http://aaa.ccc.bbb", nil)

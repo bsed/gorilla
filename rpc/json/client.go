@@ -18,12 +18,12 @@ import (
 // clientRequest represents a JSON-RPC request sent by a client.
 type clientRequest struct {
 	// A String containing the name of the method to be invoked.
-	Method string         `json:"method"`
+	Method string `json:"method"`
 	// Object to pass as request parameter to the method.
 	Params [1]interface{} `json:"params"`
 	// The request id. This can be of any type. It is used to match the
 	// response with the request that it is replying to.
-	Id     uint64         `json:"id"`
+	Id uint64 `json:"id"`
 }
 
 // clientResponse represents a JSON-RPC response returned to a client.

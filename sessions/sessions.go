@@ -338,7 +338,7 @@ func flashKey(vars ...string) (string, []string) {
 type contextKey int
 
 const (
-   sessionsKey contextKey = iota
+	sessionsKey contextKey = iota
 )
 
 // getRequestSessions returns a sessions container for a single request.
