@@ -134,9 +134,6 @@ func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error 
 		return r.err
 	}
 	r.regexp = r.getRegexpGroup()
-	if tpl == "" {
-		return errors.New("mux: host and path templates can't be empty")
-	}
 	if !matchHost {
 		if tpl[0] != '/' {
 			return fmt.Errorf("mux: path must start with a slash, got %q", tpl)

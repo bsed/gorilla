@@ -55,7 +55,7 @@ type Codec struct {
 }
 
 // NewRequest returns a CodecRequest.
-func (c *Codec)	NewRequest(r *http.Request) rpc.CodecRequest {
+func (c *Codec) NewRequest(r *http.Request) rpc.CodecRequest {
 	return newCodecRequest(r)
 }
 

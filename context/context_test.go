@@ -12,8 +12,8 @@ import (
 type keyType int
 
 const (
-   key1 keyType = iota
-   key2
+	key1 keyType = iota
+	key2
 )
 
 func TestContext(t *testing.T) {

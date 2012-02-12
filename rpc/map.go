@@ -18,7 +18,7 @@ import (
 var (
 	// Precompute the reflect type for os.Error.  Can't use os.Error directly
 	// because Typeof takes an empty interface value.  This is annoying.
-	unusedError *error
+	unusedError   *error
 	typeOfOsError = reflect.TypeOf(unusedError).Elem()
 	// Same as above, this time for http.Request.
 	unusedRequest *http.Request

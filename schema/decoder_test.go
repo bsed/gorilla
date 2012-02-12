@@ -60,20 +60,48 @@ func TestBasicValue(t *testing.T) {
 	}
 	s := &S1{}
 	_ = NewDecoder().Decode(s, v)
-	if s.F01 != e.F01 {	t.Errorf("F01: expected %v, got %v", e.F01, s.F01) }
-	if s.F02 != e.F02 {	t.Errorf("F02: expected %v, got %v", e.F02, s.F02) }
-	if s.F03 != e.F03 {	t.Errorf("F03: expected %v, got %v", e.F03, s.F03) }
-	if s.F04 != e.F04 {	t.Errorf("F04: expected %v, got %v", e.F04, s.F04) }
-	if s.F05 != e.F05 {	t.Errorf("F05: expected %v, got %v", e.F05, s.F05) }
-	if s.F06 != e.F06 {	t.Errorf("F06: expected %v, got %v", e.F06, s.F06) }
-	if s.F07 != e.F07 {	t.Errorf("F07: expected %v, got %v", e.F07, s.F07) }
-	if s.F08 != e.F08 {	t.Errorf("F08: expected %v, got %v", e.F08, s.F08) }
-	if s.F09 != e.F09 {	t.Errorf("F09: expected %v, got %v", e.F09, s.F09) }
-	if s.F10 != e.F10 {	t.Errorf("F10: expected %v, got %v", e.F10, s.F10) }
-	if s.F11 != e.F11 {	t.Errorf("F11: expected %v, got %v", e.F11, s.F11) }
-	if s.F12 != e.F12 {	t.Errorf("F12: expected %v, got %v", e.F12, s.F12) }
-	if s.F13 != e.F13 {	t.Errorf("F13: expected %v, got %v", e.F13, s.F13) }
-	if s.F14 != e.F14 {	t.Errorf("F14: expected %v, got %v", e.F14, s.F14) }
+	if s.F01 != e.F01 {
+		t.Errorf("F01: expected %v, got %v", e.F01, s.F01)
+	}
+	if s.F02 != e.F02 {
+		t.Errorf("F02: expected %v, got %v", e.F02, s.F02)
+	}
+	if s.F03 != e.F03 {
+		t.Errorf("F03: expected %v, got %v", e.F03, s.F03)
+	}
+	if s.F04 != e.F04 {
+		t.Errorf("F04: expected %v, got %v", e.F04, s.F04)
+	}
+	if s.F05 != e.F05 {
+		t.Errorf("F05: expected %v, got %v", e.F05, s.F05)
+	}
+	if s.F06 != e.F06 {
+		t.Errorf("F06: expected %v, got %v", e.F06, s.F06)
+	}
+	if s.F07 != e.F07 {
+		t.Errorf("F07: expected %v, got %v", e.F07, s.F07)
+	}
+	if s.F08 != e.F08 {
+		t.Errorf("F08: expected %v, got %v", e.F08, s.F08)
+	}
+	if s.F09 != e.F09 {
+		t.Errorf("F09: expected %v, got %v", e.F09, s.F09)
+	}
+	if s.F10 != e.F10 {
+		t.Errorf("F10: expected %v, got %v", e.F10, s.F10)
+	}
+	if s.F11 != e.F11 {
+		t.Errorf("F11: expected %v, got %v", e.F11, s.F11)
+	}
+	if s.F12 != e.F12 {
+		t.Errorf("F12: expected %v, got %v", e.F12, s.F12)
+	}
+	if s.F13 != e.F13 {
+		t.Errorf("F13: expected %v, got %v", e.F13, s.F13)
+	}
+	if s.F14 != e.F14 {
+		t.Errorf("F14: expected %v, got %v", e.F14, s.F14)
+	}
 }
 
 // ----------------------------------------------------------------------------
