@@ -135,7 +135,7 @@ func (r *Route) addRegexpMatcher(tpl string, matchHost, matchPrefix bool) error 
 	}
 	r.regexp = r.getRegexpGroup()
 	if !matchHost {
-		if tpl[0] != '/' {
+		if len(tpl) == 0 || tpl[0] != '/' {
 			return fmt.Errorf("mux: path must start with a slash, got %q", tpl)
 		}
 		if r.regexp.path != nil {
