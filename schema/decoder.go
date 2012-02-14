@@ -65,9 +65,7 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 		if v.IsNil() {
-			ptr := reflect.New(t)
-			v.Set(ptr)
-			v = ptr
+			v.Set(reflect.New(t))
 		}
 		v = v.Elem()
 	}
