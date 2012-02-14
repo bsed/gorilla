@@ -43,64 +43,54 @@ func (c *cache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 	var struc *structInfo
 	var field *fieldInfo
 	var index64 int64
-	var index int
 	var err error
-	raw := strings.Split(p, ".")
-	res := make([]pathPart, 0)
+	parts := make([]pathPart, 0)
 	path := make([]int, 0)
-	for i := 0; i < len(raw); i++ {
+	keys := strings.Split(p, ".")
+	for i := 0; i < len(keys); i++ {
 		if struc = c.get(t); struc == nil {
 			return nil, invalidPath
 		}
-		if field = struc.get(raw[i]); field == nil {
+		if field = struc.get(keys[i]); field == nil {
 			return nil, invalidPath
 		}
-		path = append(path, field.index)
-		switch field.mainType.Kind() {
-		case reflect.Ptr:
-			if field.elemType.Kind() != reflect.Struct {
-				if conv := c.conv[field.elemType]; conv == nil {
-					// Unsupported type.
-					return nil, invalidPath
-				}
-			}
-		case reflect.Slice:
-			if field.elemType.Kind() == reflect.Struct {
-				// i+1 must be the index, and i+2 must exist.
-				i++
-				if i+1 >= len(raw) {
-					return nil, invalidPath
-				}
-				if index64, err = strconv.ParseInt(raw[i], 10, 0); err != nil {
-					return nil, invalidPath
-				}
-				index = int(index64)
-				res = append(res, pathPart{
-					path:  path,
-					field: field,
-					index: index,
-				})
-				path = make([]int, 0)
-				t = field.elemType
-			} else if conv := c.conv[field.elemType]; conv == nil {
-				// Unsupported type.
+		// Valid field. Append index.
+		path = append(path, field.idx)
+		if field.ss {
+			// Parse a special case: slices of structs.
+			// i+1 must be the slice index, and i+2 must exist.
+			i++
+			if i+1 >= len(keys) {
 				return nil, invalidPath
 			}
-		case reflect.Struct:
-			t = field.mainType
-		default:
-			if conv := c.conv[field.mainType]; conv == nil {
-				// Unsupported type.
+			if index64, err = strconv.ParseInt(keys[i], 10, 0); err != nil {
 				return nil, invalidPath
+			}
+			parts = append(parts, pathPart{
+				path:  path,
+				field: field,
+				index: int(index64),
+			})
+			path = make([]int, 0)
+			// Get the next struct type, dropping ptrs.
+			if t.Kind() == reflect.Ptr {
+				t = t.Elem()
+			}
+			if t.Kind() == reflect.Slice {
+				t = t.Elem()
+				if t.Kind() == reflect.Ptr {
+					t = t.Elem()
+				}
 			}
 		}
 	}
-	res = append(res, pathPart{
+	// Add the remaining.
+	parts = append(parts, pathPart{
 		path:  path,
 		field: field,
 		index: -1,
 	})
-	return res, nil
+	return parts, nil
 }
 
 // get returns a cached structInfo, creating it if necessary.
@@ -108,36 +98,51 @@ func (c *cache) get(t reflect.Type) *structInfo {
 	id := typeID(t)
 	c.l.Lock()
 	info := c.m[id]
+	c.l.Unlock()
 	if info == nil {
 		if info = c.create(t); info != nil {
+			c.l.Lock()
 			c.m[id] = info
+			c.l.Unlock()
 		}
 	}
-	c.l.Unlock()
 	return info
 }
 
 // creat creates a structInfo with meta-data about a struct.
 func (c *cache) create(t reflect.Type) *structInfo {
-	info := &structInfo{
-		fields: make(map[string]*fieldInfo),
-	}
+	info := &structInfo{fields: make(map[string]*fieldInfo)}
 	for i := 0; i < t.NumField(); i++ {
-		// TODO: ignore unsupported field types.
 		field := t.Field(i)
 		alias := fieldAlias(field)
-		// Ignore this field?
-		if alias != "-" {
-			info.fields[alias] = &fieldInfo{
-				index:    i,
-				alias:    alias,
-				name:     field.Name,
-				mainType: field.Type,
+		if alias == "-" {
+			// Ignore this field.
+			continue
+		}
+		// Check if the type is supported and don't cache it if not.
+		// First let's get the basic type.
+		isSlice, isStruct := false, false
+		ft := field.Type
+		if ft.Kind() == reflect.Ptr {
+			ft = ft.Elem()
+		}
+		if ft.Kind() == reflect.Slice {
+			isSlice = true
+			ft = ft.Elem()
+			if ft.Kind() == reflect.Ptr {
+				ft = ft.Elem()
 			}
-			kind := field.Type.Kind()
-			if kind == reflect.Slice || kind == reflect.Ptr {
-				info.fields[alias].elemType = field.Type.Elem()
+		}
+		if isStruct = ft.Kind() == reflect.Struct; !isStruct {
+			if conv := c.conv[ft]; conv == nil {
+				// Type is not supported.
+				continue
 			}
+		}
+		info.fields[alias] = &fieldInfo{
+			idx: i,
+			typ: field.Type,
+			ss:  isSlice && isStruct,
 		}
 	}
 	return info
@@ -154,17 +159,15 @@ func (i *structInfo) get(alias string) *fieldInfo {
 }
 
 type fieldInfo struct {
-	index    int
-	alias    string
-	name     string
-	mainType reflect.Type
-	elemType reflect.Type
+	typ reflect.Type
+	idx int          // field index in the struct.
+	ss  bool         // true if this is a slice of structs.
 }
 
 type pathPart struct {
-	path  []int
 	field *fieldInfo
-	index int
+	path  []int      // path to the field: walks structs using field indices.
+	index int        // struct index in slices of structs.
 }
 
 // ----------------------------------------------------------------------------
@@ -185,7 +188,7 @@ func typeID(t reflect.Type) string {
 	return name
 }
 
-// fieldAlias
+// fieldAlias parses a field tag to get a field alias.
 func fieldAlias(field reflect.StructField) string {
 	var alias string
 	if tag := field.Tag.Get("schema"); tag != "" {

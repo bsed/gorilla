@@ -47,11 +47,12 @@ The supported field types in the destination struct are:
 	* int variants (int, int8, int16, int32, int64)
 	* string
 	* uint variants (uint, uint8, uint16, uint32, uint64)
-	* structs
-	* slices of any of the above types
+	* struct
 	* a pointer to one of the above types
+	* a slice or a pointer to a slice of one of the above types
 
-Non-supported types are simply ignored.
+Non-supported types are simply ignored, however custom types can be registered
+to be converted.
 
 To fill nested structs, keys must use a dotted notation as the "path" for the
 field. So for example, to fill the struct Person below:
