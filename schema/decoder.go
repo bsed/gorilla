@@ -49,61 +49,78 @@ func (d *Decoder) Decode(dst interface{}, src map[string][]string) error {
 
 // decode fills a struct field using a parsed path.
 func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
-	field := fieldByIndex(v, parts[0].path)
-	if len(parts) == 1 {
-		// Simple case.
-		switch field.Kind() {
-		case reflect.Slice:
-			items := make([]reflect.Value, len(values))
-			elemT := field.Type().Elem()
-			conv := d.cache.conv[elemT]
-			if conv == nil {
-				return
+	// Get the field walking the struct fields by index.
+	for _, idx := range parts[0].path {
+		if v.Type().Kind() == reflect.Ptr {
+			if v.IsNil() {
+				v.Set(reflect.New(v.Type().Elem()))
 			}
-			for key, value := range values {
-				if item := conv(value); item.IsValid() {
-					items[key] = item
-				} else {
-					// If a single element is invalid should we give up
-					// or set a zero value?
-					// items[key] = reflect.New(elemT)
-					return
-				}
-			}
-			slice := reflect.MakeSlice(field.Type(), 0, 0)
-			field.Set(reflect.Append(slice, items...))
-		default:
-			if conv := d.cache.conv[field.Type()]; conv != nil {
-				if v := conv(values[0]); v.IsValid() {
-					field.Set(v)
-				}
-			}
+			v = v.Elem()
 		}
+		v = v.Field(idx)
+	}
+
+	// Dereference if needed.
+	t := v.Type()
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+		if v.IsNil() {
+			ptr := reflect.New(t)
+			v.Set(ptr)
+			v = ptr
+		}
+		v = v.Elem()
+	}
+
+	// Slice of structs. Let's go recursive.
+	if len(parts) > 1 {
+		idx := parts[0].index
+		if v.IsNil() || v.Len() < idx+1 {
+			value := reflect.MakeSlice(t, idx+1, idx+1)
+			if v.Len() < idx+1 {
+				// Resize it.
+				reflect.Copy(value, v)
+			}
+			v.Set(value)
+		}
+		d.decode(v.Index(idx), parts[1:], values)
 		return
 	}
-	// Let's go recursive.
-	idx := parts[0].index
-	if field.IsNil() {
-		slice := reflect.MakeSlice(field.Type(), idx+1, idx+1)
-		field.Set(slice)
-	} else if field.Len() < idx+1 {
-		// Resize it.
-		slice := reflect.MakeSlice(field.Type(), idx+1, idx+1)
-		reflect.Copy(slice, field)
-		field.Set(slice)
-	}
-	d.decode(field.Index(idx), parts[1:], values)
-}
 
-// fieldByIndex returns the nested field corresponding to index.
-func fieldByIndex(v reflect.Value, index []int) reflect.Value {
-	for _, x := range index {
-		if v.Type().Kind() == reflect.Ptr {
-			newV := reflect.New(v.Type().Elem())
-			v.Set(newV)
-			v = newV.Elem()
+	// Simple case.
+	switch t.Kind() {
+	case reflect.Slice:
+		items := make([]reflect.Value, len(values))
+		elemT := t.Elem()
+		isPtrElem := elemT.Kind() == reflect.Ptr
+		if isPtrElem {
+			elemT = elemT.Elem()
 		}
-		v = v.Field(x)
+		conv := d.cache.conv[elemT]
+		if conv == nil {
+			return
+		}
+		for key, value := range values {
+			if item := conv(value); item.IsValid() {
+				if isPtrElem {
+					ptr := reflect.New(elemT)
+					ptr.Elem().Set(item)
+					item = ptr
+				}
+				items[key] = item
+			} else {
+				// If a single value is invalid should we give up
+				// or set a zero value?
+				return
+			}
+		}
+		value := reflect.Append(reflect.MakeSlice(t, 0, 0), items...)
+		v.Set(value)
+	default:
+		if conv := d.cache.conv[t]; conv != nil {
+			if value := conv(values[0]); value.IsValid() {
+				v.Set(value)
+			}
+		}
 	}
-	return v
 }
