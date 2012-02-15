@@ -386,3 +386,29 @@ func TestDefaultConverters(t *testing.T) {
 		t.Errorf("F14: expected %v, got %v", e.F14, s.F14)
 	}
 }
+
+// ----------------------------------------------------------------------------
+
+func TestInlineStruct(t *testing.T) {
+	s1 := &struct{
+		F01 bool
+	}{}
+	s2 := &struct{
+		F01 int
+	}{}
+	v1 := map[string][]string{
+		"F01": {"true"},
+	}
+	v2 := map[string][]string{
+		"F01": {"42"},
+	}
+	decoder := NewDecoder()
+	_ = decoder.Decode(s1, v1)
+	if s1.F01 != true {
+		t.Errorf("s1: expected %v, got %v", true, s1.F01)
+	}
+	_ = decoder.Decode(s2, v2)
+	if s2.F01 != 42 {
+		t.Errorf("s2: expected %v, got %v", 42, s2.F01)
+	}
+}
