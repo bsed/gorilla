@@ -86,8 +86,7 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 	}
 
 	// Simple case.
-	switch t.Kind() {
-	case reflect.Slice:
+	if t.Kind() == reflect.Slice {
 		items := make([]reflect.Value, len(values))
 		elemT := t.Elem()
 		isPtrElem := elemT.Kind() == reflect.Ptr
@@ -114,7 +113,7 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 		}
 		value := reflect.Append(reflect.MakeSlice(t, 0, 0), items...)
 		v.Set(value)
-	default:
+	} else {
 		if conv := d.cache.conv[t]; conv != nil {
 			if value := conv(values[0]); value.IsValid() {
 				v.Set(value)

@@ -126,8 +126,7 @@ func (c *cache) create(t reflect.Type) *structInfo {
 		if ft.Kind() == reflect.Ptr {
 			ft = ft.Elem()
 		}
-		if ft.Kind() == reflect.Slice {
-			isSlice = true
+		if isSlice = ft.Kind() == reflect.Slice; isSlice {
 			ft = ft.Elem()
 			if ft.Kind() == reflect.Ptr {
 				ft = ft.Elem()
