@@ -9,6 +9,10 @@ A context stores global variables used during a request. For example, a router
 can set variables extracted from the URL and later application handlers can
 access those values. There are several others common cases.
 
+The context idea was posted by Brad Fitzpatrick to the go-nuts mailing list:
+
+	http://groups.google.com/group/golang-nuts/msg/e2d679d303aa5d53
+
 Here's the basic usage: first define the keys that you will need. The key
 type is interface{} so a key can be of any type that supports equality.
 Here we define a key using a custom int type to avoid name collisions:
