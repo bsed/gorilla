@@ -17,7 +17,7 @@ var invalidPath = errors.New("schema: invalid path")
 // newCache returns a new cache.
 func newCache() *cache {
 	c := cache{
-		m:    make(map[string]*structInfo),
+		m:    make(map[reflect.Type]*structInfo),
 		conv: make(map[reflect.Type]Converter),
 	}
 	for k, v := range converters {
@@ -29,7 +29,7 @@ func newCache() *cache {
 // cache caches meta-data about a struct.
 type cache struct {
 	l    sync.Mutex
-	m    map[string]*structInfo
+	m    map[reflect.Type]*structInfo
 	conv map[reflect.Type]Converter
 }
 
@@ -95,16 +95,14 @@ func (c *cache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 
 // get returns a cached structInfo, creating it if necessary.
 func (c *cache) get(t reflect.Type) *structInfo {
-	id := typeID(t)
 	c.l.Lock()
-	info := c.m[id]
+	info := c.m[t]
 	c.l.Unlock()
 	if info == nil {
-		if info = c.create(t); info != nil {
-			c.l.Lock()
-			c.m[id] = info
-			c.l.Unlock()
-		}
+		info = c.create(t)
+		c.l.Lock()
+		c.m[t] = info
+		c.l.Unlock()
 	}
 	return info
 }
@@ -170,22 +168,6 @@ type pathPart struct {
 }
 
 // ----------------------------------------------------------------------------
-
-// typeID returns a string identifier for a type.
-func typeID(t reflect.Type) string {
-	// Borrowed from gob package.
-	// Default to printed representation for unnamed types.
-	name := t.String()
-	// But for named types, qualify with import path.
-	if t.Name() != "" {
-		if t.PkgPath() == "" {
-			name = t.Name()
-		} else {
-			name = t.PkgPath() + "." + t.Name()
-		}
-	}
-	return name
-}
 
 // fieldAlias parses a field tag to get a field alias.
 func fieldAlias(field reflect.StructField) string {
