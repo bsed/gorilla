@@ -7,6 +7,7 @@ package datastore
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -14,6 +15,11 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 
 	pb "appengine_internal/datastore"
+)
+
+var (
+	minTime = time.Unix(0, 0)
+	maxTime = time.Unix(int64(math.MaxInt64)/1e6, (int64(math.MaxInt64)%1e6)*1e3)
 )
 
 // valueToProto converts a named value to a newly allocated Property.
@@ -45,6 +51,9 @@ func valueToProto(name string, value interface{}, multiple bool) (p *pb.Property
 		}
 	case reflect.Struct:
 		if t, ok := v.Interface().(time.Time); ok {
+			if t.Before(minTime) || t.After(maxTime) {
+				return nil, "time value out of range"
+			}
 			pv.Int64Value = proto.Int64(t.UnixNano() / 1e3)
 		} else {
 			unsupported = true
@@ -208,6 +217,9 @@ func propertiesToProto(key *Key, src <-chan Property) (*pb.EntityProto, error) {
 				x.Value.Referencevalue = keyToReferenceValue(v)
 			}
 		case time.Time:
+			if v.Before(minTime) || v.After(maxTime) {
+				return nil, fmt.Errorf("datastore: time value out of range")
+			}
 			x.Value.Int64Value = proto.Int64(v.UnixNano() / 1e3)
 			x.Meaning = pb.NewProperty_Meaning(pb.Property_GD_WHEN)
 		case appengine.BlobKey:
