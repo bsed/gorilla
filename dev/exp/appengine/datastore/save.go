@@ -52,7 +52,7 @@ func valueToProto(name string, value interface{}, multiple bool) (p *pb.Property
 	case reflect.Struct:
 		if t, ok := v.Interface().(time.Time); ok {
 			if t.Before(minTime) || t.After(maxTime) {
-				return nil, "time value out of range"
+				return nil, errors.New("time value out of range")
 			}
 			pv.Int64Value = proto.Int64(t.UnixNano() / 1e3)
 		} else {
