@@ -36,7 +36,7 @@ func (s *baseSessionStore) SetEncoders(encoders ...sessions.SessionEncoder) {
 // ----------------------------------------------------------------------------
 
 type Session struct {
-	Date  datastore.Time
+	Date  time.Time
 	Value []byte
 }
 
@@ -79,7 +79,7 @@ func (s *DatastoreSessionStore) Save(r *http.Request, w http.ResponseWriter,
 	c := appengine.NewContext(r)
 	entityKey := datastore.NewKey(c, "Session", sessionKey(sid), 0, nil)
 	_, err = datastore.Put(appengine.NewContext(r), entityKey, &Session{
-		Date:  datastore.SecondsToTime(time.Now()),
+		Date:  time.Now(),
 		Value: serialized,
 	})
 	if err != nil {
