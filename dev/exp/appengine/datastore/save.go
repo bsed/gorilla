@@ -218,7 +218,7 @@ func propertiesToProto(key *Key, src <-chan Property) (*pb.EntityProto, error) {
 			}
 		case time.Time:
 			if v.Before(minTime) || v.After(maxTime) {
-				return nil, fmt.Errorf("datastore: time value out of range")
+				return nil, errors.New("datastore: time value out of range")
 			}
 			x.Value.Int64Value = proto.Int64(v.UnixNano() / 1e3)
 			x.Meaning = pb.NewProperty_Meaning(pb.Property_GD_WHEN)

@@ -128,12 +128,6 @@ func (q *Query) KeysOnly(keysOnly bool) *Query {
 	return q
 }
 
-// Compile configures the query to produce cursors.
-func (q *Query) Compile(compile bool) *Query {
-	q.base.Compile(compile)
-	return q
-}
-
 // Cursor sets the cursor position to start the query.
 func (q *Query) Cursor(cursor *Cursor) *Query {
 	q.base.Cursor(cursor)
