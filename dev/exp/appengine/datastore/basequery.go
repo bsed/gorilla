@@ -174,14 +174,6 @@ func (q *BaseQuery) KeysOnly(keysOnly bool) *BaseQuery {
 	return q
 }
 
-// Compile configures the query to produce cursors.
-func (q *BaseQuery) Compile(compile bool) *BaseQuery {
-	if q.err == nil {
-		q.pbq.Compile = proto.Bool(compile)
-	}
-	return q
-}
-
 // Cursor sets the cursor position to start the query.
 func (q *BaseQuery) Cursor(cursor *Cursor) *BaseQuery {
 	if q.err == nil {
@@ -192,6 +184,9 @@ func (q *BaseQuery) Cursor(cursor *Cursor) *BaseQuery {
 		} else {
 			q.pbq.CompiledCursor = cursor.compiledCursor
 		}
+	}
+	if q.err == nil {
+		q.pbq.Compile = proto.Bool(true)
 	}
 	return q
 }
@@ -206,6 +201,9 @@ func (q *BaseQuery) EndCursor(cursor *Cursor) *BaseQuery {
 		} else {
 			q.pbq.EndCompiledCursor = cursor.compiledCursor
 		}
+	}
+	if q.err == nil {
+		q.pbq.Compile = proto.Bool(true)
 	}
 	return q
 }
