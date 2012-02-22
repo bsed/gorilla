@@ -70,7 +70,8 @@ func valueToProto(name string, value interface{}, multiple bool) (p *pb.Property
 		unsupported = true
 	}
 	if unsupported {
-		return nil, errors.New("unsupported datastore value type: " + v.Type().String())
+		return nil, fmt.Errorf("unsupported datastore value type: %v",
+			v.Type().String())
 	}
 	p = &pb.Property{
 		Name:     proto.String(name),
@@ -140,7 +141,8 @@ func saveStructProperty(c chan<- Property, name string, noIndex, multiple bool, 
 		}
 	}
 	if p.Value == nil {
-		return fmt.Errorf("datastore: unsupported struct field type: %v", v.Type())
+		return fmt.Errorf("datastore: unsupported struct field type: %v",
+			v.Type())
 	}
 	c <- p
 	return nil

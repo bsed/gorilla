@@ -74,20 +74,20 @@ func (q *Query) Filter(filter string, value interface{}) *Query {
 	property := strings.TrimRight(filter, " ><=")
 	var operator queryOperator
 	switch strings.TrimSpace(filter[len(property):]) {
-		case "<":
-			operator = QueryOperatorLessThan
-		case "<=":
-			operator = QueryOperatorLessThanOrEqual
-		case "=":
-			operator = QueryOperatorEqual
-		case ">=":
-			operator = QueryOperatorGreaterThanOrEqual
-		case ">":
-			operator = QueryOperatorGreaterThan
-		default:
-			q.base.err = fmt.Errorf("datastore: invalid query filter %q",
-				filter)
-			return q
+	case "<":
+		operator = QueryOperatorLessThan
+	case "<=":
+		operator = QueryOperatorLessThanOrEqual
+	case "=":
+		operator = QueryOperatorEqual
+	case ">=":
+		operator = QueryOperatorGreaterThanOrEqual
+	case ">":
+		operator = QueryOperatorGreaterThan
+	default:
+		q.base.err = fmt.Errorf("datastore: invalid query filter %q",
+			filter)
+		return q
 	}
 	q.base.Filter(q.propertyName(property), operator, value)
 	return q

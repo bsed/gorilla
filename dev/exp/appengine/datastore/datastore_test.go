@@ -2,8 +2,8 @@ package datastore
 
 import (
 	//"fmt"
-	"testing"
 	"gae-go-testing.googlecode.com/git/appenginetesting"
+	"testing"
 )
 
 func getContext(t *testing.T) *appenginetesting.Context {
@@ -155,36 +155,36 @@ func TestKindlessAncestorQuery(t *testing.T) {
 
 func TestCursor(t *testing.T) {
 	/*
-	c := getContext(t)
-	defer c.Close()
+		c := getContext(t)
+		defer c.Close()
 
-	e := &struct{}{}
-	keys := make([]*Key, 50)
-	entities := make([]interface{}, 50)
-	for i := 0; i < 50; i++ {
-		keys[i] = NewKey(c, "A", fmt.Sprintf("%03d", i), 0, nil)
-		entities[i] = e
-	}
+		e := &struct{}{}
+		keys := make([]*Key, 50)
+		entities := make([]interface{}, 50)
+		for i := 0; i < 50; i++ {
+			keys[i] = NewKey(c, "A", fmt.Sprintf("%03d", i), 0, nil)
+			entities[i] = e
+		}
 
-	if _, err := PutMulti(c, keys, entities); err != nil {
-		t.Errorf("Error on PutMulti(): %v\n", err)
-	}
+		if _, err := PutMulti(c, keys, entities); err != nil {
+			t.Errorf("Error on PutMulti(): %v\n", err)
+		}
 
-	q1 := NewQuery("A").Compile(true)
-	i1 := q1.Run(c)
+		q1 := NewQuery("A").Compile(true)
+		i1 := q1.Run(c)
 
-	q1 = NewQuery("A").Limit(1).Compile(true).Cursor(i1.CursorAt(5))
-	i2 := q1.Run(c)
-	k2, _ := i2.Next(struct{}{})
-	if k2.StringID() != "005" {
-		t.Errorf("Expected %q string id, got %q", "005", k2.StringID())
-	}
+		q1 = NewQuery("A").Limit(1).Compile(true).Cursor(i1.CursorAt(5))
+		i2 := q1.Run(c)
+		k2, _ := i2.Next(struct{}{})
+		if k2.StringID() != "005" {
+			t.Errorf("Expected %q string id, got %q", "005", k2.StringID())
+		}
 
-	q1 = NewQuery("A").Limit(1).Compile(true).Cursor(i1.CursorAt(42))
-	i3 := q1.Run(c)
-	k3, _ := i3.Next(struct{}{})
-	if k3.StringID() != "042" {
-		t.Errorf("Expected %q string id, got %q", "042", k3.StringID())
-	}
+		q1 = NewQuery("A").Limit(1).Compile(true).Cursor(i1.CursorAt(42))
+		i3 := q1.Run(c)
+		k3, _ := i3.Next(struct{}{})
+		if k3.StringID() != "042" {
+			t.Errorf("Expected %q string id, got %q", "042", k3.StringID())
+		}
 	*/
 }

@@ -391,15 +391,15 @@ func (c *Cursor) Encode() string {
 // advance returns a new Cursor advanced by the given offset.
 func (c *Cursor) advance(ctx appengine.Context, query *Query, offset int) *Cursor {
 	/*
-	options := &QueryOptions{
-		limit:       0,
-		// TODO: int32 conversion
-		offset:      int32(offset),
-		keysOnly:    true,
-		compile:     true,
-		startCursor: c,
-	}
-	return query.Run(ctx, options).Cursor()
+		options := &QueryOptions{
+			limit:       0,
+			// TODO: int32 conversion
+			offset:      int32(offset),
+			keysOnly:    true,
+			compile:     true,
+			startCursor: c,
+		}
+		return query.Run(ctx, options).Cursor()
 	*/
 	return nil
 }
