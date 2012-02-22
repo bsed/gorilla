@@ -264,7 +264,6 @@ func NewKey(c appengine.Context, kind, stringID string, intID int64, parent *Key
 	}
 }
 
-
 // NewNamespaceKey is the same as NewKey, but creates a key with a
 // namespace.
 //

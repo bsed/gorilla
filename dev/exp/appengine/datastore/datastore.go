@@ -90,7 +90,7 @@ func keyToProto(k *Key) *pb.Reference {
 		namespace = proto.String(k.namespace)
 	}
 	return &pb.Reference{
-		App: proto.String(k.appID),
+		App:       proto.String(k.appID),
 		NameSpace: namespace,
 		Path: &pb.Path{
 			Element: e,
