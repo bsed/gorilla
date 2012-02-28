@@ -1,7 +1,7 @@
 package datastore
 
 import (
-	//"fmt"
+	"fmt"
 	"gae-go-testing.googlecode.com/git/appenginetesting"
 	"testing"
 )
@@ -154,37 +154,42 @@ func TestKindlessAncestorQuery(t *testing.T) {
 // ----------------------------------------------------------------------------
 
 func TestCursor(t *testing.T) {
-	/*
-		c := getContext(t)
-		defer c.Close()
+	c := getContext(t)
+	defer c.Close()
 
-		e := &struct{}{}
-		keys := make([]*Key, 50)
-		entities := make([]interface{}, 50)
-		for i := 0; i < 50; i++ {
-			keys[i] = NewKey(c, "A", fmt.Sprintf("%03d", i), 0, nil)
-			entities[i] = e
-		}
+	e := &struct{}{}
+	keys := make([]*Key, 50)
+	entities := make([]interface{}, 50)
+	for i := 0; i < 50; i++ {
+		keys[i] = NewKey(c, "A", fmt.Sprintf("%03d", i), 0, nil)
+		entities[i] = e
+	}
 
-		if _, err := PutMulti(c, keys, entities); err != nil {
-			t.Errorf("Error on PutMulti(): %v\n", err)
-		}
+	if _, err := PutMulti(c, keys, entities); err != nil {
+		t.Errorf("Error on PutMulti(): %v\n", err)
+	}
 
-		q1 := NewQuery("A").Compile(true)
-		i1 := q1.Run(c)
+	q1 := NewQuery("A").Limit(10).Cursor(nil)
+	i1 := q1.Run(c)
+	c1 := i1.Cursor()
+	k1, _ := i1.Next(struct{}{})
+	if k1.StringID() != "000" {
+		t.Errorf("Expected %q string id, got %q", "005", k1.StringID())
+	}
 
-		q1 = NewQuery("A").Limit(1).Compile(true).Cursor(i1.CursorAt(5))
-		i2 := q1.Run(c)
-		k2, _ := i2.Next(struct{}{})
-		if k2.StringID() != "005" {
-			t.Errorf("Expected %q string id, got %q", "005", k2.StringID())
-		}
+	q2 := NewQuery("A").Limit(10).Cursor(c1)
+	i2 := q2.Run(c)
+	c2 := i2.Cursor()
+	k2, _ := i2.Next(struct{}{})
+	if k2.StringID() != "010" {
+		t.Errorf("Expected %q string id, got %q", "042", k2.StringID())
+	}
 
-		q1 = NewQuery("A").Limit(1).Compile(true).Cursor(i1.CursorAt(42))
-		i3 := q1.Run(c)
-		k3, _ := i3.Next(struct{}{})
-		if k3.StringID() != "042" {
-			t.Errorf("Expected %q string id, got %q", "042", k3.StringID())
-		}
-	*/
+	q3 := NewQuery("A").Limit(10).Cursor(c2)
+	i3 := q3.Run(c)
+	_ = i3.Cursor()
+	k3, _ := i3.Next(struct{}{})
+	if k3.StringID() != "020" {
+		t.Errorf("Expected %q string id, got %q", "042", k3.StringID())
+	}
 }

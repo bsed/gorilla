@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 
 	"code.google.com/p/goprotobuf/proto"
@@ -59,6 +60,14 @@ func NewBaseQuery() *BaseQuery {
 }
 
 // BaseQuery deals with protocol buffers so that Query doesn't have to.
+//
+// It is a more bare version of datastore.Query intended to be used as base
+// for query objects. It stores the query protobuf directly instead of
+// building it when the query runs, and has a slightly less friendly API for
+// filters and orders because it doesn't perform any string parsing --
+// syntax flavors are left for implementations such as Query.
+//
+// When an error occurs, further method calls don't perform any operation.
 type BaseQuery struct {
 	pbq *pb.Query
 	err error
@@ -70,9 +79,6 @@ func (q *BaseQuery) Clone() *BaseQuery {
 }
 
 // Namespace sets the namespace for the query.
-//
-// This is a temporary function to fill the gap until appengine.Context
-// supports namespaces.
 func (q *BaseQuery) Namespace(namespace string) *BaseQuery {
 	if q.err == nil {
 		if namespace == "" {
@@ -143,9 +149,7 @@ func (q *BaseQuery) Order(property string, direction queryDirection) *BaseQuery 
 // A zero value means unlimited. A negative value is invalid.
 func (q *BaseQuery) Limit(limit int) *BaseQuery {
 	if q.err == nil {
-		if limit == 0 {
-			q.pbq.Limit = nil
-		} else if q.err = validateInt32(limit, "limit"); q.err == nil {
+		if q.err = validateInt32(limit, "limit"); q.err == nil {
 			q.pbq.Limit = proto.Int32(int32(limit))
 		}
 	}
@@ -156,9 +160,7 @@ func (q *BaseQuery) Limit(limit int) *BaseQuery {
 // A negative value is invalid.
 func (q *BaseQuery) Offset(offset int) *BaseQuery {
 	if q.err == nil {
-		if offset == 0 {
-			q.pbq.Offset = nil
-		} else if q.err = validateInt32(offset, "offset"); q.err == nil {
+		if q.err = validateInt32(offset, "offset"); q.err == nil {
 			q.pbq.Offset = proto.Int32(int32(offset))
 		}
 	}
@@ -174,15 +176,23 @@ func (q *BaseQuery) KeysOnly(keysOnly bool) *BaseQuery {
 	return q
 }
 
+// Compile configures the query to produce cursors.
+func (q *BaseQuery) Compile(compile bool) *BaseQuery {
+	if q.err == nil {
+		q.pbq.Compile = proto.Bool(compile)
+	}
+	return q
+}
+
 // Cursor sets the cursor position to start the query.
 func (q *BaseQuery) Cursor(cursor *Cursor) *BaseQuery {
 	if q.err == nil {
 		if cursor == nil {
 			q.pbq.CompiledCursor = nil
-		} else if cursor.compiledCursor == nil {
+		} else if cursor.compiled == nil {
 			q.err = errors.New("datastore: empty start cursor")
 		} else {
-			q.pbq.CompiledCursor = cursor.compiledCursor
+			q.pbq.CompiledCursor = cursor.compiled
 		}
 	}
 	if q.err == nil {
@@ -196,10 +206,10 @@ func (q *BaseQuery) EndCursor(cursor *Cursor) *BaseQuery {
 	if q.err == nil {
 		if cursor == nil {
 			q.pbq.EndCompiledCursor = nil
-		} else if cursor.compiledCursor == nil {
+		} else if cursor.compiled == nil {
 			q.err = errors.New("datastore: empty end cursor")
 		} else {
-			q.pbq.EndCompiledCursor = cursor.compiledCursor
+			q.pbq.EndCompiledCursor = cursor.compiled
 		}
 	}
 	if q.err == nil {
@@ -219,8 +229,8 @@ func (q *BaseQuery) toProto(pbq *pb.Query, zeroLimitMeansZero bool) error {
 	if q.err != nil {
 		return q.err
 	}
-	if zeroLimitMeansZero && pbq.Limit == nil {
-		pbq.Limit = proto.Int32(0)
+	if !zeroLimitMeansZero && pbq.Limit != nil && *pbq.Limit == 0 {
+		pbq.Limit = nil
 	}
 	return nil
 }
@@ -250,6 +260,170 @@ func (q *BaseQuery) Run(c appengine.Context) *Iterator {
 		return t
 	}
 	return t
+}
+
+// GetAll runs the query in the given context and returns all keys that match
+// that query, as well as appending the values to dst.
+//
+// dst must have type *[]S or *[]*S or *[]P, for some struct type S or some non-
+// interface, non-pointer type P such that P or *P implements PropertyLoadSaver.
+//
+// As a special case, *PropertyList is an invalid type for dst, even though a
+// PropertyList is a slice of structs. It is treated as invalid to avoid being
+// mistakenly passed when *[]PropertyList was intended.
+//
+// If q is a ``keys-only'' query, GetAll ignores dst and only returns the keys.
+func (q *BaseQuery) GetAll(c appengine.Context, dst interface{}) ([]*Key, error) {
+	var (
+		dv       reflect.Value
+		mat      multiArgType
+		elemType reflect.Type
+	)
+	keysOnly := q.pbq.KeysOnly != nil && *q.pbq.KeysOnly
+	if !keysOnly {
+		dv = reflect.ValueOf(dst)
+		if dv.Kind() != reflect.Ptr || dv.IsNil() {
+			return nil, ErrInvalidEntityType
+		}
+		dv = dv.Elem()
+		mat, elemType = checkMultiArg(dv)
+		if mat == multiArgTypeInvalid || mat == multiArgTypeInterface {
+			return nil, ErrInvalidEntityType
+		}
+	}
+
+	var keys []*Key
+	for t := q.Run(c); ; {
+		k, e, err := t.next()
+		if err == Done {
+			break
+		}
+		if err != nil {
+			return keys, err
+		}
+		if !keysOnly {
+			ev := reflect.New(elemType)
+			if elemType.Kind() == reflect.Map {
+				// This is a special case. The zero values of a map type are
+				// not immediately useful; they have to be make'd.
+				//
+				// Funcs and channels are similar, in that a zero value is not useful,
+				// but even a freshly make'd channel isn't useful: there's no fixed
+				// channel buffer size that is always going to be large enough, and
+				// there's no goroutine to drain the other end. Theoretically, these
+				// types could be supported, for example by sniffing for a constructor
+				// method or requiring prior registration, but for now it's not a
+				// frequent enough concern to be worth it. Programmers can work around
+				// it by explicitly using Iterator.Next instead of the Query.GetAll
+				// convenience method.
+				x := reflect.MakeMap(elemType)
+				ev.Elem().Set(x)
+			}
+			if err = loadEntity(ev.Interface(), e); err != nil {
+				return keys, err
+			}
+			if mat != multiArgTypeStructPtr {
+				ev = ev.Elem()
+			}
+			dv.Set(reflect.Append(dv, ev))
+		}
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
+// Count returns the number of results for the query.
+func (q *BaseQuery) Count(c appengine.Context) (int, error) {
+	// Check that the query is well-formed.
+	if q.err != nil {
+		return 0, q.err
+	}
+	var limit, offset, newOffset int32
+	if q.pbq.Limit != nil {
+		limit = *q.pbq.Limit
+	}
+	if q.pbq.Offset != nil {
+		offset = *q.pbq.Offset
+		newOffset = offset
+	}
+
+	// Run a copy of the query, with keysOnly true, and an adjusted offset.
+	// We also set the limit to zero, as we don't want any actual entity data,
+	// just the number of skipped results.
+	newQ := q.Clone()
+	newQ.KeysOnly(true)
+	newQ.Limit(0)
+	if limit == 0 {
+		// If the original query was unlimited, set the new query's offset to maximum.
+		newOffset = math.MaxInt32
+		newQ.Offset(int(newOffset))
+	} else {
+		newOffset = offset + limit
+		if newOffset >= 0 {
+			newQ.Offset(int(newOffset))
+		} else {
+			// Do the best we can, in the presence of overflow.
+			newOffset = math.MaxInt32
+			newQ.Offset(int(newOffset))
+		}
+	}
+	req := &pb.Query{}
+	if err := newQ.toProto(req, true); err != nil {
+		return 0, err
+	}
+	res := &pb.QueryResult{}
+	if err := c.Call("datastore_v3", "RunQuery", req, res, nil); err != nil {
+		return 0, err
+	}
+
+	// n is the count we will return. For example, suppose that our original
+	// query had an offset of 4 and a limit of 2008: the count will be 2008,
+	// provided that there are at least 2012 matching entities. However, the
+	// RPCs will only skip 1000 results at a time. The RPC sequence is:
+	//   call RunQuery with (offset, limit) = (2012, 0)  // 2012 == newQ.offset
+	//   response has (skippedResults, moreResults) = (1000, true)
+	//   n += 1000  // n == 1000
+	//   call Next     with (offset, limit) = (1012, 0)  // 1012 == newQ.offset - n
+	//   response has (skippedResults, moreResults) = (1000, true)
+	//   n += 1000  // n == 2000
+	//   call Next     with (offset, limit) = (12, 0)    // 12 == newQ.offset - n
+	//   response has (skippedResults, moreResults) = (12, false)
+	//   n += 12    // n == 2012
+	//   // exit the loop
+	//   n -= 4     // n == 2008
+	var n int32
+	for {
+		// The QueryResult should have no actual entity data, just skipped results.
+		if len(res.Result) != 0 {
+			return 0, errors.New("datastore: internal error: Count request returned too much data")
+		}
+		n += proto.GetInt32(res.SkippedResults)
+		if !proto.GetBool(res.MoreResults) {
+			break
+		}
+		if err := callNext(c, res, newOffset-n, 0, true); err != nil {
+			return 0, err
+		}
+	}
+	n -= offset
+	if n < 0 {
+		// If the offset was greater than the number of matching entities,
+		// return 0 instead of negative.
+		n = 0
+	}
+	return int(n), nil
+}
+
+// GetCursorAt returns a cursor at the given position for this query.
+func (q *BaseQuery) GetCursorAt(c appengine.Context, position int) (*Cursor, error) {
+	if q.err != nil {
+		return nil, q.err
+	}
+	if err := validateInt32(position, "cursor position"); err != nil {
+		return nil, err
+	}
+	q = q.Clone().Limit(0).Offset(position).KeysOnly(true).Compile(true)
+	return q.Run(c).Cursor(), nil
 }
 
 // validateInt32 validates that an int is positive ad doesn't overflow.
@@ -344,6 +518,14 @@ func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
 	return k, e, nil
 }
 
+// Cursor returns a cursor for the current query.
+func (t *Iterator) Cursor() *Cursor {
+	if t.res.CompiledCursor != nil {
+		return &Cursor{t.res.CompiledCursor}
+	}
+	return nil
+}
+
 // callNext issues a datastore_v3/Next RPC to advance a cursor, such as that
 // returned by a query with more results.
 func callNext(c appengine.Context, res *pb.QueryResult, offset, limit int32, zeroLimitMeansZero bool) error {
@@ -371,14 +553,14 @@ func callNext(c appengine.Context, res *pb.QueryResult, offset, limit int32, zer
 
 // Cursor represents a compiled query cursor.
 type Cursor struct {
-	compiledCursor *pb.CompiledCursor
+	compiled *pb.CompiledCursor
 }
 
 // Encode returns an opaque representation of the cursor suitable for use in
 // HTML and URLs. This is compatible with the Python and Java runtimes.
 func (c *Cursor) Encode() string {
-	if c.compiledCursor != nil {
-		if b, err := proto.Marshal(c.compiledCursor); err == nil {
+	if c.compiled != nil {
+		if b, err := proto.Marshal(c.compiled); err == nil {
 			// Trailing padding is stripped.
 			return strings.TrimRight(base64.URLEncoding.EncodeToString(b), "=")
 		}
@@ -386,22 +568,6 @@ func (c *Cursor) Encode() string {
 	// We don't return the error to follow Key.Encode which only
 	// returns a string. It is unlikely to happen anyway.
 	return ""
-}
-
-// advance returns a new Cursor advanced by the given offset.
-func (c *Cursor) advance(ctx appengine.Context, query *Query, offset int) *Cursor {
-	/*
-		options := &QueryOptions{
-			limit:       0,
-			// TODO: int32 conversion
-			offset:      int32(offset),
-			keysOnly:    true,
-			compile:     true,
-			startCursor: c,
-		}
-		return query.Run(ctx, options).Cursor()
-	*/
-	return nil
 }
 
 // DecodeCursor decodes a cursor from the opaque representation returned by

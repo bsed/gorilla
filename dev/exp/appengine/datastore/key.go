@@ -116,7 +116,9 @@ func (k *Key) marshal(b *bytes.Buffer) {
 	if k.parent != nil {
 		k.parent.marshal(b)
 	} else {
-		b.WriteString(k.namespace)
+		if k.namespace != "" {
+			b.WriteString(k.namespace)
+		}
 	}
 	b.WriteByte('/')
 	b.WriteString(k.kind)
