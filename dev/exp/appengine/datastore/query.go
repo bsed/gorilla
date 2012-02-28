@@ -20,8 +20,6 @@ func NewQuery(kind string) *Query {
 type Query struct {
 	base    *BaseQuery
 	aliases map[string]string
-	// Keep track of some properties we eventually use.
-	limit int
 }
 
 // Clone returns a copy of the query.
@@ -113,7 +111,6 @@ func (q *Query) Order(order string) *Query {
 // Limit sets the maximum number of keys/entities to return.
 // A zero value means unlimited. A negative value is invalid.
 func (q *Query) Limit(limit int) *Query {
-	q.limit = limit
 	q.base.Limit(limit)
 	return q
 }
@@ -131,15 +128,17 @@ func (q *Query) KeysOnly(keysOnly bool) *Query {
 	return q
 }
 
-// Cursor sets the cursor position to start the query.
-func (q *Query) Cursor(cursor *Cursor) *Query {
-	q.base.Cursor(cursor)
+// Compile configures the query to produce cursors.
+func (q *Query) Compile(compile bool) *Query {
+	q.base.Compile(compile)
 	return q
 }
 
-// EndCursor sets the cursor position to end the query.
-func (q *Query) EndCursor(cursor *Cursor) *Query {
-	q.base.EndCursor(cursor)
+// Cursor sets the cursor position to start the query.
+//
+// When a cursor is set the query is automatically configured to compile.
+func (q *Query) Cursor(cursor *Cursor) *Query {
+	q.base.Cursor(cursor)
 	return q
 }
 
@@ -165,23 +164,17 @@ func (q *Query) GetAll(c appengine.Context, dst interface{}) ([]*Key, error) {
 
 // GetPage is the same as GetAll, but it also returns a cursor and a flag
 // indicating if there are more results.
-func (q *Query) GetPage(c appengine.Context, dst interface{}) (keys []*Key, cursor *Cursor, hasMore bool, err error) {
-	q = q.Clone()
-	q.base.Limit(q.limit + 1)
-	if keys, err = q.GetAll(c, dst); err != nil {
-		return nil, nil, false, err
-	}
-	if len(keys) > q.limit {
-		hasMore = true
-		keys = keys[:q.limit]
-	}
-	if cursor, err = q.base.GetCursorAt(c, q.limit); err != nil {
-		return nil, nil, false, err
-	}
-	return
+func (q *Query) GetPage(c appengine.Context, dst interface{}) (keys []*Key,
+	cursor *Cursor, hasMore bool, err error) {
+	return q.base.GetPage(c, dst)
 }
 
 // Count returns the number of results for the query.
 func (q *Query) Count(c appengine.Context) (int, error) {
 	return q.base.Count(c)
+}
+
+// GetCursorAt returns a cursor at the given position for this query.
+func (q *Query) GetCursorAt(c appengine.Context, position int) (*Cursor, error) {
+	return q.base.GetCursorAt(c, position)
 }

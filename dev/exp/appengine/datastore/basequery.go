@@ -229,7 +229,7 @@ func (q *BaseQuery) toProto(pbq *pb.Query, zeroLimitMeansZero bool) error {
 	if q.err != nil {
 		return q.err
 	}
-	if !zeroLimitMeansZero && pbq.Limit != nil && *pbq.Limit == 0 {
+	if !zeroLimitMeansZero && proto.GetInt32(pbq.Limit) == 0 {
 		pbq.Limit = nil
 	}
 	return nil
@@ -242,18 +242,12 @@ func (q *BaseQuery) Run(c appengine.Context) *Iterator {
 	if err := q.toProto(&req, false); err != nil {
 		return &Iterator{err: q.err}
 	}
-	var limit, offset int32
-	if req.Limit != nil {
-		limit = *req.Limit
-	}
-	if req.Offset != nil {
-		offset = *req.Offset
-	}
 	req.App = proto.String(c.FullyQualifiedAppID())
 	t := &Iterator{
 		c:      c,
-		offset: offset,
-		limit:  limit,
+		q:      q,
+		limit:  proto.GetInt32(req.Limit),
+		offset: proto.GetInt32(req.Offset),
 	}
 	if err := c.Call("datastore_v3", "RunQuery", &req, &t.res, nil); err != nil {
 		t.err = err
@@ -332,41 +326,52 @@ func (q *BaseQuery) GetAll(c appengine.Context, dst interface{}) ([]*Key, error)
 	return keys, nil
 }
 
+// GetPage is the same as GetAll, but it also returns a cursor and a flag
+// indicating if there are more results.
+func (q *BaseQuery) GetPage(c appengine.Context, dst interface{}) (keys []*Key,
+	cursor *Cursor, hasMore bool, err error) {
+	q = q.Clone()
+	limit := int(proto.GetInt32(q.pbq.Limit))
+	q.Limit(limit + 1)
+	if keys, err = q.GetAll(c, dst); err != nil {
+		return nil, nil, false, err
+	}
+	if len(keys) > limit {
+		hasMore = true
+		keys = keys[:limit]
+	}
+	if cursor, err = q.GetCursorAt(c, limit); err != nil {
+		return nil, nil, false, err
+	}
+	return
+}
+
 // Count returns the number of results for the query.
 func (q *BaseQuery) Count(c appengine.Context) (int, error) {
 	// Check that the query is well-formed.
 	if q.err != nil {
 		return 0, q.err
 	}
-	var limit, offset, newOffset int32
-	if q.pbq.Limit != nil {
-		limit = *q.pbq.Limit
-	}
-	if q.pbq.Offset != nil {
-		offset = *q.pbq.Offset
-		newOffset = offset
-	}
-
 	// Run a copy of the query, with keysOnly true, and an adjusted offset.
 	// We also set the limit to zero, as we don't want any actual entity data,
 	// just the number of skipped results.
 	newQ := q.Clone()
 	newQ.KeysOnly(true)
 	newQ.Limit(0)
+	limit := proto.GetInt32(q.pbq.Limit)
+	offset := proto.GetInt32(q.pbq.Offset)
+	var newOffset int32
 	if limit == 0 {
 		// If the original query was unlimited, set the new query's offset to maximum.
 		newOffset = math.MaxInt32
-		newQ.Offset(int(newOffset))
 	} else {
 		newOffset = offset + limit
-		if newOffset >= 0 {
-			newQ.Offset(int(newOffset))
-		} else {
+		if newOffset < 0 {
 			// Do the best we can, in the presence of overflow.
 			newOffset = math.MaxInt32
-			newQ.Offset(int(newOffset))
 		}
 	}
+	newQ.Offset(int(newOffset))
 	req := &pb.Query{}
 	if err := newQ.toProto(req, true); err != nil {
 		return 0, err
@@ -423,7 +428,15 @@ func (q *BaseQuery) GetCursorAt(c appengine.Context, position int) (*Cursor, err
 		return nil, err
 	}
 	q = q.Clone().Limit(0).Offset(position).KeysOnly(true).Compile(true)
-	return q.Run(c).Cursor(), nil
+	t := q.Run(c)
+	for {
+		if _, err := t.Next(nil); err == Done {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+	}
+	return t.getCursor(), nil
 }
 
 // validateInt32 validates that an int is positive ad doesn't overflow.
@@ -447,9 +460,12 @@ var Done = errors.New("datastore: query has no more results")
 // Iterator is the result of running a query.
 type Iterator struct {
 	c      appengine.Context
+	q      *BaseQuery
 	offset int32
 	limit  int32
 	res    pb.QueryResult
+	curr   int // position of the current item in the current batch
+	last   int // position of the last item in the current batch
 	err    error
 }
 
@@ -464,43 +480,14 @@ func (t *Iterator) Next(dst interface{}) (*Key, error) {
 	if err != nil || e == nil {
 		return k, err
 	}
+	t.curr += 1
 	return k, loadEntity(dst, e)
 }
 
 func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
-	if t.err != nil {
-		return nil, nil, t.err
+	if err := t.nextBatch(); err != nil {
+		return nil, nil, err
 	}
-
-	// Issue datastore_v3/Next RPCs as necessary.
-	for len(t.res.Result) == 0 {
-		if !proto.GetBool(t.res.MoreResults) {
-			t.err = Done
-			return nil, nil, t.err
-		}
-		t.offset -= proto.GetInt32(t.res.SkippedResults)
-		if t.offset < 0 {
-			t.offset = 0
-		}
-		if err := callNext(t.c, &t.res, t.offset, t.limit, false); err != nil {
-			t.err = err
-			return nil, nil, t.err
-		}
-		// For an Iterator, a zero limit means unlimited.
-		if t.limit == 0 {
-			continue
-		}
-		t.limit -= int32(len(t.res.Result))
-		if t.limit > 0 {
-			continue
-		}
-		t.limit = 0
-		if proto.GetBool(t.res.MoreResults) {
-			t.err = errors.New("datastore: internal error: limit exhausted but more_results is true")
-			return nil, nil, t.err
-		}
-	}
-
 	// Pop the EntityProto from the front of t.res.Result and
 	// extract its key.
 	var e *pb.EntityProto
@@ -518,12 +505,93 @@ func (t *Iterator) next() (*Key, *pb.EntityProto, error) {
 	return k, e, nil
 }
 
-// Cursor returns a cursor for the current query.
-func (t *Iterator) Cursor() *Cursor {
-	if t.res.CompiledCursor != nil {
-		return &Cursor{t.res.CompiledCursor}
+func (t *Iterator) nextBatch() error {
+	if t.err != nil {
+		return t.err
+	}
+	// Issue datastore_v3/Next RPCs as necessary.
+	for len(t.res.Result) == 0 {
+		if !proto.GetBool(t.res.MoreResults) {
+			t.err = Done
+			return t.err
+		}
+		t.offset -= proto.GetInt32(t.res.SkippedResults)
+		if t.offset < 0 {
+			t.offset = 0
+		}
+		if err := callNext(t.c, &t.res, t.offset, t.limit, false); err != nil {
+			t.err = err
+			return t.err
+		}
+		// Update last position counter.
+		t.last += len(t.res.Result)
+		// For an Iterator, a zero limit means unlimited.
+		if t.limit == 0 {
+			continue
+		}
+		t.limit -= int32(len(t.res.Result))
+		if t.limit > 0 {
+			continue
+		}
+		t.limit = 0
+		if proto.GetBool(t.res.MoreResults) {
+			t.err = errors.New("datastore: internal error: limit exhausted but more_results is true")
+			return t.err
+		}
 	}
 	return nil
+}
+
+// GetCursorAfter returns a cursor positioned just after the item returned by
+// Iterator.Next().
+//
+// Note that sometimes requesting a cursor requires a datastore roundtrip
+// (but not if the cursor corresponds to a batch boundary, normally
+// the query limit).
+//
+// If Compile(true) was not set or a cursor wasn't set in the query, it
+// always returns nil. If Next() wasn't called yet it also returns nil.
+func (t *Iterator) GetCursorAfter() *Cursor {
+	return t.getCursorAt(t.curr)
+}
+
+// CursorBefore returns a cursor positioned just before the item returned by
+// Iterator.Next().
+//
+// Note that sometimes requesting a cursor requires a datastore roundtrip
+// (but not if the cursor corresponds to a batch boundary, normally
+// the query limit).
+//
+// If Compile(true) was not set or a cursor wasn't set in the query, it
+// always returns nil. If Next() wasn't called yet it also returns nil.
+func (t *Iterator) GetCursorBefore() *Cursor {
+	return t.getCursorAt(t.curr - 1)
+}
+
+// getCursorAt returns a cursor in the given position.
+func (t *Iterator) getCursorAt(position int) *Cursor {
+	if err := t.nextBatch(); err != nil && err != Done {
+		return nil
+	}
+	if t.curr == 0 || t.res.CompiledCursor == nil {
+		// Next() wasn't called or query is not configured to compile.
+		return nil
+	}
+	if position == t.last {
+		// Cursor from the current batch.
+		return t.getCursor()
+	}
+	// Perform datastore roundtrip.
+	cursor, err := t.q.GetCursorAt(t.c, position)
+	if err != nil {
+		return nil
+	}
+	return cursor
+}
+
+// getCursor returns the cursor for the current batch.
+func (t *Iterator) getCursor() *Cursor {
+	return &Cursor{t.res.CompiledCursor}
 }
 
 // callNext issues a datastore_v3/Next RPC to advance a cursor, such as that

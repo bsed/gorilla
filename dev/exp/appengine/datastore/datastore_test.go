@@ -153,6 +153,42 @@ func TestKindlessAncestorQuery(t *testing.T) {
 
 // ----------------------------------------------------------------------------
 
+func TestGetCursorAt(t *testing.T) {
+	c := getContext(t)
+	defer c.Close()
+
+	e := &struct{}{}
+	keys := make([]*Key, 20)
+	entities := make([]interface{}, 20)
+	for i := 0; i < 20; i++ {
+		keys[i] = NewKey(c, "A", fmt.Sprintf("%03d", i), 0, nil)
+		entities[i] = e
+	}
+	if _, err := PutMulti(c, keys, entities); err != nil {
+		t.Errorf("Error on PutMulti(): %v\n", err)
+	}
+
+	q1 := NewQuery("A").Limit(1).Compile(true)
+	for i := 0; i < 20; i++ {
+		cursor, err := q1.GetCursorAt(c, i)
+		if err != nil {
+			t.Fatalf("Failed to return cursor from CursorAt()")
+		}
+		q2 := NewQuery("A").Limit(1).Cursor(cursor)
+		i2 := q2.Run(c)
+		k2, err2 := i2.Next(struct{}{})
+		if err2 == Done {
+			break
+		} else if err2 != nil {
+			t.Fatalf("%v", err2)
+		}
+		if k2.StringID() != keys[i].StringID() {
+			t.Errorf("Expected id %q, got %q", keys[i].StringID(), k2.StringID())
+		}
+	}
+}
+
+/*
 func TestCursor(t *testing.T) {
 	c := getContext(t)
 	defer c.Close()
@@ -171,25 +207,46 @@ func TestCursor(t *testing.T) {
 
 	q1 := NewQuery("A").Limit(10).Cursor(nil)
 	i1 := q1.Run(c)
-	c1 := i1.Cursor()
 	k1, _ := i1.Next(struct{}{})
+	c1 := i1.GetCursorAfter()
 	if k1.StringID() != "000" {
-		t.Errorf("Expected %q string id, got %q", "005", k1.StringID())
+		t.Errorf("Expected %q string id, got %q", "000", k1.StringID())
 	}
 
 	q2 := NewQuery("A").Limit(10).Cursor(c1)
 	i2 := q2.Run(c)
-	c2 := i2.Cursor()
 	k2, _ := i2.Next(struct{}{})
+	c2 := i2.GetCursorAfter()
 	if k2.StringID() != "010" {
-		t.Errorf("Expected %q string id, got %q", "042", k2.StringID())
+		t.Errorf("Expected %q string id, got %q", "010", k2.StringID())
 	}
 
 	q3 := NewQuery("A").Limit(10).Cursor(c2)
 	i3 := q3.Run(c)
-	_ = i3.Cursor()
+	//c3 := i3.GetCursorAfter()
 	k3, _ := i3.Next(struct{}{})
 	if k3.StringID() != "020" {
-		t.Errorf("Expected %q string id, got %q", "042", k3.StringID())
+		t.Errorf("Expected %q string id, got %q", "020", k3.StringID())
+	}
+
+	/*
+	q4 := NewQuery("A").Limit(10).KeysOnly(true).Cursor(c3)
+	k4, _, hasMore4, err4 := q4.GetPage(c, nil)
+	if err4 != nil {
+		t.Fatalf("Error on GetPage: %v", err4)
+	}
+	if len(k4) != 10 {
+		t.Fatalf("Expected 10 results, got %v", len(k4))
+	}
+
+	if k4[0].StringID() != "030" {
+		t.Errorf("Expected %q string id, got %q", "030", k4[0].StringID())
+	}
+	if k4[9].StringID() != "039" {
+		t.Errorf("Expected %q string id, got %q", "039", k4[9].StringID())
+	}
+	if !hasMore4 {
+		t.Errorf("Expected hasMore")
 	}
 }
+*/
