@@ -23,7 +23,7 @@ type Route struct {
 	// Manager for the variables from host and path.
 	regexp *routeRegexpGroup
 	// If true, when the path pattern is "/path/", accessing "/path" will
-	// redirect to the former and vice-versa.
+	// redirect to the former and vice versa.
 	strictSlash bool
 	// The name used to build URLs.
 	name string

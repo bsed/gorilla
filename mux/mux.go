@@ -100,8 +100,8 @@ func (r *Router) GetRoute(name string) *Route {
 
 // StrictSlash defines the slash behavior for new routes.
 //
-// When true, if the route path is /path/, accessing /path will redirect to
-// /path/, and vice versa.
+// When true, if the route path is "/path/", accessing "/path" will redirect
+// to the former and vice versa.
 func (r *Router) StrictSlash(value bool) *Router {
 	r.strictSlash = value
 	return r
