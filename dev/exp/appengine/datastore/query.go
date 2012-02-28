@@ -20,6 +20,8 @@ func NewQuery(kind string) *Query {
 type Query struct {
 	base    *BaseQuery
 	aliases map[string]string
+	// Keep track of some properties we eventually use.
+	limit int
 }
 
 // Clone returns a copy of the query.
@@ -111,6 +113,7 @@ func (q *Query) Order(order string) *Query {
 // Limit sets the maximum number of keys/entities to return.
 // A zero value means unlimited. A negative value is invalid.
 func (q *Query) Limit(limit int) *Query {
+	q.limit = limit
 	q.base.Limit(limit)
 	return q
 }
@@ -145,12 +148,40 @@ func (q *Query) Run(c appengine.Context) *Iterator {
 	return q.base.Run(c)
 }
 
-// TODO
+// GetAll runs the query in the given context and returns all keys that match
+// that query, as well as appending the values to dst.
+//
+// dst must have type *[]S or *[]*S or *[]P, for some struct type S or some non-
+// interface, non-pointer type P such that P or *P implements PropertyLoadSaver.
+//
+// As a special case, *PropertyList is an invalid type for dst, even though a
+// PropertyList is a slice of structs. It is treated as invalid to avoid being
+// mistakenly passed when *[]PropertyList was intended.
+//
+// If q is a ``keys-only'' query, GetAll ignores dst and only returns the keys.
 func (q *Query) GetAll(c appengine.Context, dst interface{}) ([]*Key, error) {
-	return nil, nil
+	return q.base.GetAll(c, dst)
 }
 
-// TODO
+// GetPage is the same as GetAll, but it also returns a cursor and a flag
+// indicating if there are more results.
+func (q *Query) GetPage(c appengine.Context, dst interface{}) (keys []*Key, cursor *Cursor, hasMore bool, err error) {
+	q = q.Clone()
+	q.base.Limit(q.limit + 1)
+	if keys, err = q.GetAll(c, dst); err != nil {
+		return nil, nil, false, err
+	}
+	if len(keys) > q.limit {
+		hasMore = true
+		keys = keys[:q.limit]
+	}
+	if cursor, err = q.base.GetCursorAt(c, q.limit); err != nil {
+		return nil, nil, false, err
+	}
+	return
+}
+
+// Count returns the number of results for the query.
 func (q *Query) Count(c appengine.Context) (int, error) {
-	return 0, nil
+	return q.base.Count(c)
 }
