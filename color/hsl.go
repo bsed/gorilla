@@ -9,6 +9,7 @@ import (
 	"math"
 )
 
+// HSLModel converts any color.Color to a HSL color.
 var HSLModel = color.ModelFunc(hslModel)
 
 // HSL represents a cylindrical coordinate of points in an RGB color model.
