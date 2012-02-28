@@ -9,6 +9,7 @@ import (
 	"math"
 )
 
+// HSVModel converts any color.Color to a HSV color.
 var HSVModel = color.ModelFunc(hsvModel)
 
 // HSV represents a cylindrical coordinate of points in an RGB color model.

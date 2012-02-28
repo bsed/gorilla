@@ -10,6 +10,7 @@ import (
 	"strconv"
 )
 
+// HexModel converts any color.Color to an Hex color.
 var HexModel = color.ModelFunc(hexModel)
 
 // Hex represents an RGB color in hexadecimal format.
@@ -33,9 +34,9 @@ func hexModel(c color.Color) color.Color {
 	return RGBToHex(uint8(r>>8), uint8(g>>8), uint8(b>>8))
 }
 
-// RGBToHex converts an RGB triple to a Hex string.
+// RGBToHex converts an RGB triple to an Hex string.
 func RGBToHex(r, g, b uint8) Hex {
-	return Hex(fmt.Sprintf("%02X%02X%02X", r, g, b))
+	return Hex(fmt.Sprintf("#%02X%02X%02X", r, g, b))
 }
 
 // HexToRGB converts an Hex string to a RGB triple.
