@@ -52,6 +52,7 @@ func RGBToHSV(r, g, b uint8) (h, s, v float64) {
 		// Achromatic.
 		h = 0
 	} else {
+		// Chromatic.
 		switch max {
 		case fR:
 			h = (fG - fB) / d
