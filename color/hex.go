@@ -41,22 +41,16 @@ func RGBToHex(r, g, b uint8) Hex {
 
 // HexToRGB converts an Hex string to a RGB triple.
 func HexToRGB(h Hex) (uint8, uint8, uint8) {
-	size := len(h)
-	if size > 0 && h[0] == '#' {
+	if len(h) > 0 && h[0] == '#' {
 		h = h[1:]
-		size -= 1
 	}
-	if size != 3 && size != 6 {
-		return 0, 0, 0
-	}
-	if size == 3 {
+	if len(h) == 3 {
 		h = h[:1] + h[:1] + h[1:2] + h[1:2] + h[2:] + h[2:]
 	}
-	r64, err1 := strconv.ParseUint(string(h[:2]), 16, 8)
-	g64, err2 := strconv.ParseUint(string(h[2:4]), 16, 8)
-	b64, err3 := strconv.ParseUint(string(h[4:]), 16, 8)
-	if err1 != nil || err2 != nil || err3 != nil {
-		return 0, 0, 0
+	if len(h) == 6 {
+		if rgb, err := strconv.ParseUint(string(h), 16, 32); err == nil {
+			return uint8(rgb>>16), uint8((rgb>>8) & 0xFF), uint8(rgb & 0xFF)
+		}
 	}
-	return uint8(r64), uint8(g64), uint8(b64)
+	return 0, 0, 0
 }
