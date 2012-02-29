@@ -418,7 +418,10 @@ func (s *requestSessions) Save(w http.ResponseWriter) error {
 			errMulti = append(errMulti, err)
 		}
 	}
-	return errMulti
+	if len(errMulti) > 0 {
+		return errMulti
+	}
+	return nil
 }
 
 // sessionKeys extracts session/store keys from variadic arguments.
