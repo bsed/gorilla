@@ -19,9 +19,9 @@ type HSV struct {
 
 // RGBA returns the alpha-premultiplied red, green, blue and alpha values
 // for the HSV.
-func (c HSV) RGBA() (r, g, b, a uint32) {
-	r8, g8, b8 := HSVToRGB(c.H, c.S, c.V)
-	return uint32(r8), uint32(g8), uint32(b8), 0xffff
+func (c HSV) RGBA() (uint32, uint32, uint32, uint32) {
+	r, g, b := HSVToRGB(c.H, c.S, c.V)
+	return uint32(r) * 0x101, uint32(g) * 0x101, uint32(b) * 0x101, 0xffff
 }
 
 // hsvModel converts a color.Color to HSV.
@@ -74,11 +74,11 @@ func RGBToHSV(r, g, b uint8) (h, s, v float64) {
 // Ported from http://goo.gl/Vg1h9
 func HSVToRGB(h, s, v float64) (r, g, b uint8) {
 	var fR, fG, fB float64
-	i := math.Floor(h * 6);
-	f := h * 6 - i;
-	p := v * (1.0 - s);
-	q := v * (1.0 - f * s);
-	t := v * (1.0 - (1.0 - f) * s);
+	i := math.Floor(h * 6)
+	f := h * 6 - i
+	p := v * (1.0 - s)
+	q := v * (1.0 - f * s)
+	t := v * (1.0 - (1.0 - f) * s)
 	switch int(i) % 6 {
 	case 0:
 		fR = v

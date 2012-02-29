@@ -21,8 +21,8 @@ type Hex string
 // RGBA returns the alpha-premultiplied red, green, blue and alpha values
 // for the Hex.
 func (c Hex) RGBA() (uint32, uint32, uint32, uint32) {
-	r8, g8, b8 := HexToRGB(c)
-	return uint32(r8), uint32(g8), uint32(b8), 0xffff
+	r, g, b := HexToRGB(c)
+	return uint32(r) * 0x101, uint32(g) * 0x101, uint32(b) * 0x101, 0xffff
 }
 
 // hexModel converts a color.Color to Hex.
