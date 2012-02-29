@@ -19,9 +19,9 @@ type HSL struct {
 
 // RGBA returns the alpha-premultiplied red, green, blue and alpha values
 // for the HSL.
-func (c HSL) RGBA() (r, g, b, a uint32) {
-	r8, g8, b8 := HSLToRGB(c.H, c.S, c.L)
-	return uint32(r8), uint32(g8), uint32(b8), 0xffff
+func (c HSL) RGBA() (uint32, uint32, uint32, uint32) {
+	r, g, b := HSLToRGB(c.H, c.S, c.L)
+	return uint32(r) * 0x101, uint32(g) * 0x101, uint32(b) * 0x101, 0xffff
 }
 
 // hslModel converts a color.Color to HSL.
