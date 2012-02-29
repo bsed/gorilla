@@ -13,6 +13,8 @@ import (
 var HSVModel = color.ModelFunc(hsvModel)
 
 // HSV represents a cylindrical coordinate of points in an RGB color model.
+//
+// Values are in the range 0 to 1.
 type HSV struct {
 	H, S, V float64
 }
@@ -81,29 +83,17 @@ func HSVToRGB(h, s, v float64) (r, g, b uint8) {
 	t := v * (1.0 - (1.0 - f) * s)
 	switch int(i) % 6 {
 	case 0:
-		fR = v
-		fG = t
-		fB = p
+		fR, fG, fB = v, t, p
 	case 1:
-		fR = q
-		fG = v
-		fB = p
+		fR, fG, fB = q, v, p
 	case 2:
-		fR = p
-		fG = v
-		fB = t
+		fR, fG, fB = p, v, t
 	case 3:
-		fR = p
-		fG = q
-		fB = v
+		fR, fG, fB = p, q, v
 	case 4:
-		fR = t
-		fG = p
-		fB = v
+		fR, fG, fB = t, p, v
 	case 5:
-		fR = v
-		fG = p
-		fB = q
+		fR, fG, fB = v, p, q
 	}
 	r = uint8((fR * 255) + 0.5)
 	g = uint8((fG * 255) + 0.5)

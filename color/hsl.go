@@ -13,6 +13,8 @@ import (
 var HSLModel = color.ModelFunc(hslModel)
 
 // HSL represents a cylindrical coordinate of points in an RGB color model.
+//
+// Values are in the range 0 to 1.
 type HSL struct {
 	H, S, L float64
 }
