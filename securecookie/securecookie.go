@@ -262,15 +262,16 @@ func verifyMac(h hash.Hash, value []byte, mac []byte) error {
 // prepended to the resulting ciphertext.
 func encrypt(block cipher.Block, value []byte) ([]byte, error) {
 	// Initialization vector on wikipedia: http://goo.gl/zF67k
-	iv := GenerateRandomKey(block.BlockSize())
-	if iv == nil {
+	b := make([]byte, len(value)+block.BlockSize())
+	if _, err := rand.Read(b); err != nil {
 		return nil, errors.New("securecookie: failed to generate random iv")
 	}
 	// Encrypt it.
-	stream := cipher.NewCTR(block, iv)
+	stream := cipher.NewCTR(block, b[:block.BlockSize()])
 	stream.XORKeyStream(value, value)
 	// Return iv + ciphertext.
-	return append(iv, value...), nil
+	copy(b[block.BlockSize():], value)
+	return b, nil
 }
 
 // decrypt decrypts a value using the given block in counter mode.
