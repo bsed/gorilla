@@ -5,7 +5,7 @@
 /*
 Package gorilla/color provides converters for different color models.
 
-It implements models for Hex, HSL and HSV models following the interfaces
-defined in the standard library's image/color package.
+It implements Hex, HSL and HSV models following the interfaces defined in
+the standard image/color package.
 */
 package color

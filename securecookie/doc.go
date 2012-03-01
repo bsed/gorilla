@@ -6,10 +6,10 @@
 Package gorilla/securecookie encodes and decodes authenticated and optionally
 encrypted cookie values.
 
-Secure cookies can't be forged, because their are validated using HMAC.
+Secure cookies can't be forged, because their values are validated using HMAC.
 When encrypted, the content is also inaccessible to malicious eyes.
 
-To use it, first create a new SecureCookie:
+To use it, first create a new SecureCookie instance:
 
 	var hashKey = []byte("very-secret")
 	var blockKey = []byte("a-lot-secret")
