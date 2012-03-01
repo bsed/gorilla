@@ -136,7 +136,7 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	if b, err = serialize(value); err != nil {
 		return "", err
 	}
-	// 2. Encrypt and encode (optional).
+	// 2. Encrypt and encode to base64 (optional).
 	if s.block != nil {
 		if b, err = encrypt(s.block, b); err != nil {
 			return "", err
@@ -189,7 +189,10 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	if len(parts) != 4 {
 		return errors.New("securecookie: invalid value")
 	}
-	// 4. Verify date ranges against parts[0].
+	// 4. Verify name against parts[1] and date ranges against parts[0].
+	if name != string(parts[1]) {
+		return errors.New("securecookie: invalid name")
+	}
 	var t1 int64
 	if t1, err = strconv.ParseInt(string(parts[0]), 10, 64); err != nil {
 		return errors.New("securecookie: invalid timestamp")
@@ -206,7 +209,7 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	if err = verifyMac(h, b[:len(b)-len(parts[3])-1], parts[3]); err != nil {
 		return err
 	}
-	// 6. Decode and decrypt parts[2] (optional).
+	// 6. Decode from base64 and decrypt parts[2] (optional).
 	if s.block != nil {
 		if b, err = decode(parts[2]); err != nil {
 			return err
@@ -261,7 +264,7 @@ func encrypt(block cipher.Block, value []byte) ([]byte, error) {
 	// Initialization vector on wikipedia: http://goo.gl/zF67k
 	iv := GenerateRandomKey(block.BlockSize())
 	if iv == nil {
-		return nil, errors.New("securecookie: failed to generate random key")
+		return nil, errors.New("securecookie: failed to generate random iv")
 	}
 	// Encrypt it.
 	stream := cipher.NewCTR(block, iv)
