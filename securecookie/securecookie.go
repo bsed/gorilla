@@ -93,7 +93,7 @@ func (s *SecureCookie) MinAge(value int) *SecureCookie {
 	return s
 }
 
-// HashFunc sets the hash algorithm used to create HMAC.
+// HashFunc sets the hash function used to create HMAC.
 //
 // Default is crypto/sha256.New.
 func (s *SecureCookie) HashFunc(f func() hash.Hash) *SecureCookie {
@@ -101,7 +101,7 @@ func (s *SecureCookie) HashFunc(f func() hash.Hash) *SecureCookie {
 	return s
 }
 
-// BlockFunc sets the encryption algorithm used to create cipher.Block.
+// BlockFunc sets the encryption function used to create a cipher.Block.
 //
 // Default is crypto/aes.New.
 func (s *SecureCookie) BlockFunc(f func([]byte) (cipher.Block, error)) *SecureCookie {
@@ -262,16 +262,15 @@ func verifyMac(h hash.Hash, value []byte, mac []byte) error {
 // prepended to the resulting ciphertext.
 func encrypt(block cipher.Block, value []byte) ([]byte, error) {
 	// Initialization vector on wikipedia: http://goo.gl/zF67k
-	b := make([]byte, len(value)+block.BlockSize())
-	if _, err := rand.Read(b); err != nil {
+	iv := GenerateRandomKey(block.BlockSize())
+	if iv == nil {
 		return nil, errors.New("securecookie: failed to generate random iv")
 	}
 	// Encrypt it.
-	stream := cipher.NewCTR(block, b[:block.BlockSize()])
+	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(value, value)
 	// Return iv + ciphertext.
-	copy(b[block.BlockSize():], value)
-	return b, nil
+	return append(iv, value...), nil
 }
 
 // decrypt decrypts a value using the given block in counter mode.
