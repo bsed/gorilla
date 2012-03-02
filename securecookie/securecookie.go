@@ -136,7 +136,7 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	if b, err = serialize(value); err != nil {
 		return "", err
 	}
-	// 2. Create MAC for "name|date|value".
+	// 2. Create MAC for "name|date|value". Extra pipe to be used later.
 	b = []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), b))
 	mac := createMac(hmac.New(s.hashFunc, s.hashKey), b[:len(b)-1])
 	// 3. Append mac, remove name.
@@ -149,7 +149,7 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	}
 	// 5. Encode to base64.
 	b = encode(b)
-	// 5. Check length.
+	// 6. Check length.
 	if s.maxLength != 0 && len(b) > s.maxLength {
 		return "", errors.New("securecookie: the value is too long")
 	}
@@ -193,12 +193,12 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	if len(parts) != 3 {
 		return errors.New("securecookie: invalid value %v")
 	}
-	// 5. Verify MAC: "name|parts[0]|parts[1]" against parts[2].
+	// 5. Verify MAC: "name|date|serialized" against mac.
 	b = append([]byte(name + "|"), b[:len(b)-len(parts[2])-1]...)
 	if err = verifyMac(hmac.New(s.hashFunc, s.hashKey), b, parts[2]); err != nil {
 		return err
 	}
-	// 6. Verify date ranges against parts[0].
+	// 6. Verify date ranges.
 	var t1 int64
 	if t1, err = strconv.ParseInt(string(parts[0]), 10, 64); err != nil {
 		return errors.New("securecookie: invalid timestamp")
@@ -210,7 +210,7 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	if s.maxAge != 0 && t1 < t2-s.maxAge {
 		return errors.New("securecookie: expired timestamp")
 	}
-	// 7. Deserialize parts[1].
+	// 7. Deserialize.
 	if err = deserialize(parts[1], dst); err != nil {
 		return err
 	}
