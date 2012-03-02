@@ -82,6 +82,10 @@ func (c *cache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 					t = t.Elem()
 				}
 			}
+		} else if field.typ.Kind() == reflect.Struct {
+			t = field.typ
+		} else if field.typ.Kind() == reflect.Ptr && field.typ.Elem().Kind() == reflect.Struct {
+			t = field.typ.Elem()
 		}
 	}
 	// Add the remaining.

@@ -412,3 +412,68 @@ func TestInlineStruct(t *testing.T) {
 		t.Errorf("s2: expected %v, got %v", 42, s2.F01)
 	}
 }
+
+// ----------------------------------------------------------------------------
+
+type Foo struct {
+	F01 int
+	F02 Bar
+}
+
+type Bar struct {
+	F01 string
+	F02 string
+	F03 string
+	F14 string
+	S05 string
+	Str string
+}
+
+func TestSimpleExample(t *testing.T) {
+	data := map[string][]string{
+		"F01":     {"1"},
+		"F02.F01": {"S1"},
+		"F02.F02": {"S2"},
+		"F02.F03": {"S3"},
+		"F02.F14": {"S4"},
+		"F02.S05": {"S5"},
+		"F02.Str": {"Str"},
+	}
+
+	e := &Foo{
+		F01: 1,
+		F02: Bar{
+			F01: "S1",
+			F02: "S2",
+			F03: "S3",
+			F14: "S4",
+			S05: "S5",
+			Str: "Str",
+		},
+	}
+
+	s := &Foo{}
+	_ = NewDecoder().Decode(s, data)
+
+	if s.F01 != e.F01 {
+		t.Errorf("F01: expected %v, got %v", e.F01, s.F01)
+	}
+	if s.F02.F01 != e.F02.F01 {
+		t.Errorf("F02.F01: expected %v, got %v", e.F02.F01, s.F02.F01)
+	}
+	if s.F02.F02 != e.F02.F02 {
+		t.Errorf("F02.F02: expected %v, got %v", e.F02.F02, s.F02.F02)
+	}
+	if s.F02.F03 != e.F02.F03 {
+		t.Errorf("F02.F03: expected %v, got %v", e.F02.F03, s.F02.F03)
+	}
+	if s.F02.F14 != e.F02.F14 {
+		t.Errorf("F02.F14: expected %v, got %v", e.F02.F14, s.F02.F14)
+	}
+	if s.F02.S05 != e.F02.S05 {
+		t.Errorf("F02.S05: expected %v, got %v", e.F02.S05, s.F02.S05)
+	}
+	if s.F02.Str != e.F02.Str {
+		t.Errorf("F02.Str: expected %v, got %v", e.F02.Str, s.F02.Str)
+	}
+}
