@@ -24,7 +24,7 @@ import (
 // Codec defines an interface to encode and decode cookie values.
 type Codec interface {
 	Encode(name string, value interface{}) (string, error)
-	Decode(name, value string) (interface{}, error)
+	Decode(name, value string, dst interface{}) (interface{}, error)
 }
 
 // New returns a new SecureCookie.
@@ -121,7 +121,9 @@ func (s *SecureCookie) BlockFunc(f func([]byte) (cipher.Block, error)) *SecureCo
 // finally deserializes the value.
 //
 // The name argument is the cookie name. It is stored with the encoded value.
-// The value argument is the map to be encoded.
+// The value argument is the value to be encoded. It can be any value that can
+// be encoded using encoding/gob. To store special structures, they must be
+// registered first using gob.Register().
 func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	if s.err != nil {
 		return "", s.err
@@ -194,8 +196,9 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 		return errors.New("securecookie: invalid value %v")
 	}
 	// 5. Verify MAC: "name|date|serialized" against mac.
+	h := hmac.New(s.hashFunc, s.hashKey)
 	b = append([]byte(name + "|"), b[:len(b)-len(parts[2])-1]...)
-	if err = verifyMac(hmac.New(s.hashFunc, s.hashKey), b, parts[2]); err != nil {
+	if err = verifyMac(h, b, parts[2]); err != nil {
 		return err
 	}
 	// 6. Verify date ranges.
@@ -250,10 +253,9 @@ func verifyMac(h hash.Hash, value []byte, mac []byte) error {
 
 // encrypt encrypts a value using the given block in counter mode.
 //
-// A random initialization vector with the length of the block size is
-// prepended to the resulting ciphertext.
+// A random initialization vector (http://goo.gl/zF67k) with the length of the
+// block size is prepended to the resulting ciphertext.
 func encrypt(block cipher.Block, value []byte) ([]byte, error) {
-	// Initialization vector on wikipedia: http://goo.gl/zF67k
 	iv := GenerateRandomKey(block.BlockSize())
 	if iv == nil {
 		return nil, errors.New("securecookie: failed to generate random iv")
@@ -268,7 +270,7 @@ func encrypt(block cipher.Block, value []byte) ([]byte, error) {
 // decrypt decrypts a value using the given block in counter mode.
 //
 // The value to be decrypted must be prepended by a initialization vector
-// with the length of the block size.
+// (http://goo.gl/zF67k) with the length of the block size.
 func decrypt(block cipher.Block, value []byte) ([]byte, error) {
 	size := block.BlockSize()
 	if len(value) > size {
@@ -326,7 +328,7 @@ func decode(value []byte) ([]byte, error) {
 
 // Helpers --------------------------------------------------------------------
 
-// GenerateRandomKey is a convenience to generate a key using crypto/rand.
+// GenerateRandomKey returns a random key created using crypto/rand.
 func GenerateRandomKey(length int) []byte {
 	k := make([]byte, length)
 	if _, err := rand.Read(k); err != nil {
