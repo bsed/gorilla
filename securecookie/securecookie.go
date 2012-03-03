@@ -24,7 +24,7 @@ import (
 // Codec defines an interface to encode and decode cookie values.
 type Codec interface {
 	Encode(name string, value interface{}) (string, error)
-	Decode(name, value string, dst interface{}) (interface{}, error)
+	Decode(name, value string, dst interface{}) error
 }
 
 // New returns a new SecureCookie.
