@@ -72,9 +72,12 @@ func (c *cache) parsePath(p string, t reflect.Type) ([]pathPart, error) {
 				index: int(index64),
 			})
 			path = make([]int, 0)
+
 			// Get the next struct type, dropping ptrs.
-			if t.Kind() == reflect.Ptr {
-				t = t.Elem()
+			if field.typ.Kind() == reflect.Ptr {
+				t = field.typ.Elem()
+			} else {
+				t = field.typ
 			}
 			if t.Kind() == reflect.Slice {
 				t = t.Elem()
