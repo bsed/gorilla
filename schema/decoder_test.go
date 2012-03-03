@@ -418,6 +418,7 @@ func TestInlineStruct(t *testing.T) {
 type Foo struct {
 	F01 int
 	F02 Bar
+	Bif []Baz
 }
 
 type Bar struct {
@@ -429,15 +430,20 @@ type Bar struct {
 	Str string
 }
 
+type Baz struct {
+	F99 []string
+}
+
 func TestSimpleExample(t *testing.T) {
 	data := map[string][]string{
-		"F01":     {"1"},
-		"F02.F01": {"S1"},
-		"F02.F02": {"S2"},
-		"F02.F03": {"S3"},
-		"F02.F14": {"S4"},
-		"F02.S05": {"S5"},
-		"F02.Str": {"Str"},
+		"F01":       {"1"},
+		"F02.F01":   {"S1"},
+		"F02.F02":   {"S2"},
+		"F02.F03":   {"S3"},
+		"F02.F14":   {"S4"},
+		"F02.S05":   {"S5"},
+		"F02.Str":   {"Str"},
+		"Bif.0.F99": {"A","B","C"},
 	}
 
 	e := &Foo{
@@ -449,6 +455,9 @@ func TestSimpleExample(t *testing.T) {
 			F14: "S4",
 			S05: "S5",
 			Str: "Str",
+		},
+		Bif: []Baz{{
+			F99: []string{"A","B","C"}},
 		},
 	}
 
@@ -475,5 +484,12 @@ func TestSimpleExample(t *testing.T) {
 	}
 	if s.F02.Str != e.F02.Str {
 		t.Errorf("F02.Str: expected %v, got %v", e.F02.Str, s.F02.Str)
+	}
+	if len(s.Bif) != len(e.Bif) {
+		t.Errorf("Bif len: expected %d, got %d", len(e.Bif), len(s.Bif))
+	} else {
+		if len(s.Bif[0].F99) != len(e.Bif[0].F99) {
+			t.Errorf("Bif[0].F99 len: expected %d, got %d", len(e.Bif[0].F99), len(s.Bif[0].F99))
+		}
 	}
 }
