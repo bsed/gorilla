@@ -5,12 +5,18 @@
 package sessions
 
 import (
+	"code.google.com/p/gorilla/context"
+	"code.google.com/p/gorilla/securecookie"
 	"encoding/gob"
 	"errors"
 	"fmt"
 	"net/http"
-	"code.google.com/p/gorilla/context"
-	"code.google.com/p/gorilla/securecookie"
+)
+
+// Default session and flash keys.
+const (
+	sessionKey = "s"
+	flashesKey = "_flashes"
 )
 
 // SessionConfig --------------------------------------------------------------
@@ -19,8 +25,8 @@ import (
 //
 // Fields are a subset of http.Cookie fields.
 type SessionConfig struct {
-	Path     string
-	Domain   string
+	Path   string
+	Domain string
 	// MaxAge=0 means no 'Max-Age' attribute specified.
 	// MaxAge<0 means delete cookie now, equivalently 'Max-Age: 0'.
 	// MaxAge>0 means Max-Age attribute present and given in seconds.
@@ -33,7 +39,7 @@ type SessionConfig struct {
 
 // Session stores the values and optional configuration for a session.
 type Session struct {
-	Value  map[interface{}]interface{}
+	Values map[interface{}]interface{}
 	Config *SessionConfig
 	IsNew  bool
 	name   string
@@ -45,13 +51,13 @@ type Session struct {
 // A single variadic argument is accepted, and it is optional: it defines
 // the flash key. If not defined "_flash" is used by default.
 func (s *Session) Flashes(vars ...string) []interface{} {
-	key := "_flash"
+	key := flashesKey
 	if len(vars) > 0 {
 		key = vars[0]
 	}
-	if flashes, ok := s.Value[key]; ok {
+	if flashes, ok := s.Values[key]; ok {
 		// Drop the flashes and return it.
-		delete(s.Value, key)
+		delete(s.Values, key)
 		return flashes.([]interface{})
 	}
 	// Return a new one.
@@ -63,20 +69,25 @@ func (s *Session) Flashes(vars ...string) []interface{} {
 // A single variadic argument is accepted, and it is optional: it defines
 // the flash key. If not defined "_flash" is used by default.
 func (s *Session) AddFlash(value interface{}, vars ...string) {
-	key := "_flash"
+	key := flashesKey
 	if len(vars) > 0 {
 		key = vars[0]
 	}
 	var flashes []interface{}
-	if v, ok := s.Value[key]; ok {
+	if v, ok := s.Values[key]; ok {
 		flashes = v.([]interface{})
 	}
-	s.Value[key] = append(flashes, value)
+	s.Values[key] = append(flashes, value)
 }
 
 // Name returns the name used to register the session.
 func (s *Session) Name() string {
 	return s.name
+}
+
+// Store returns the session store used to register the session.
+func (s *Session) Store() Store {
+	return s.store
 }
 
 // Request Sessions -----------------------------------------------------------
@@ -107,21 +118,13 @@ type Sessions struct {
 
 // Get returns a registered session for the current request.
 //
-// It returns (nil, nil) if there are no sessions with the given name.
-// It returns (nil, error) if there's a session with the given name but
-// it was registered using a different store.
-func (s *Sessions) Get(store Store, name string) (*Session, error) {
-	if session, ok := s.m[name]; ok {
-		if store == nil || session.store != store {
-			return nil, errors.New("sessions: session doesn't match the store")
-		}
-		return session, nil
-	}
-	return nil, nil
+// It returns nil if there are no sessions with the given name.
+func (s *Sessions) Get(name string) *Session {
+	return s.m[name]
 }
 
-// Add registers a session for the current request.
-func (s *Sessions) Add(store Store, name string, session *Session) {
+// Register registers a session for the given name and session store.
+func (s *Sessions) Register(store Store, name string, session *Session) {
 	session.store = store
 	session.name = name
 	s.m[name] = session
@@ -160,7 +163,8 @@ func Save(r *http.Request, w http.ResponseWriter) error {
 //
 // The codecs are tried in order. Multiple codecs are accepted to allow
 // key rotation.
-func EncodeCookie(name string, value interface{}, codecs ...securecookie.Codec) (string, error) {
+func EncodeCookie(name string, value interface{},
+	codecs ...securecookie.Codec) (string, error) {
 	for _, codec := range codecs {
 		if encoded, err := codec.Encode(name, value); err == nil {
 			return encoded, nil
@@ -173,7 +177,8 @@ func EncodeCookie(name string, value interface{}, codecs ...securecookie.Codec) 
 //
 // The codecs are tried in order. Multiple codecs are accepted to allow
 // key rotation.
-func DecodeCookie(name string, value string, codecs ...securecookie.Codec) (map[interface{}]interface{}, error) {
+func DecodeCookie(name string, value string,
+	codecs ...securecookie.Codec) (map[interface{}]interface{}, error) {
 	m := make(map[interface{}]interface{})
 	for _, codec := range codecs {
 		if err := codec.Decode(name, value, &m); err == nil {
@@ -181,19 +186,6 @@ func DecodeCookie(name string, value string, codecs ...securecookie.Codec) (map[
 		}
 	}
 	return nil, errors.New("sessions: cookie could not be decoded")
-}
-
-// CreateCookie returns an *http.Cookie with the given configuration.
-func CreateCookie(name, value string, config *SessionConfig) *http.Cookie {
-	return &http.Cookie{
-		Name:     name,
-		Value:    value,
-		Path:     config.Path,
-		Domain:   config.Domain,
-		MaxAge:   config.MaxAge,
-		Secure:   config.Secure,
-		HttpOnly: config.HttpOnly,
-	}
 }
 
 // Error ----------------------------------------------------------------------
