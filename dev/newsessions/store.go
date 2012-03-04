@@ -14,6 +14,7 @@ import (
 // Store is an interface for custom session stores.
 type Store interface {
 	Get(r *http.Request, name string) (*Session, error)
+	New(r *http.Request, name string) (*Session, error)
 	Save(r *http.Request, w http.ResponseWriter, s *Session) error
 }
 
@@ -56,7 +57,7 @@ type CookieStore struct {
 	Codecs []securecookie.Codec
 }
 
-// Get returns a session for the given name.
+// Get returns a session for the given name after registering it in Sessions.
 //
 // It returns a new session if the sessions doesn't exist. Access IsNew on
 // the session to check if it is an existing session or a new one.
@@ -64,29 +65,26 @@ type CookieStore struct {
 // It returns a new session and an error if the session exists but could
 // not be decoded.
 func (s *CookieStore) Get(r *http.Request, name string) (*Session, error) {
-	sessions := GetSessions(r)
-	if session := sessions.Get(name); session != nil {
-		return session, nil
-	}
+	return GetSessions(r).Get(s, name)
+}
+
+// New returns a session for the given name without registering it in Sessions.
+//
+// See Get().
+func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
+	session := NewSession(s, name)
 	var errDecoding error
-	session := &Session{}
 	if c, err := r.Cookie(name); err == nil {
-		if m, err := DecodeCookie(name, c.Value, s.Codecs...); err == nil {
-			session.Values = m
-		} else {
-			session.Values = make(map[interface{}]interface{})
-			errDecoding = err
-		}
+		errDecoding = DecodeCookie(name, c.Value, &session.Values, s.Codecs...)
 	} else {
-		session.Values = make(map[interface{}]interface{})
 		session.IsNew = true
 	}
-	sessions.Register(s, name, session)
 	return session, errDecoding
 }
 
 // Save saves a single session to the response.
-func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter, session *Session) error {
+func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
+	session *Session) error {
 	encoded, err := EncodeCookie(session.Name(), session.Values, s.Codecs...)
 	if err != nil {
 		return err
