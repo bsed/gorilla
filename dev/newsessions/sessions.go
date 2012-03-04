@@ -34,13 +34,22 @@ type SessionConfig struct {
 
 // Session --------------------------------------------------------------------
 
+// NewSession is called by session stores to create a new session instance.
+func NewSession(store Store, name string) *Session {
+	return &Session{
+		Values: make(map[interface{}]interface{}),
+		store:  store,
+		name:   name,
+	}
+}
+
 // Session stores the values and optional configuration for a session.
 type Session struct {
 	Values map[interface{}]interface{}
 	Config *SessionConfig
 	IsNew  bool
-	name   string
 	store  Store
+	name   string
 }
 
 // Flashes returns a slice of flash messages from the session.
@@ -77,6 +86,12 @@ func (s *Session) AddFlash(value interface{}, vars ...string) {
 	s.Values[key] = append(flashes, value)
 }
 
+// Save is a convenience method to save this session. It is the same as calling
+// store.Save(request, response, session)
+func (s *Session) Save(r *http.Request, w http.ResponseWriter) error {
+	return s.store.Save(r, w, s)
+}
+
 // Name returns the name used to register the session.
 func (s *Session) Name() string {
 	return s.name
@@ -88,6 +103,12 @@ func (s *Session) Store() Store {
 }
 
 // Request Sessions -----------------------------------------------------------
+
+// sessionInfo stores a session tracked by Sessions.
+type sessionInfo struct {
+	s *Session
+	e error
+}
 
 // contextKey is the type used to store Sessions in the context.
 type contextKey int
@@ -102,7 +123,8 @@ func GetSessions(r *http.Request) *Sessions {
 		return s.(*Sessions)
 	}
 	sessions := &Sessions{
-		m: make(map[string]*Session),
+		request:  r,
+		sessions: make(map[string]sessionInfo),
 	}
 	context.DefaultContext.Set(r, sessionsKey, sessions)
 	return sessions
@@ -110,31 +132,33 @@ func GetSessions(r *http.Request) *Sessions {
 
 // Sessions stores all sessions used during the current request.
 type Sessions struct {
-	m map[string]*Session
+	request  *http.Request
+	sessions map[string]sessionInfo
 }
 
-// Get returns a registered session for the current request.
+// Get returns a session for the given name and session store.
 //
 // It returns nil if there are no sessions with the given name.
-func (s *Sessions) Get(name string) *Session {
-	return s.m[name]
-}
-
-// Register registers a session for the given name and session store.
-func (s *Sessions) Register(store Store, name string, session *Session) {
+func (s *Sessions) Get(store Store, name string) (*Session, error) {
+	if info, ok := s.sessions[name]; ok {
+		return info.s, info.e
+	}
+	session, err := store.New(s.request, name)
 	session.store = store
 	session.name = name
-	s.m[name] = session
+	s.sessions[name] = sessionInfo{s: session, e: err}
+	return session, err
 }
 
 // Save saves all sessions registered for the current request.
-func (s *Sessions) Save(r *http.Request, w http.ResponseWriter) error {
+func (s *Sessions) Save(w http.ResponseWriter) error {
 	var errMulti MultiError
-	for name, session := range s.m {
+	for name, info := range s.sessions {
+		session := info.s
 		if session.store == nil {
 			errMulti = append(errMulti, fmt.Errorf(
 				"sessions: missing store for session %q", name))
-		} else if err := session.store.Save(r, w, session); err != nil {
+		} else if err := session.store.Save(s.request, w, session); err != nil {
 			errMulti = append(errMulti, fmt.Errorf(
 				"sessions: error saving session %q -- %v", name, err))
 		}
@@ -153,7 +177,7 @@ func init() {
 
 // Save saves all sessions used during the current request.
 func Save(r *http.Request, w http.ResponseWriter) error {
-	return GetSessions(r).Save(r, w)
+	return GetSessions(r).Save(w)
 }
 
 // EncodeCookie encodes a cookie value using a group of securecookie codecs.
@@ -174,15 +198,14 @@ func EncodeCookie(name string, value interface{},
 //
 // The codecs are tried in order. Multiple codecs are accepted to allow
 // key rotation.
-func DecodeCookie(name string, value string,
-	codecs ...securecookie.Codec) (map[interface{}]interface{}, error) {
-	m := make(map[interface{}]interface{})
+func DecodeCookie(name string, value string, dst *map[interface{}]interface{},
+	codecs ...securecookie.Codec) error {
 	for _, codec := range codecs {
-		if err := codec.Decode(name, value, &m); err == nil {
-			return m, nil
+		if err := codec.Decode(name, value, dst); err == nil {
+			return nil
 		}
 	}
-	return nil, errors.New("sessions: cookie could not be decoded")
+	return errors.New("sessions: cookie could not be decoded")
 }
 
 // Error ----------------------------------------------------------------------

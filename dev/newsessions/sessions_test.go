@@ -103,7 +103,7 @@ func TestFlashes(t *testing.T) {
 	hdr = rsp.Header()
 	cookies, ok = hdr["Set-Cookie"]
 	if !ok || len(cookies) != 1 {
-		t.Errorf("No cookies ser. Header:", hdr)
+		t.Fatalf("No cookies. Header:", hdr)
 	}
 
 	// Round 2 ----------------------------------------------------------------
@@ -118,7 +118,7 @@ func TestFlashes(t *testing.T) {
 	// Check all saved values.
 	flashes = session.Flashes()
 	if len(flashes) != 2 {
-		t.Errorf("Expected flashes; Got %v", flashes)
+		t.Fatalf("Expected flashes; Got %v", flashes)
 	}
 	if flashes[0] != "foo" || flashes[1] != "bar" {
 		t.Errorf("Expected foo,bar; Got %v", flashes)

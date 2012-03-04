@@ -22,6 +22,6 @@ API in a nutshell:
 		s.Values["foo"] = "bar"
 		s.Values[42] = 43
 		// Save it.
-		sessions.Save(r, w)
+		s.Save(r, w)
 	}
 */
