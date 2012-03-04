@@ -13,11 +13,8 @@ import (
 	"net/http"
 )
 
-// Default session and flash keys.
-const (
-	sessionKey = "s"
-	flashesKey = "_flashes"
-)
+// Default flashes key.
+const flashesKey = "_flash"
 
 // SessionConfig --------------------------------------------------------------
 
