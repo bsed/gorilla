@@ -170,7 +170,7 @@ func TestAll(t *testing.T) {
 		t.Errorf("f8: got nil")
 	} else if s.F08.F08 == nil {
 		t.Errorf("f8.f8: got nil")
-	}  else if s.F08.F08.F07.F01 == nil {
+	} else if s.F08.F08.F07.F01 == nil {
 		t.Errorf("f8.f8.f7.f1: expected %v, got nil", vals(*e.F08.F08.F07.F01))
 	} else {
 		sF08, eF08 := *s.F08.F08.F07.F01, *e.F08.F08.F07.F01
@@ -310,15 +310,15 @@ type S3 struct {
 
 func TestDefaultConverters(t *testing.T) {
 	v := map[string][]string{
-		"F01":  {"true"},
-		"F02":  {"4.2"},
-		"F03":  {"4.3"},
-		"F04":  {"-42"},
-		"F05":  {"-43"},
-		"F06":  {"-44"},
-		"F07":  {"-45"},
-		"F08":  {"-46"},
-		"F09":  {"foo"},
+		"F01": {"true"},
+		"F02": {"4.2"},
+		"F03": {"4.3"},
+		"F04": {"-42"},
+		"F05": {"-43"},
+		"F06": {"-44"},
+		"F07": {"-45"},
+		"F08": {"-46"},
+		"F09": {"foo"},
 		"F10": {"42"},
 		"F11": {"43"},
 		"F12": {"44"},
@@ -326,15 +326,15 @@ func TestDefaultConverters(t *testing.T) {
 		"F14": {"46"},
 	}
 	e := S3{
-		F01:  true,
-		F02:  4.2,
-		F03:  4.3,
-		F04:  -42,
-		F05:  -43,
-		F06:  -44,
-		F07:  -45,
-		F08:  -46,
-		F09:  "foo",
+		F01: true,
+		F02: 4.2,
+		F03: 4.3,
+		F04: -42,
+		F05: -43,
+		F06: -44,
+		F07: -45,
+		F08: -46,
+		F09: "foo",
 		F10: 42,
 		F11: 43,
 		F12: 44,
@@ -390,10 +390,10 @@ func TestDefaultConverters(t *testing.T) {
 // ----------------------------------------------------------------------------
 
 func TestInlineStruct(t *testing.T) {
-	s1 := &struct{
+	s1 := &struct {
 		F01 bool
 	}{}
-	s2 := &struct{
+	s2 := &struct {
 		F01 int
 	}{}
 	v1 := map[string][]string{
@@ -443,7 +443,7 @@ func TestSimpleExample(t *testing.T) {
 		"F02.F14":   {"S4"},
 		"F02.S05":   {"S5"},
 		"F02.Str":   {"Str"},
-		"Bif.0.F99": {"A","B","C"},
+		"Bif.0.F99": {"A", "B", "C"},
 	}
 
 	e := &Foo{
@@ -457,7 +457,7 @@ func TestSimpleExample(t *testing.T) {
 			Str: "Str",
 		},
 		Bif: []Baz{{
-			F99: []string{"A","B","C"}},
+			F99: []string{"A", "B", "C"}},
 		},
 	}
 
