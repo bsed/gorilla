@@ -100,9 +100,9 @@ func TestEncription(t *testing.T) {
 
 func TestSerialization(t *testing.T) {
 	var (
-		serialized []byte
+		serialized   []byte
 		deserialized map[string]string
-		err error
+		err          error
 	)
 	for _, value := range testCookies {
 		if serialized, err = serialize(value); err != nil {

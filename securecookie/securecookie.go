@@ -12,8 +12,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/gob"
 	"encoding/base64"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"hash"
@@ -197,7 +197,7 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	}
 	// 5. Verify MAC: "name|date|serialized" against mac.
 	h := hmac.New(s.hashFunc, s.hashKey)
-	b = append([]byte(name + "|"), b[:len(b)-len(parts[2])-1]...)
+	b = append([]byte(name+"|"), b[:len(b)-len(parts[2])-1]...)
 	if err = verifyMac(h, b, parts[2]); err != nil {
 		return err
 	}

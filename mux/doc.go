@@ -39,8 +39,8 @@ one of the paths, the corresponding handler is called passing
 (http.ResponseWriter, *http.Request) as parameters.
 
 Paths can have variables. They are defined using the format {name} or
-{name:pattern}. If a pattern is not defined, the matched variable
-will be anything until the next slash. For example:
+{name:pattern}. If a regular expression pattern is not defined, the matched
+variable will be anything until the next slash. For example:
 
 	r := mux.NewRouter()
 	r.HandleFunc("/products/{key}", ProductHandler)

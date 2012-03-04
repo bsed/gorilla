@@ -62,9 +62,9 @@ func RGBToHSV(r, g, b uint8) (h, s, v float64) {
 				h += 6
 			}
 		case fG:
-			h = (fB - fR) / d + 2
+			h = (fB-fR)/d + 2
 		case fB:
-			h = (fR - fG) / d + 4
+			h = (fR-fG)/d + 4
 		}
 		h /= 6
 	}
@@ -77,10 +77,10 @@ func RGBToHSV(r, g, b uint8) (h, s, v float64) {
 func HSVToRGB(h, s, v float64) (r, g, b uint8) {
 	var fR, fG, fB float64
 	i := math.Floor(h * 6)
-	f := h * 6 - i
+	f := h*6 - i
 	p := v * (1.0 - s)
-	q := v * (1.0 - f * s)
-	t := v * (1.0 - (1.0 - f) * s)
+	q := v * (1.0 - f*s)
+	t := v * (1.0 - (1.0-f)*s)
 	switch int(i) % 6 {
 	case 0:
 		fR, fG, fB = v, t, p

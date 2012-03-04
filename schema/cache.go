@@ -164,14 +164,14 @@ func (i *structInfo) get(alias string) *fieldInfo {
 
 type fieldInfo struct {
 	typ reflect.Type
-	idx int          // field index in the struct.
-	ss  bool         // true if this is a slice of structs.
+	idx int  // field index in the struct.
+	ss  bool // true if this is a slice of structs.
 }
 
 type pathPart struct {
 	field *fieldInfo
-	path  []int      // path to the field: walks structs using field indices.
-	index int        // struct index in slices of structs.
+	path  []int // path to the field: walks structs using field indices.
+	index int   // struct index in slices of structs.
 }
 
 // ----------------------------------------------------------------------------
