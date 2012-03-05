@@ -71,9 +71,9 @@ flashes, call session.Flashes(). Here is an example:
 Flash messages are useful to set information to be read after a redirection,
 like after form submissions.
 
-By default, session cookies last for a month. This is probably too long for a
-lot of cases, but it is easy to change this and other attributes during
-runtime. Sessions can be configured individually, or the store can be
+By default, session cookies last for a month. This is probably too long for
+some cases, but it is easy to change this and other attributes during
+runtime. Sessions can be configured individually or the store can be
 configured and then all sessions saved using it will use that configuration.
 We access session.Options or store.Options to set a new configuration. The
 fields are basically a subset of http.Cookie fields. Let's change the
