@@ -37,7 +37,7 @@ type Store interface {
 // strong keys.
 func NewCookieStore(keyPairs ...[]byte) *CookieStore {
 	// Initialize it with a default configuration.
-	s := &CookieStore{Config: &SessionConfig{
+	s := &CookieStore{Options: &Options{
 		Path:   "/",
 		MaxAge: 86400 * 30,
 	}}
@@ -53,11 +53,11 @@ func NewCookieStore(keyPairs ...[]byte) *CookieStore {
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	Config *SessionConfig // default configuration
-	Codecs []securecookie.Codec
+	Options *Options             // default configuration
+	Codecs  []securecookie.Codec
 }
 
-// Get returns a session for the given name after registering it in Sessions.
+// Get returns a session for the given name after adding it to the registry.
 //
 // It returns a new session if the sessions doesn't exist. Access IsNew on
 // the session to check if it is an existing session or a new one.
@@ -65,12 +65,14 @@ type CookieStore struct {
 // It returns a new session and an error if the session exists but could
 // not be decoded.
 func (s *CookieStore) Get(r *http.Request, name string) (*Session, error) {
-	return GetSessions(r).Get(s, name)
+	return GetRegistry(r).Get(s, name)
 }
 
-// New returns a session for the given name without registering it in Sessions.
+// New returns a session for the given name without adding it to the registry.
 //
-// See Get().
+// The difference between New() and Get() is that calling New() twice will
+// decode the session data twice, while Get() registers and reuses the same
+// decoded session after the first call.
 func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	session := NewSession(s, name)
 	var errDecoding error
@@ -89,18 +91,18 @@ func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 	if err != nil {
 		return err
 	}
-	config := s.Config
-	if session.Config != nil {
-		config = session.Config
+	options := s.Options
+	if session.Options != nil {
+		options = session.Options
 	}
 	cookie := &http.Cookie{
 		Name:     session.Name(),
 		Value:    encoded,
-		Path:     config.Path,
-		Domain:   config.Domain,
-		MaxAge:   config.MaxAge,
-		Secure:   config.Secure,
-		HttpOnly: config.HttpOnly,
+		Path:     options.Path,
+		Domain:   options.Domain,
+		MaxAge:   options.MaxAge,
+		Secure:   options.Secure,
+		HttpOnly: options.HttpOnly,
 	}
 	http.SetCookie(w, cookie)
 	return nil

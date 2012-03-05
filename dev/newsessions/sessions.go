@@ -16,12 +16,12 @@ import (
 // Default flashes key.
 const flashesKey = "_flash"
 
-// SessionConfig --------------------------------------------------------------
+// Options --------------------------------------------------------------------
 
-// SessionConfig stores configuration for a session.
+// Options stores configuration for a session or session store.
 //
 // Fields are a subset of http.Cookie fields.
-type SessionConfig struct {
+type Options struct {
 	Path   string
 	Domain string
 	// MaxAge=0 means no 'Max-Age' attribute specified.
@@ -45,11 +45,11 @@ func NewSession(store Store, name string) *Session {
 
 // Session stores the values and optional configuration for a session.
 type Session struct {
-	Values map[interface{}]interface{}
-	Config *SessionConfig
-	IsNew  bool
-	store  Store
-	name   string
+	Values  map[interface{}]interface{}
+	Options *Options
+	IsNew   bool
+	store   Store
+	name    string
 }
 
 // Flashes returns a slice of flash messages from the session.
@@ -102,27 +102,27 @@ func (s *Session) Store() Store {
 	return s.store
 }
 
-// Request Sessions -----------------------------------------------------------
+// Registry -------------------------------------------------------------------
 
-// sessionInfo stores a session tracked by Sessions.
+// sessionInfo stores a session tracked by the registry.
 type sessionInfo struct {
 	s *Session
 	e error
 }
 
-// contextKey is the type used to store Sessions in the context.
+// contextKey is the type used to store the registry in the context.
 type contextKey int
 
-// sessionsKey is the key used to store Sessions in the context.
+// sessionsKey is the key used to store the registry in the context.
 const sessionsKey contextKey = 0
 
-// GetSessions returns the Sessions instance for the current request.
-func GetSessions(r *http.Request) *Sessions {
+// GetRegistry returns the registry instance for the current request.
+func GetRegistry(r *http.Request) *Registry {
 	s := context.DefaultContext.Get(r, sessionsKey)
 	if s != nil {
-		return s.(*Sessions)
+		return s.(*Registry)
 	}
-	sessions := &Sessions{
+	sessions := &Registry{
 		request:  r,
 		sessions: make(map[string]sessionInfo),
 	}
@@ -130,17 +130,18 @@ func GetSessions(r *http.Request) *Sessions {
 	return sessions
 }
 
-// Sessions stores all sessions used during the current request.
-type Sessions struct {
+// Registry stores sessions used during a request.
+type Registry struct {
 	request  *http.Request
 	sessions map[string]sessionInfo
 }
 
-// Get returns a session for the given name and session store.
+// Get registers and returns a session for the given name and session store.
 //
-// It returns nil if there are no sessions with the given name.
-func (s *Sessions) Get(store Store, name string) (*Session, error) {
+// It returns a new session if there are no sessions registered for the name.
+func (s *Registry) Get(store Store, name string) (*Session, error) {
 	if info, ok := s.sessions[name]; ok {
+		info.s.store = store
 		return info.s, info.e
 	}
 	session, err := store.New(s.request, name)
@@ -151,7 +152,7 @@ func (s *Sessions) Get(store Store, name string) (*Session, error) {
 }
 
 // Save saves all sessions registered for the current request.
-func (s *Sessions) Save(w http.ResponseWriter) error {
+func (s *Registry) Save(w http.ResponseWriter) error {
 	var errMulti MultiError
 	for name, info := range s.sessions {
 		session := info.s
@@ -177,7 +178,7 @@ func init() {
 
 // Save saves all sessions used during the current request.
 func Save(r *http.Request, w http.ResponseWriter) error {
-	return GetSessions(r).Save(w)
+	return GetRegistry(r).Save(w)
 }
 
 // EncodeCookie encodes a cookie value using a group of securecookie codecs.
