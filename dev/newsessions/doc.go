@@ -117,7 +117,7 @@ at once: it's sessions.Save(). Here's an example:
 		session2, _ := store.Get(r, "session-two")
 		session2.Values[42] = 43
 		// Save all sessions.
-		sessions.Save(w)
+		sessions.Save(r, w)
 	}
 
 This is because when we call Get() from a session store, it adds the session
