@@ -120,7 +120,7 @@ at once: it's sessions.Save(). Here's an example:
 		sessions.Save(r, w)
 	}
 
-This is because when we call Get() from a session store, it adds the session
-to a common registry. Save() uses it to save all registered sessions.
+This is possible because when we call Get() from a session store, it adds the
+session to a common registry. Save() uses it to save all registered sessions.
 */
 package sessions

@@ -5,12 +5,11 @@
 package sessions
 
 import (
-	"code.google.com/p/gorilla/context"
-	"code.google.com/p/gorilla/securecookie"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"net/http"
+
+	"code.google.com/p/gorilla/context"
 )
 
 // Default flashes key.
@@ -113,21 +112,21 @@ type sessionInfo struct {
 // contextKey is the type used to store the registry in the context.
 type contextKey int
 
-// sessionsKey is the key used to store the registry in the context.
-const sessionsKey contextKey = 0
+// registryKey is the key used to store the registry in the context.
+const registryKey contextKey = 0
 
-// GetRegistry returns the registry instance for the current request.
+// GetRegistry returns a registry instance for the current request.
 func GetRegistry(r *http.Request) *Registry {
-	s := context.DefaultContext.Get(r, sessionsKey)
-	if s != nil {
-		return s.(*Registry)
+	registry := context.DefaultContext.Get(r, registryKey)
+	if registry != nil {
+		return registry.(*Registry)
 	}
-	sessions := &Registry{
+	newRegistry := &Registry{
 		request:  r,
 		sessions: make(map[string]sessionInfo),
 	}
-	context.DefaultContext.Set(r, sessionsKey, sessions)
-	return sessions
+	context.DefaultContext.Set(r, registryKey, newRegistry)
+	return newRegistry
 }
 
 // Registry stores sessions used during a request.
@@ -139,16 +138,16 @@ type Registry struct {
 // Get registers and returns a session for the given name and session store.
 //
 // It returns a new session if there are no sessions registered for the name.
-func (s *Registry) Get(store Store, name string) (*Session, error) {
+func (s *Registry) Get(store Store, name string) (session *Session, err error) {
 	if info, ok := s.sessions[name]; ok {
-		info.s.store = store
-		return info.s, info.e
+		session, err = info.s, info.e
+	} else {
+		session, err = store.New(s.request, name)
+		session.name = name
+		s.sessions[name] = sessionInfo{s: session, e: err}
 	}
-	session, err := store.New(s.request, name)
 	session.store = store
-	session.name = name
-	s.sessions[name] = sessionInfo{s: session, e: err}
-	return session, err
+	return
 }
 
 // Save saves all sessions registered for the current request.
@@ -179,34 +178,6 @@ func init() {
 // Save saves all sessions used during the current request.
 func Save(r *http.Request, w http.ResponseWriter) error {
 	return GetRegistry(r).Save(w)
-}
-
-// EncodeCookie encodes a cookie value using a group of securecookie codecs.
-//
-// The codecs are tried in order. Multiple codecs are accepted to allow
-// key rotation.
-func EncodeCookie(name string, value interface{},
-	codecs ...securecookie.Codec) (string, error) {
-	for _, codec := range codecs {
-		if encoded, err := codec.Encode(name, value); err == nil {
-			return encoded, nil
-		}
-	}
-	return "", errors.New("sessions: cookie could not be encoded")
-}
-
-// DecodeCookie decodes a cookie value using a group of securecookie codecs.
-//
-// The codecs are tried in order. Multiple codecs are accepted to allow
-// key rotation.
-func DecodeCookie(name string, value string, dst *map[interface{}]interface{},
-	codecs ...securecookie.Codec) error {
-	for _, codec := range codecs {
-		if err := codec.Decode(name, value, dst); err == nil {
-			return nil
-		}
-	}
-	return errors.New("sessions: cookie could not be decoded")
 }
 
 // Error ----------------------------------------------------------------------

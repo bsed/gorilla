@@ -5,11 +5,10 @@
 package sessions
 
 import (
-	"code.google.com/p/gorilla/securecookie"
 	"net/http"
-)
 
-// Store ----------------------------------------------------------------------
+	"code.google.com/p/gorilla/securecookie"
+)
 
 // Store is an interface for custom session stores.
 type Store interface {
@@ -53,7 +52,7 @@ func NewCookieStore(keyPairs ...[]byte) *CookieStore {
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	Options *Options             // default configuration
+	Options *Options // default configuration
 	Codecs  []securecookie.Codec
 }
 
@@ -75,11 +74,14 @@ func (s *CookieStore) Get(r *http.Request, name string) (*Session, error) {
 // decoded session after the first call.
 func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	session := NewSession(s, name)
+	session.IsNew = true
 	var errDecoding error
 	if c, err := r.Cookie(name); err == nil {
-		errDecoding = DecodeCookie(name, c.Value, &session.Values, s.Codecs...)
-	} else {
-		session.IsNew = true
+		errDecoding = securecookie.DecodeMulti(name, c.Value, &session.Values,
+			s.Codecs...)
+		if errDecoding == nil {
+			session.IsNew = false
+		}
 	}
 	return session, errDecoding
 }
@@ -87,7 +89,8 @@ func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 // Save saves a single session to the response.
 func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 	session *Session) error {
-	encoded, err := EncodeCookie(session.Name(), session.Values, s.Codecs...)
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
+		s.Codecs...)
 	if err != nil {
 		return err
 	}
