@@ -336,3 +336,31 @@ func GenerateRandomKey(length int) []byte {
 	}
 	return k
 }
+
+// EncodeMulti encodes a cookie value using a group of codecs.
+//
+// The codecs are tried in order. Multiple codecs are accepted to allow
+// key rotation.
+func EncodeMulti(name string, value interface{},
+	codecs ...Codec) (string, error) {
+	for _, codec := range codecs {
+		if encoded, err := codec.Encode(name, value); err == nil {
+			return encoded, nil
+		}
+	}
+	return "", errors.New("securecookie: the value could not be encoded")
+}
+
+// DecodeMulti decodes a cookie value using a group of codecs.
+//
+// The codecs are tried in order. Multiple codecs are accepted to allow
+// key rotation.
+func DecodeMulti(name string, value string, dst interface{},
+	codecs ...Codec) error {
+	for _, codec := range codecs {
+		if err := codec.Decode(name, value, dst); err == nil {
+			return nil
+		}
+	}
+	return errors.New("securecookie: the value could not be decoded")
+}
