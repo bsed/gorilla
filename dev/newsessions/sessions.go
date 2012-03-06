@@ -44,6 +44,7 @@ func NewSession(store Store, name string) *Session {
 
 // Session stores the values and optional configuration for a session.
 type Session struct {
+	ID      []byte
 	Values  map[interface{}]interface{}
 	Options *Options
 	IsNew   bool
@@ -56,17 +57,17 @@ type Session struct {
 // A single variadic argument is accepted, and it is optional: it defines
 // the flash key. If not defined "_flash" is used by default.
 func (s *Session) Flashes(vars ...string) []interface{} {
+	var flashes []interface{}
 	key := flashesKey
 	if len(vars) > 0 {
 		key = vars[0]
 	}
-	if flashes, ok := s.Values[key]; ok {
+	if v, ok := s.Values[key]; ok {
 		// Drop the flashes and return it.
 		delete(s.Values, key)
-		return flashes.([]interface{})
+		flashes = v.([]interface{})
 	}
-	// Return a new one.
-	return make([]interface{}, 0)
+	return flashes
 }
 
 // AddFlash adds a flash message to the session.
