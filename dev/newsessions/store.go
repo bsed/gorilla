@@ -5,7 +5,10 @@
 package sessions
 
 import (
+	"io"
 	"net/http"
+	"os"
+	"sync"
 
 	"code.google.com/p/gorilla/securecookie"
 )
@@ -21,12 +24,12 @@ type Store interface {
 
 // NewCookieStore returns a new CookieStore.
 //
-// Keys are defined in pairs: one for authentication and the other for
+// Keys are defined in pairs to allow key rotation, but the common case is
+// to set a single authentication key and optionally an encryption key.
+//
+// The first key in a pair is used for authentication and the second for
 // encryption. The encryption key can be set to nil or omitted in the last
 // pair, but the authentication key is required in all pairs.
-//
-// Multiple pairs are accepted to allow key rotation, but the common case is
-// to set a single authentication key and optionally an encryption key.
 //
 // It is recommended to use an authentication key with 32 or 64 bytes.
 // The encryption key, if set, must be either 16, 24, or 32 bytes to select
@@ -35,25 +38,19 @@ type Store interface {
 // Use the convenience function securecookie.GenerateRandomKey() to create
 // strong keys.
 func NewCookieStore(keyPairs ...[]byte) *CookieStore {
-	// Initialize it with a default configuration.
-	s := &CookieStore{Options: &Options{
-		Path:   "/",
-		MaxAge: 86400 * 30,
-	}}
-	for i := 0; i < len(keyPairs); i += 2 {
-		var blockKey []byte
-		if i+1 < len(keyPairs) {
-			blockKey = keyPairs[i+1]
-		}
-		s.Codecs = append(s.Codecs, securecookie.New(keyPairs[i], blockKey))
+	return &CookieStore{
+		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
+		Options: &Options{
+			Path:   "/",
+			MaxAge: 86400 * 30,
+		},
 	}
-	return s
 }
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	Options *Options // default configuration
 	Codecs  []securecookie.Codec
+	Options *Options // default configuration
 }
 
 // Get returns a session for the given name after adding it to the registry.
@@ -75,15 +72,15 @@ func (s *CookieStore) Get(r *http.Request, name string) (*Session, error) {
 func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	session := NewSession(s, name)
 	session.IsNew = true
-	var errDecoding error
-	if c, err := r.Cookie(name); err == nil {
-		errDecoding = securecookie.DecodeMulti(name, c.Value, &session.Values,
+	var err error
+	if c, errCookie := r.Cookie(name); errCookie == nil {
+		err = securecookie.DecodeMulti(name, c.Value, &session.Values,
 			s.Codecs...)
-		if errDecoding == nil {
+		if err == nil {
 			session.IsNew = false
 		}
 	}
-	return session, errDecoding
+	return session, err
 }
 
 // Save saves a single session to the response.
@@ -108,5 +105,128 @@ func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 		HttpOnly: options.HttpOnly,
 	}
 	http.SetCookie(w, cookie)
+	return nil
+}
+
+// FilesystemStore ------------------------------------------------------------
+
+var fileMutex sync.RWMutex
+
+func NewFilesystemStore(keyPairs ...[]byte) *FilesystemStore {
+	return &FilesystemStore{
+		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
+		Options: &Options{
+			Path:   "/",
+			MaxAge: 86400 * 30,
+		},
+	}
+}
+
+// FilesystemStore stores sessions in the filesystem.
+type FilesystemStore struct {
+	Codecs  []securecookie.Codec
+	Options *Options // default configuration
+}
+
+func (s *FilesystemStore) Get(r *http.Request, name string) (*Session, error) {
+	return GetRegistry(r).Get(s, name)
+}
+
+func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
+	session := NewSession(s, name)
+	session.IsNew = true
+	var err error
+	if c, errCookie := r.Cookie(name); errCookie == nil {
+		err = securecookie.DecodeMulti(name, c.Value, &session.ID, s.Codecs...)
+		if err == nil {
+			err = s.readFile(session)
+			if err == nil {
+				session.IsNew = false
+			}
+		}
+	}
+	return session, err
+}
+
+func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
+	session *Session) error {
+	if session.ID == nil {
+		session.ID = securecookie.GenerateRandomKey(32)
+	}
+	if err := s.writeFile(session); err != nil {
+		return err
+	}
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.ID,
+		s.Codecs...)
+	if err != nil {
+		return err
+	}
+	options := s.Options
+	if session.Options != nil {
+		options = session.Options
+	}
+	cookie := &http.Cookie{
+		Name:     session.Name(),
+		Value:    encoded,
+		Path:     options.Path,
+		Domain:   options.Domain,
+		MaxAge:   options.MaxAge,
+		Secure:   options.Secure,
+		HttpOnly: options.HttpOnly,
+	}
+	http.SetCookie(w, cookie)
+	return nil
+}
+
+func (s *FilesystemStore) writeFile(session *Session) error {
+	if len(session.Values) == 0 {
+		// Don't need to write anything.
+		return nil
+	}
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
+		s.Codecs...)
+	if err != nil {
+		return err
+	}
+	// TODO make path configurable.
+	filename := "/tmp/session_" + string(session.ID)
+	fileMutex.Lock()
+	defer fileMutex.Unlock()
+	fp, err2 := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
+	if err2 != nil {
+		return err2
+	}
+	if _, err = fp.Write([]byte(encoded)); err != nil {
+		return err
+	}
+	fp.Close()
+	return nil
+}
+
+func (s *FilesystemStore) readFile(session *Session) error {
+	// TODO make path configurable.
+	filename := "/tmp/session_" + string(session.ID)
+	fp, err := os.OpenFile(filename, os.O_RDONLY, 0400)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	var fdata []byte
+	buf := make([]byte, 128)
+	for {
+		var n int
+		n, err = fp.Read(buf[0:])
+		fdata = append(fdata, buf[0:n]...)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+	}
+	if err = securecookie.DecodeMulti(session.Name(), string(fdata),
+		&session.Values, s.Codecs...); err != nil {
+		return err
+	}
 	return nil
 }
