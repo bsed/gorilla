@@ -337,6 +337,21 @@ func GenerateRandomKey(length int) []byte {
 	return k
 }
 
+// CodecsFromPairs returns a slice of SecureCookie instances.
+//
+// It is a convenience function to create a list of codecs for key rotation.
+func CodecsFromPairs(keyPairs ...[]byte) []*SecureCookie {
+	codecs := make([]*SecureCookie, len(keyPairs) + len(keyPairs) % 2)
+	for i := 0; i < len(keyPairs); i += 2 {
+		var blockKey []byte
+		if i+1 < len(keyPairs) {
+			blockKey = keyPairs[i+1]
+		}
+		codecs[i/2] = New(keyPairs[i], blockKey)
+	}
+	return codecs
+}
+
 // EncodeMulti encodes a cookie value using a group of codecs.
 //
 // The codecs are tried in order. Multiple codecs are accepted to allow
