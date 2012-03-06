@@ -83,7 +83,7 @@ func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	return session, err
 }
 
-// Save saves a single session to the response.
+// Save adds a single session to the response.
 func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 	session *Session) error {
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
@@ -112,8 +112,21 @@ func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 
 var fileMutex sync.RWMutex
 
-func NewFilesystemStore(keyPairs ...[]byte) *FilesystemStore {
+// NewCookieStore returns a new CookieStore.
+//
+// The path argument is the directory where sessions will be saved. If empty
+// it will use os.TempDir().
+//
+// See NewCookieStore() for a description of the other parameters.
+func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
+	if path == "" {
+		path = os.TempDir()
+	}
+	if path[len(path)-1] != '/' {
+		path += "/"
+	}
 	return &FilesystemStore{
+		path:    path,
 		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
 		Options: &Options{
 			Path:   "/",
@@ -124,14 +137,21 @@ func NewFilesystemStore(keyPairs ...[]byte) *FilesystemStore {
 
 // FilesystemStore stores sessions in the filesystem.
 type FilesystemStore struct {
+	path    string
 	Codecs  []securecookie.Codec
 	Options *Options // default configuration
 }
 
+// Get returns a session for the given name after adding it to the registry.
+//
+// See CookieStore.Get().
 func (s *FilesystemStore) Get(r *http.Request, name string) (*Session, error) {
 	return GetRegistry(r).Get(s, name)
 }
 
+// New returns a session for the given name without adding it to the registry.
+//
+// See CookieStore.New().
 func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
 	session := NewSession(s, name)
 	session.IsNew = true
@@ -148,6 +168,7 @@ func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
 	return session, err
 }
 
+// Save adds a single session to the response.
 func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	session *Session) error {
 	if session.ID == nil {
@@ -178,6 +199,7 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	return nil
 }
 
+// writeFile writes encoded session.Values in a file.
 func (s *FilesystemStore) writeFile(session *Session) error {
 	if len(session.Values) == 0 {
 		// Don't need to write anything.
@@ -188,8 +210,7 @@ func (s *FilesystemStore) writeFile(session *Session) error {
 	if err != nil {
 		return err
 	}
-	// TODO make path configurable.
-	filename := "/tmp/session_" + string(session.ID)
+	filename := s.path + "session_" + string(session.ID)
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 	fp, err2 := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
@@ -203,9 +224,9 @@ func (s *FilesystemStore) writeFile(session *Session) error {
 	return nil
 }
 
+// readFile reads a file and decodes its content into session.Values.
 func (s *FilesystemStore) readFile(session *Session) error {
-	// TODO make path configurable.
-	filename := "/tmp/session_" + string(session.ID)
+	filename := s.path + "session_" + string(session.ID)
 	fp, err := os.OpenFile(filename, os.O_RDONLY, 0400)
 	if err != nil {
 		return err
