@@ -39,7 +39,7 @@ type Store interface {
 // strong keys.
 func NewCookieStore(keyPairs ...[]byte) *CookieStore {
 	return &CookieStore{
-		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
+		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &Options{
 			Path:   "/",
 			MaxAge: 86400 * 30,
@@ -112,7 +112,7 @@ func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 
 var fileMutex sync.RWMutex
 
-// NewCookieStore returns a new CookieStore.
+// NewFilesystemStore returns a new FilesystemStore.
 //
 // The path argument is the directory where sessions will be saved. If empty
 // it will use os.TempDir().
@@ -126,12 +126,12 @@ func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
 		path += "/"
 	}
 	return &FilesystemStore{
-		path:    path,
-		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
+		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &Options{
 			Path:   "/",
 			MaxAge: 86400 * 30,
 		},
+		path: path,
 	}
 }
 
@@ -163,7 +163,7 @@ func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
 	if c, errCookie := r.Cookie(name); errCookie == nil {
 		err = securecookie.DecodeMulti(name, c.Value, &session.ID, s.Codecs...)
 		if err == nil {
-			err = s.readFile(session)
+			err = s.load(session)
 			if err == nil {
 				session.IsNew = false
 			}
@@ -178,7 +178,7 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.ID == "" {
 		session.ID = string(securecookie.GenerateRandomKey(32))
 	}
-	if err := s.writeFile(session); err != nil {
+	if err := s.save(session); err != nil {
 		return err
 	}
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.ID,
@@ -203,8 +203,8 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	return nil
 }
 
-// writeFile writes encoded session.Values in a file.
-func (s *FilesystemStore) writeFile(session *Session) error {
+// save writes encoded session.Values to a file.
+func (s *FilesystemStore) save(session *Session) error {
 	if len(session.Values) == 0 {
 		// Don't need to write anything.
 		return nil
@@ -228,8 +228,8 @@ func (s *FilesystemStore) writeFile(session *Session) error {
 	return nil
 }
 
-// readFile reads a file and decodes its content into session.Values.
-func (s *FilesystemStore) readFile(session *Session) error {
+// load reads a file and decodes its content into session.Values.
+func (s *FilesystemStore) load(session *Session) error {
 	filename := s.path + "session_" + session.ID
 	fp, err := os.OpenFile(filename, os.O_RDONLY, 0400)
 	if err != nil {

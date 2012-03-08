@@ -9,7 +9,7 @@ import (
 	"math"
 )
 
-// HSVModel converts any color.Color to a HSV color.
+// HSVModel converts any Color to a HSV color.
 var HSVModel = color.ModelFunc(hsvModel)
 
 // HSV represents a cylindrical coordinate of points in an RGB color model.
@@ -26,7 +26,7 @@ func (c HSV) RGBA() (uint32, uint32, uint32, uint32) {
 	return uint32(r) * 0x101, uint32(g) * 0x101, uint32(b) * 0x101, 0xffff
 }
 
-// hsvModel converts a color.Color to HSV.
+// hsvModel converts a Color to HSV.
 func hsvModel(c color.Color) color.Color {
 	if _, ok := c.(HSV); ok {
 		return c

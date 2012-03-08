@@ -40,12 +40,12 @@ func NewDatastoreStore(kind string, keyPairs ...[]byte) *DatastoreStore {
 		kind = "Session"
 	}
 	return &DatastoreStore{
-		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
+		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &sessions.Options{
 			Path:   "/",
 			MaxAge: 86400 * 30,
 		},
-		kind:    kind,
+		kind: kind,
 	}
 }
 
@@ -167,12 +167,12 @@ func NewMemcacheStore(keyPrefix string, keyPairs ...[]byte) *MemcacheStore {
 		keyPrefix = "gorilla.appengine.sessions."
 	}
 	return &MemcacheStore{
-		Codecs:  securecookie.CodecsFromPairs(keyPairs...),
+		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &sessions.Options{
 			Path:   "/",
 			MaxAge: 86400 * 30,
 		},
-		prefix:  keyPrefix,
+		prefix: keyPrefix,
 	}
 }
 
@@ -186,7 +186,7 @@ type MemcacheStore struct {
 // Get returns a session for the given name after adding it to the registry.
 //
 // See CookieStore.Get().
-func (s *MemcacheStore)	Get(r *http.Request, name string) (*sessions.Session,
+func (s *MemcacheStore) Get(r *http.Request, name string) (*sessions.Session,
 	error) {
 	return sessions.GetRegistry(r).Get(s, name)
 }
@@ -194,7 +194,7 @@ func (s *MemcacheStore)	Get(r *http.Request, name string) (*sessions.Session,
 // New returns a session for the given name without adding it to the registry.
 //
 // See CookieStore.New().
-func (s *MemcacheStore)	New(r *http.Request, name string) (*sessions.Session,
+func (s *MemcacheStore) New(r *http.Request, name string) (*sessions.Session,
 	error) {
 	session := sessions.NewSession(s, name)
 	session.IsNew = true
@@ -212,7 +212,7 @@ func (s *MemcacheStore)	New(r *http.Request, name string) (*sessions.Session,
 }
 
 // Save adds a single session to the response.
-func (s *MemcacheStore)	Save(r *http.Request, w http.ResponseWriter,
+func (s *MemcacheStore) Save(r *http.Request, w http.ResponseWriter,
 	session *sessions.Session) error {
 	if session.ID == "" {
 		session.ID = s.prefix + string(securecookie.GenerateRandomKey(32))

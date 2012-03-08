@@ -9,7 +9,7 @@ import (
 	"math"
 )
 
-// HSLModel converts any color.Color to a HSL color.
+// HSLModel converts any Color to a HSL color.
 var HSLModel = color.ModelFunc(hslModel)
 
 // HSL represents a cylindrical coordinate of points in an RGB color model.
@@ -26,7 +26,7 @@ func (c HSL) RGBA() (uint32, uint32, uint32, uint32) {
 	return uint32(r) * 0x101, uint32(g) * 0x101, uint32(b) * 0x101, 0xffff
 }
 
-// hslModel converts a color.Color to HSL.
+// hslModel converts a Color to HSL.
 func hslModel(c color.Color) color.Color {
 	if _, ok := c.(HSL); ok {
 		return c

@@ -35,6 +35,7 @@ Once a SecureCookie instance is set, use it to encode a cookie value:
 			cookie := &http.Cookie{
 				Name:  "cookie-name",
 				Value: encoded,
+				Path:  "/",
 			}
 			http.SetCookie(w, cookie)
 		}
