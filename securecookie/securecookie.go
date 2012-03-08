@@ -328,7 +328,8 @@ func decode(value []byte) ([]byte, error) {
 
 // Helpers --------------------------------------------------------------------
 
-// GenerateRandomKey returns a random key created using crypto/rand.
+// GenerateRandomKey is a convenience function to create a random key using
+// crypto/rand.
 func GenerateRandomKey(length int) []byte {
 	k := make([]byte, length)
 	if _, err := rand.Read(k); err != nil {
@@ -341,7 +342,7 @@ func GenerateRandomKey(length int) []byte {
 //
 // It is a convenience function to create a list of codecs for key rotation.
 func CodecsFromPairs(keyPairs ...[]byte) []Codec {
-	codecs := make([]Codec, len(keyPairs) + len(keyPairs) % 2)
+	codecs := make([]Codec, len(keyPairs)+len(keyPairs)%2)
 	for i := 0; i < len(keyPairs); i += 2 {
 		var blockKey []byte
 		if i+1 < len(keyPairs) {

@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-// HexModel converts any color.Color to an Hex color.
+// HexModel converts any Color to an Hex color.
 var HexModel = color.ModelFunc(hexModel)
 
 // Hex represents an RGB color in hexadecimal format.
@@ -25,7 +25,7 @@ func (c Hex) RGBA() (uint32, uint32, uint32, uint32) {
 	return uint32(r) * 0x101, uint32(g) * 0x101, uint32(b) * 0x101, 0xffff
 }
 
-// hexModel converts a color.Color to Hex.
+// hexModel converts a Color to Hex.
 func hexModel(c color.Color) color.Color {
 	if _, ok := c.(Hex); ok {
 		return c
