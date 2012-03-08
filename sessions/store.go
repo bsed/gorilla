@@ -136,10 +136,14 @@ func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
 }
 
 // FilesystemStore stores sessions in the filesystem.
+//
+// It also serves as a referece for custom stores.
+//
+// This store is still experimental and not well tested. Feedback is welcome.
 type FilesystemStore struct {
-	path    string
 	Codecs  []securecookie.Codec
 	Options *Options // default configuration
+	path    string
 }
 
 // Get returns a session for the given name after adding it to the registry.
@@ -171,8 +175,8 @@ func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
 // Save adds a single session to the response.
 func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	session *Session) error {
-	if session.ID == nil {
-		session.ID = securecookie.GenerateRandomKey(32)
+	if session.ID == "" {
+		session.ID = string(securecookie.GenerateRandomKey(32))
 	}
 	if err := s.writeFile(session); err != nil {
 		return err
@@ -210,7 +214,7 @@ func (s *FilesystemStore) writeFile(session *Session) error {
 	if err != nil {
 		return err
 	}
-	filename := s.path + "session_" + string(session.ID)
+	filename := s.path + "session_" + session.ID
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 	fp, err2 := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0600)
@@ -226,7 +230,7 @@ func (s *FilesystemStore) writeFile(session *Session) error {
 
 // readFile reads a file and decodes its content into session.Values.
 func (s *FilesystemStore) readFile(session *Session) error {
-	filename := s.path + "session_" + string(session.ID)
+	filename := s.path + "session_" + session.ID
 	fp, err := os.OpenFile(filename, os.O_RDONLY, 0400)
 	if err != nil {
 		return err
