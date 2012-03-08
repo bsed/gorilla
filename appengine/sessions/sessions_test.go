@@ -91,7 +91,7 @@ func TestMemcacheSessionFlashes(t *testing.T) {
 // ----------------------------------------------------------------------------
 
 func testSessionFlashes(t *testing.T, store sessions.Store) {
-	defer CloseTestingContext()
+	defer closeTestingContext()
 
 	var req *http.Request
 	var rsp *ResponseRecorder

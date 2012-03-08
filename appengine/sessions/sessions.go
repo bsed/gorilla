@@ -299,7 +299,7 @@ func deserialize(src []byte, dst interface{}) error {
 
 // Testing hack :( ------------------------------------------------------------
 
-// Context is a testing hack. We don't have a good testing story in App Engine
+// context is a testing hack. We don't have a good testing story in App Engine
 // so we need this kind of stuff.
 var context appengine.Context
 
@@ -316,9 +316,9 @@ func newContext(r *http.Request) appengine.Context {
 	return appengine.NewContext(r)
 }
 
-// CloseTestingContext is part of a hack to make packages testable in
+// closeTestingContext is part of a hack to make packages testable in
 // App Engine. :(
-func CloseTestingContext() {
+func closeTestingContext() {
 	if context != nil {
 		context.(*appenginetesting.Context).Close()
 		context = nil
