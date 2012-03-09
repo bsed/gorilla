@@ -10,39 +10,26 @@ Usage is the same as described in gorilla/sessions documentation:
 
 	http://gorilla-web.appspot.com/pkg/gorilla/sessions
 
-...with a little preparation needed: the new stores must be registered and
-their secret keys must be set before use. We can do it in a init() function:
+...but you'll use the DatastoreStore or MemcacheStore to load and save your
+sessions. Let's initialize both:
 
-	import (
-		// ...
-		appengineSessions "gorilla.googlecode.com/hg/gorilla/appengine/sessions"
-		"gorilla.googlecode.com/hg/gorilla/sessions"
-	)
+	var dStore = sessions.NewDatastoreStore("", []byte("very-secret"))
+	var mStore = sessions.NewMemcacheStore("", []byte("a-lot-secret"))
 
-	func init() {
-		// Register the datastore and memcache session stores.
-		sessions.SetStore("datastore", new(appengineSessions.DatastoreSessionStore))
-		sessions.SetStore("memcache", new(appengineSessions.MemcacheSessionStore))
+After this, call the appropriate store to retrieve a session, and then call
+Save() on the session to save it:
 
-		// Set secret keys for the session stores.
-		sessions.SetStoreKeys("datastore", []byte("my-secret-key"))
-		sessions.SetStoreKeys("memcache", []byte("my-secret-key"))
+	func MyHandler(w http.ResponseWriter, r *http.Request) {
+		// Get a session. We're ignoring the error resulted from decoding an
+		// existing session: Get() always returns a session, even if empty.
+		session, _ := dStore.Get(r, "session-name")
+		// Set some session values.
+		session.Values["foo"] = "bar"
+		session.Values[42] = 43
+		// Save it.
+		session.Save(r, w)
 	}
 
-After this, to retrieve a session using datastore or memcache, pass a third
-parameter to sessions.Session() with the key used to register the store.
-For datastore:
-
-	if session, err := sessions.Session(r, "", "datastore"); err == nil {
-		session["foo"] = "bar"
-		sessions.Save(r, w)
-	}
-
-Or for memcache:
-
-	if session, err := sessions.Session(r, "", "memcache"); err == nil {
-		session["foo"] = "bar"
-		sessions.Save(r, w)
-	}
+Check the sessions package documentation for more details about other features.
 */
 package sessions
