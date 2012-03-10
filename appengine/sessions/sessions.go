@@ -158,7 +158,7 @@ func (s *DatastoreStore) load(r *http.Request,
 
 // NewMemcacheStore returns a new MemcacheStore.
 //
-// The keyPrefix argument is the prfix used for memcache keys. If empty it
+// The keyPrefix argument is the prefix used for memcache keys. If empty it
 // will use "gorilla.appengine.sessions.".
 //
 // See NewCookieStore() for a description of the other parameters.
