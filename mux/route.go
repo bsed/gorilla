@@ -25,6 +25,8 @@ type Route struct {
 	// If true, when the path pattern is "/path/", accessing "/path" will
 	// redirect to the former and vice versa.
 	strictSlash bool
+	// If true, this route never matches: it is only used to build URLs.
+	buildOnly bool
 	// The name used to build URLs.
 	name string
 	// Error resulted from building a route.
@@ -38,6 +40,9 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 
 // Match matches the route against the request.
 func (r *Route) match(req *http.Request, match *RouteMatch) bool {
+	if r.buildOnly {
+		return false
+	}
 	// Match everything.
 	for _, m := range r.matchers {
 		if matched := m.match(req, match); !matched {
@@ -68,6 +73,12 @@ func (r *Route) match(req *http.Request, match *RouteMatch) bool {
 // GetError returns an error resulted from building the route, if any.
 func (r *Route) GetError() error {
 	return r.err
+}
+
+// BuildOnly sets the route to never match: it is only used to build URLs.
+func (r *Route) BuildOnly() *Route {
+	r.buildOnly = true
+	return r
 }
 
 // Handler --------------------------------------------------------------------
@@ -386,6 +397,9 @@ func (r *Route) Subrouter() *Router {
 // All variables defined in the route are required, and their values must
 // conform to the corresponding patterns.
 func (r *Route) URL(pairs ...string) (*url.URL, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	if r.regexp == nil {
 		return nil, errors.New("mux: route doesn't have a host or path")
 	}
@@ -414,6 +428,9 @@ func (r *Route) URL(pairs ...string) (*url.URL, error) {
 //
 // The route must have a host defined.
 func (r *Route) URLHost(pairs ...string) (*url.URL, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	if r.regexp == nil || r.regexp.host == nil {
 		return nil, errors.New("mux: route doesn't have a host")
 	}
@@ -431,6 +448,9 @@ func (r *Route) URLHost(pairs ...string) (*url.URL, error) {
 //
 // The route must have a path defined.
 func (r *Route) URLPath(pairs ...string) (*url.URL, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	if r.regexp == nil || r.regexp.path == nil {
 		return nil, errors.New("mux: route doesn't have a path")
 	}
