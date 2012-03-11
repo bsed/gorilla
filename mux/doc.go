@@ -163,7 +163,8 @@ This also works for host variables:
 
 All variables defined in the route are required, and their values must
 conform to the corresponding patterns. These requirements guarantee that a
-generated URL will always match a registered route.
+generated URL will always match a registered route -- the only exception is
+for explicitly defined "build-only" routes which never match.
 
 There's also a way to build only the URL host or path for a route:
 use the methods URLHost() or URLPath() instead. For the previous route,
