@@ -126,7 +126,15 @@ func (r *routeRegexp) match(req *http.Request, match *RouteMatch) bool {
 	if !r.matchHost {
 		return r.regexp.MatchString(req.URL.Path)
 	}
-	return r.regexp.MatchString(req.URL.Host)
+	host := req.URL.Host
+	if !req.URL.IsAbs() {
+		host = req.Host
+		// Slice off any port information.
+		if i := strings.Index(host, ":"); i != -1 {
+			host = host[:i]
+		}
+	}
+	return r.regexp.MatchString(host)
 }
 
 // url builds a URL part using the given values.
