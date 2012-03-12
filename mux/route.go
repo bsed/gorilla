@@ -40,7 +40,7 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 
 // Match matches the route against the request.
 func (r *Route) match(req *http.Request, match *RouteMatch) bool {
-	if r.buildOnly {
+	if r.buildOnly || r.err != nil {
 		return false
 	}
 	// Match everything.
