@@ -141,14 +141,12 @@ type FooBar struct {
 func TestCustomType(t *testing.T) {
 	s1 := New([]byte("12345"), []byte("1234567890123456"))
 	// Type is not registered in gob. (!!!)
-	var src interface{}
-	src = &FooBar{42, "bar"}
+	src := &FooBar{42, "bar"}
 	encoded, _ := s1.Encode("sid", src)
 
-	var dst interface{}
-	dst = &FooBar{}
+	dst := &FooBar{}
 	_ = s1.Decode("sid", encoded, dst)
-	if dst.(*FooBar).Foo != 42 || dst.(*FooBar).Bar != "bar" {
+	if dst.Foo != 42 || dst.Bar != "bar" {
 		t.Fatalf("Expected %#v, got %#v", src, dst)
 	}
 }
