@@ -138,6 +138,7 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	if b, err = serialize(value); err != nil {
 		return "", err
 	}
+	b = encode(b)
 	// 2. Create MAC for "name|date|value". Extra pipe to be used later.
 	b = []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), b))
 	mac := createMac(hmac.New(s.hashFunc, s.hashKey), b[:len(b)-1])
@@ -214,7 +215,11 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 		return errors.New("securecookie: expired timestamp")
 	}
 	// 7. Deserialize.
-	if err = deserialize(parts[1], dst); err != nil {
+	b, err = decode(parts[1])
+	if err != nil {
+		return err
+	}
+	if err = deserialize(b, dst); err != nil {
 		return err
 	}
 	// Done.
