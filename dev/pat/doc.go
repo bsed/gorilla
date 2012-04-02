@@ -13,9 +13,9 @@ Let's start registering a couple of URL paths and handlers:
 
 	func main() {
 		r := pat.New()
-		r.Get("/", http.HandlerFunc(HomeHandler))
-		r.Get("/products", http.HandlerFunc(ProductsHandler))
-		r.Get("/articles", http.HandlerFunc(ArticlesHandler))
+		r.Get("/", HomeHandler)
+		r.Get("/products", ProductsHandler)
+		r.Get("/articles", ArticlesHandler)
 		http.Handle("/", r)
 	}
 
@@ -24,14 +24,18 @@ equivalent to how http.HandleFunc() works: if an incoming GET request matches
 one of the paths, the corresponding handler is called passing
 (http.ResponseWriter, *http.Request) as parameters.
 
+Note: differently from pat, these methods accept a handler function, and not an
+http.Handler. We think this is shorter and more convenient. To set an
+http.Handler, use the Add() method.
+
 Paths can have variables. They are defined using the format {name} or
 {name:pattern}. If a regular expression pattern is not defined, the matched
 variable will be anything until the next slash. For example:
 
 	r := pat.New()
-	r.Get("/products/{key}", http.HandlerFunc(ProductHandler))
-	r.Get("/articles/{category}/", http.HandlerFunc(ArticlesCategoryHandler))
-	r.Get("/articles/{category}/{id:[0-9]+}", http.HandlerFunc(ArticleHandler))
+	r.Get("/products/{key}", ProductHandler)
+	r.Get("/articles/{category}/", ArticlesCategoryHandler)
+	r.Get("/articles/{category}/{id:[0-9]+}", ArticleHandler)
 
 The names are used to create a map of route variables which are stored in the
 URL query, prefixed by a colon:
