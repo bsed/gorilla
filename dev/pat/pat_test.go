@@ -23,7 +23,7 @@ func testMatch(t *testing.T, meth, pat, path string, ok bool, vars map[string]st
 	case "PUT":
 		r.Put(pat, nil)
 	}
-	req, _ := http.NewRequest(meth, "http://localhost" + path, nil)
+	req, _ := http.NewRequest(meth, "http://localhost"+path, nil)
 	m := mux.RouteMatch{}
 	if r.Match(req, &m) != ok {
 		if ok {

@@ -77,7 +77,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func registerVars(r *http.Request, vars map[string]string) {
 	parts, i := make([]string, len(vars)), 0
 	for key, value := range vars {
-		parts[i] = url.QueryEscape(":" + key) + "=" + url.QueryEscape(value)
+		parts[i] = url.QueryEscape(":"+key) + "=" + url.QueryEscape(value)
 		i++
 	}
 	r.URL.RawQuery = strings.Join(parts, "&") + "&" + r.URL.RawQuery
