@@ -19,7 +19,7 @@ The basic usage is really simple. Given this struct:
 		"Phone": {"999-999-999"},
 	}
 	person := new(Person)
-	decoder := NewDecoder()
+	decoder := schema.NewDecoder()
 	decoder.Decode(person, values)
 
 This is just a simple example and it doesn't make a lot of sense to create
@@ -29,7 +29,7 @@ will be of type url.Values: http.Request.Form or http.Request.MultipartForm.
 Note: it is a good idea to set a StructLoader instance as a package global,
 because it caches meta-data about structs, and a instance can be shared safely:
 
-	var decoder = NewDecoder()
+	var decoder = schema.NewDecoder()
 
 To define custom names for fields, use a struct tag "schema". To not populate
 certain fields, use a dash as the name and it will be ignored:
@@ -98,7 +98,8 @@ a Person with multiple Phone values, like:
 	</form>
 
 Notice that only for slices of structs the slice index is required.
-This is needed for disambiguation: if the nested struct also has a slice
-field, we could not represent it.
+This is needed for disambiguation: if the nested struct also had a slice
+field, we could not translate multiple values to it if we did not use an
+index for the parent struct.
 */
 package schema
