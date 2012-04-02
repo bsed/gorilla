@@ -28,7 +28,7 @@ Paths can have variables. They are defined using the format {name} or
 {name:pattern}. If a regular expression pattern is not defined, the matched
 variable will be anything until the next slash. For example:
 
-	r := mux.NewRouter()
+	r := pat.New()
 	r.Get("/products/{key}", http.HandlerFunc(ProductHandler))
 	r.Get("/articles/{category}/", http.HandlerFunc(ArticlesCategoryHandler))
 	r.Get("/articles/{category}/{id:[0-9]+}", http.HandlerFunc(ArticleHandler))
