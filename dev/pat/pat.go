@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"code.google.com/p/gorilla/mux"
 )
@@ -30,23 +31,23 @@ func (r *Router) Add(meth, pat string, h http.Handler) *mux.Route {
 }
 
 // Del registers a pattern with a handler for DELETE requests.
-func (r *Router) Del(pat string, h http.Handler) *mux.Route {
-	return r.Add("DELETE", pat, h)
+func (r *Router) Del(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
+	return r.Add("DELETE", pat, http.HandlerFunc(h))
 }
 
 // Get registers a pattern with a handler for GET requests.
-func (r *Router) Get(pat string, h http.Handler) *mux.Route {
-	return r.Add("GET", pat, h)
+func (r *Router) Get(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
+	return r.Add("GET", pat, http.HandlerFunc(h))
 }
 
 // Post registers a pattern with a handler for POST requests.
-func (r *Router) Post(pat string, h http.Handler) *mux.Route {
-	return r.Add("POST", pat, h)
+func (r *Router) Post(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
+	return r.Add("POST", pat, http.HandlerFunc(h))
 }
 
 // Put registers a pattern with a handler for PUT requests.
-func (r *Router) Put(pat string, h http.Handler) *mux.Route {
-	return r.Add("PUT", pat, h)
+func (r *Router) Put(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
+	return r.Add("PUT", pat, http.HandlerFunc(h))
 }
 
 // ServeHTTP dispatches the handler registered in the matched route.
@@ -74,11 +75,12 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // registerVars adds the matched route variables to the URL query.
 func registerVars(r *http.Request, vars map[string]string) {
-	params := make(url.Values)
+	parts, i := make([]string, len(vars)), 0
 	for key, value := range vars {
-		params[":" + key] = []string{value}
+		parts[i] = url.QueryEscape(":" + key) + "=" + url.QueryEscape(value)
+		i++
 	}
-	r.URL.RawQuery = params.Encode() + "&" + r.URL.RawQuery
+	r.URL.RawQuery = strings.Join(parts, "&") + "&" + r.URL.RawQuery
 }
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
