@@ -96,6 +96,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	contentType := r.Header.Get("Content-Type")
+	idx := strings.Index(contentType, ";")
+	if idx != -1 {
+		contentType = contentType[:idx]
+	}
 	codec := s.codecs[strings.ToLower(contentType)]
 	if codec == nil {
 		writeError(w, 415, "rpc: unrecognized Content-Type: "+contentType)
