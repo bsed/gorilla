@@ -4,8 +4,8 @@
 
 /*
 Package gorilla/pat is a request router and dispatcher with a pat-like
-interface. It is an alternative to gorilla/mux and showcases the power of
-its API. Package pat is documented at:
+interface. It is an alternative to gorilla/mux that showcases how it can
+be used as a base for different API flavors. Package pat is documented at:
 
 	http://gopkgdoc.appspot.com/pkg/github.com/bmizerany/pat
 
