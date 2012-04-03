@@ -123,7 +123,7 @@ func TestRouteMatchers(t *testing.T) {
 		}
 
 		var routeMatch RouteMatch
-		matched := router.match(request, &routeMatch)
+		matched := router.Match(request, &routeMatch)
 		if matched != shouldMatch {
 			// Need better messages. :)
 			if matched {
@@ -433,7 +433,7 @@ func TestHeaderMatcher(t *testing.T) {
 			request.Header.Add(key, value)
 		}
 		var routeMatch RouteMatch
-		result := v.matcher.match(request, &routeMatch)
+		result := v.matcher.Match(request, &routeMatch)
 		if result != v.result {
 			if v.result {
 				t.Errorf("%#v: should match %v.", v.matcher, request.Header)
@@ -448,7 +448,7 @@ func TestHostMatcher(t *testing.T) {
 	for _, v := range hostMatcherTests {
 		request, _ := http.NewRequest("GET", v.url, nil)
 		var routeMatch RouteMatch
-		result := v.matcher.match(request, &routeMatch)
+		result := v.matcher.Match(request, &routeMatch)
 		vars := routeMatch.Vars
 		if result != v.result {
 			if v.result {
@@ -478,7 +478,7 @@ func TestMethodMatcher(t *testing.T) {
 	for _, v := range methodMatcherTests {
 		request, _ := http.NewRequest(v.method, "http://localhost:8080/", nil)
 		var routeMatch RouteMatch
-		result := v.matcher.match(request, &routeMatch)
+		result := v.matcher.Match(request, &routeMatch)
 		if result != v.result {
 			if v.result {
 				t.Errorf("%#v: should match %v.", v.matcher, v.method)
@@ -493,7 +493,7 @@ func TestPathMatcher(t *testing.T) {
 	for _, v := range pathMatcherTests {
 		request, _ := http.NewRequest("GET", v.url, nil)
 		var routeMatch RouteMatch
-		result := v.matcher.match(request, &routeMatch)
+		result := v.matcher.Match(request, &routeMatch)
 		vars := routeMatch.Vars
 		if result != v.result {
 			if v.result {
@@ -523,7 +523,7 @@ func TestQueryMatcher(t *testing.T) {
 	for _, v := range queryMatcherTests {
 		request, _ := http.NewRequest("GET", v.url, nil)
 		var routeMatch RouteMatch
-		result := v.matcher.match(request, &routeMatch)
+		result := v.matcher.Match(request, &routeMatch)
 		if result != v.result {
 			if v.result {
 				t.Errorf("%#v: should match %v.", v.matcher, v.url)
@@ -538,7 +538,7 @@ func TestSchemeMatcher(t *testing.T) {
 	for _, v := range queryMatcherTests {
 		request, _ := http.NewRequest("GET", v.url, nil)
 		var routeMatch RouteMatch
-		result := v.matcher.match(request, &routeMatch)
+		result := v.matcher.Match(request, &routeMatch)
 		if result != v.result {
 			if v.result {
 				t.Errorf("%#v: should match %v.", v.matcher, v.url)
@@ -592,7 +592,7 @@ func TestMatchedRouteName(t *testing.T) {
 	url := "http://www.domain.com/products/"
 	request, _ := http.NewRequest("GET", url, nil)
 	var rv RouteMatch
-	ok := router.match(request, &rv)
+	ok := router.Match(request, &rv)
 
 	if !ok || rv.Route != route {
 		t.Errorf("Expected same route, got %+v.", rv.Route)
@@ -613,7 +613,7 @@ func TestSubRouting(t *testing.T) {
 	url := "http://www.domain.com/products/"
 	request, _ := http.NewRequest("GET", url, nil)
 	var rv RouteMatch
-	ok := router.match(request, &rv)
+	ok := router.Match(request, &rv)
 
 	if !ok || rv.Route != route {
 		t.Errorf("Expected same route, got %+v.", rv.Route)
@@ -656,7 +656,7 @@ func TestRedirectSlash(t *testing.T) {
 	route.Path("/{arg1}/{arg2:[0-9]+}/")
 	request, _ := http.NewRequest("GET", "http://localhost/foo/123", nil)
 	routeMatch = RouteMatch{}
-	_ = route.match(request, &routeMatch)
+	_ = route.Match(request, &routeMatch)
 	vars := routeMatch.Vars
 	if vars["arg1"] != "foo" {
 		t.Errorf("Expected foo.")
@@ -675,7 +675,7 @@ func TestRedirectSlash(t *testing.T) {
 	route.Path("/{arg1}/{arg2:[0-9]+}")
 	request, _ = http.NewRequest("GET", "http://localhost/foo/123/", nil)
 	routeMatch = RouteMatch{}
-	_ = route.match(request, &routeMatch)
+	_ = route.Match(request, &routeMatch)
 	vars = routeMatch.Vars
 	if vars["arg1"] != "foo" {
 		t.Errorf("Expected foo.")
