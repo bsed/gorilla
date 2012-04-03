@@ -98,16 +98,7 @@ func (s *DatastoreStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.Options != nil {
 		options = session.Options
 	}
-	cookie := &http.Cookie{
-		Name:     session.Name(),
-		Value:    encoded,
-		Path:     options.Path,
-		Domain:   options.Domain,
-		MaxAge:   options.MaxAge,
-		Secure:   options.Secure,
-		HttpOnly: options.HttpOnly,
-	}
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, sessions.GetCookie(session.Name(), encoded, options))
 	return nil
 }
 
@@ -225,16 +216,7 @@ func (s *MemcacheStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.Options != nil {
 		options = session.Options
 	}
-	cookie := &http.Cookie{
-		Name:     session.Name(),
-		Value:    encoded,
-		Path:     options.Path,
-		Domain:   options.Domain,
-		MaxAge:   options.MaxAge,
-		Secure:   options.Secure,
-		HttpOnly: options.HttpOnly,
-	}
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, sessions.GetCookie(session.Name(), encoded, options))
 	return nil
 }
 

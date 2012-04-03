@@ -8,6 +8,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net/http"
+	"time"
 
 	"code.google.com/p/gorilla/context"
 )
@@ -179,6 +180,26 @@ func init() {
 // Save saves all sessions used during the current request.
 func Save(r *http.Request, w http.ResponseWriter) error {
 	return GetRegistry(r).Save(w)
+}
+
+// GetCookie returns an http.Cookie with the options set. It also sets
+// the Expires field calculated based on the options.MaxAge value, if set, for
+// Internet Explorer compatibility.
+func GetCookie(name, value string, options *Options) *http.Cookie {
+	cookie := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     options.Path,
+		Domain:   options.Domain,
+		MaxAge:   options.MaxAge,
+		Secure:   options.Secure,
+		HttpOnly: options.HttpOnly,
+	}
+	if options.MaxAge > 0 {
+		t := time.Duration(options.MaxAge) * time.Second
+		cookie.Expires = time.Now().Add(t)
+	}
+	return cookie
 }
 
 // Error ----------------------------------------------------------------------
