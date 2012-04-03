@@ -21,7 +21,7 @@ import (
 var context appengine.Context
 
 func newContext(r *http.Request) appengine.Context {
-	if appengine.IsDevAppServer() && r.Header.Get("App-Testing") != "" {
+	if r.Header.Get("App-Testing") != "" {
 		if context == nil {
 			var err error
 			if context, err = appenginetesting.NewContext(nil); err != nil {

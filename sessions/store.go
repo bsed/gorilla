@@ -95,16 +95,7 @@ func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.Options != nil {
 		options = session.Options
 	}
-	cookie := &http.Cookie{
-		Name:     session.Name(),
-		Value:    encoded,
-		Path:     options.Path,
-		Domain:   options.Domain,
-		MaxAge:   options.MaxAge,
-		Secure:   options.Secure,
-		HttpOnly: options.HttpOnly,
-	}
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, GetCookie(session.Name(), encoded, options))
 	return nil
 }
 
@@ -190,16 +181,7 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.Options != nil {
 		options = session.Options
 	}
-	cookie := &http.Cookie{
-		Name:     session.Name(),
-		Value:    encoded,
-		Path:     options.Path,
-		Domain:   options.Domain,
-		MaxAge:   options.MaxAge,
-		Secure:   options.Secure,
-		HttpOnly: options.HttpOnly,
-	}
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, GetCookie(session.Name(), encoded, options))
 	return nil
 }
 
