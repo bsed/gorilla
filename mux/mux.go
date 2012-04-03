@@ -91,7 +91,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	handler.ServeHTTP(w, req)
 }
 
-// GetRoute returns a route registered with the given name.
+// Get returns a route registered with the given name.
+func (r *Router) Get(name string) *Route {
+	return r.getNamedRoutes()[name]
+}
+
+// GetRoute returns a route registered with the given name. This method
+// was renamed to Get() and remains here for backwards compatibility.
 func (r *Router) GetRoute(name string) *Route {
 	return r.getNamedRoutes()[name]
 }

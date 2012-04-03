@@ -304,7 +304,7 @@ func TestNamedRoutes(t *testing.T) {
 
 	if r1.namedRoutes == nil || len(r1.namedRoutes) != 9 {
 		t.Errorf("Expected 9 named routes, got %v", r1.namedRoutes)
-	} else if r1.GetRoute("i") == nil {
+	} else if r1.Get("i") == nil {
 		t.Errorf("Subroute name not registered")
 	}
 }

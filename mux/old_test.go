@@ -577,7 +577,7 @@ func TestUrlBuilding(t *testing.T) {
 	router := NewRouter()
 	router.HandleFunc("/articles/{category}/{id:[0-9]+}", ArticleHandler).Name("article")
 
-	url, _ := router.GetRoute("article").URL("category", "technology", "id", "42")
+	url, _ := router.Get("article").URL("category", "technology", "id", "42")
 	expected := "/articles/technology/42"
 	if url.String() != expected {
 		t.Errorf("Expected %v, got %v", expected, url.String())
@@ -619,7 +619,7 @@ func TestSubRouting(t *testing.T) {
 		t.Errorf("Expected same route, got %+v.", rv.Route)
 	}
 
-	u, _ := router.GetRoute("products").URL()
+	u, _ := router.Get("products").URL()
 	builtUrl := u.String()
 	// Yay, subroute aware of the domain when building!
 	if builtUrl != url {
