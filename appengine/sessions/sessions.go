@@ -98,7 +98,7 @@ func (s *DatastoreStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.Options != nil {
 		options = session.Options
 	}
-	http.SetCookie(w, sessions.GetCookie(session.Name(), encoded, options))
+	http.SetCookie(w, sessions.NewCookie(session.Name(), encoded, options))
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (s *MemcacheStore) Save(r *http.Request, w http.ResponseWriter,
 	if session.Options != nil {
 		options = session.Options
 	}
-	http.SetCookie(w, sessions.GetCookie(session.Name(), encoded, options))
+	http.SetCookie(w, sessions.NewCookie(session.Name(), encoded, options))
 	return nil
 }
 
