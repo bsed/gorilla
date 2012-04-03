@@ -118,6 +118,10 @@ The three URL paths we registered above will only be tested if the domain is
 only convenient, but also optimizes request matching. You can create
 subrouters combining any attribute matchers accepted by a route.
 
+Subrouters can be used to create domain or path "namespaces": you define
+subrouters in a central place and then parts of the app can register its
+paths relatively to a given subrouter.
+
 There's one more thing about subroutes. When a subrouter has a path prefix,
 the inner routes use it as base for their paths:
 
@@ -142,7 +146,7 @@ or "reversed". We define a name calling Name() on a route. For example:
 To build a URL, get the route and call the URL() method, passing a sequence of
 key/value pairs for the route variables. For the previous route, we would do:
 
-	url, err := r.GetRoute("article").URL("category", "technology", "id", "42")
+	url, err := r.Get("article").URL("category", "technology", "id", "42")
 
 ...and the result will be a url.URL with the following path:
 
@@ -157,9 +161,9 @@ This also works for host variables:
 	  Name("article")
 
 	// url.String() will be "http://news.domain.com/articles/technology/42"
-	url, err := r.GetRoute("article").URL("subdomain", "news",
-										  "category", "technology",
-										  "id", "42")
+	url, err := r.Get("article").URL("subdomain", "news",
+									 "category", "technology",
+									 "id", "42")
 
 All variables defined in the route are required, and their values must
 conform to the corresponding patterns. These requirements guarantee that a
@@ -171,11 +175,10 @@ use the methods URLHost() or URLPath() instead. For the previous route,
 we would do:
 
 	// "http://news.domain.com/"
-	host, err := r.GetRoute("article").URLHost("subdomain", "news")
+	host, err := r.Get("article").URLHost("subdomain", "news")
 
 	// "/articles/technology/42"
-	path, err := r.GetRoute("article").URLPath("category", "technology",
-											   "id", "42")
+	path, err := r.Get("article").URLPath("category", "technology", "id", "42")
 
 And if you use subrouters, host and path defined separately can be built
 as well:
@@ -187,8 +190,8 @@ as well:
 	  Name("article")
 
 	// "http://news.domain.com/articles/technology/42"
-	url, err := r.GetRoute("article").URL("subdomain", "news",
-										  "category", "technology",
-										  "id", "42")
+	url, err := r.Get("article").URL("subdomain", "news",
+									 "category", "technology",
+									 "id", "42")
 */
 package mux
