@@ -43,8 +43,21 @@ URL query, prefixed by a colon:
 	category := req.URL.Query().Get(":category")
 
 As in the gorilla/mux package, other matchers can be added to the registered
-routes, and URLs can be built as well. Check the mux documentation for more
-details:
+routes and URLs can be reversed as well. To build a URL for a route, first
+add a name to it:
+
+	r.Get("/products/{key}", ProductHandler).Name("product")
+
+Then you can get it using the name and generate a URL:
+
+	url, err := r.Get("product").URL("key", "transmogrifier")
+
+...and the result will be a url.URL with the following path:
+
+	"/products/transmogrifier"
+
+Check the mux documentation for more details about URL building and extra
+matchers:
 
 	http://gorilla-web.appspot.com/pkg/gorilla/mux/
 */
