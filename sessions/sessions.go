@@ -196,8 +196,8 @@ func NewCookie(name, value string, options *Options) *http.Cookie {
 		HttpOnly: options.HttpOnly,
 	}
 	if options.MaxAge > 0 {
-		t := time.Duration(options.MaxAge) * time.Second
-		cookie.Expires = time.Now().Add(t)
+		d := time.Duration(options.MaxAge) * time.Second
+		cookie.Expires = time.Now().Add(d)
 	}
 	return cookie
 }
