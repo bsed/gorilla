@@ -268,13 +268,13 @@ func cleanPath(p string) string {
 
 // uniqueVars returns an error if two slices contain duplicated strings.
 func uniqueVars(s1, s2 []string) error {
-	vars := make(map[string]bool)
+	vars := make(map[string]bool, len(s1))
 	for _, s := range s1 {
 		vars[s] = true
 	}
 	for _, s := range s2 {
 		if vars[s] {
-			return fmt.Errorf("mux: duplicated variable %q", s)
+			return fmt.Errorf("mux: duplicated route variable %q", s)
 		}
 	}
 	return nil
@@ -284,8 +284,8 @@ func uniqueVars(s1, s2 []string) error {
 func mapFromPairs(pairs ...string) (map[string]string, error) {
 	length := len(pairs)
 	if length%2 != 0 {
-		return nil, fmt.Errorf("mux: parameters must be multiple of 2, got %v",
-			pairs)
+		return nil, fmt.Errorf(
+			"mux: number of parameters must be multiple of 2, got %v", pairs)
 	}
 	m := make(map[string]string, length/2)
 	for i := 0; i < length; i += 2 {
@@ -316,7 +316,7 @@ func matchMap(toCheck map[string]string, toMatch map[string][]string,
 			return false
 		} else if v != "" {
 			// If value was defined as an empty string we only check that the
-			// key exists. Otherwise we also check if the value exists.
+			// key exists. Otherwise we also check for equality.
 			valueExists := false
 			for _, value := range values {
 				if v == value {
