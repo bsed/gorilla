@@ -54,7 +54,7 @@ value:
 	}
 
 We stored a map[string]string, but secure cookies can hold any value that
-can be encoded using encoding/gob. To store special structures, they must be
+can be encoded using encoding/gob. To store custom types, they must be
 registered first using gob.Register(). For basic types this is not needed;
 it works out of the box.
 */
