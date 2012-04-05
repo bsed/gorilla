@@ -7,6 +7,11 @@ version, e.g. "r2012.04.05". Changes that are not backward
 compatible are highligthed in the release notes using an
 exclamation mark between brackets, as in "[!]".
 
+Development version
+-------------------
+- [!] securecookie: changed decoding order to decrypt only after
+	HMAC was successfully verified. As a result existing values
+	will fail to decode.
 
 gorilla r2012.04.05
 -------------------

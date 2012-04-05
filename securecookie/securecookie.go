@@ -138,21 +138,21 @@ func (s *SecureCookie) Encode(name string, value interface{}) (string, error) {
 	if b, err = serialize(value); err != nil {
 		return "", err
 	}
-	b = encode(b)
-	// 2. Create MAC for "name|date|value". Extra pipe to be used later.
-	b = []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), b))
-	mac := createMac(hmac.New(s.hashFunc, s.hashKey), b[:len(b)-1])
-	// 3. Append mac, remove name.
-	b = append(b, mac...)[len(name)+1:]
-	// 4. Encrypt (optional).
+	// 2. Encrypt (optional).
 	if s.block != nil {
 		if b, err = encrypt(s.block, b); err != nil {
 			return "", err
 		}
 	}
-	// 5. Encode to base64.
 	b = encode(b)
-	// 6. Check length.
+	// 3. Create MAC for "name|date|value". Extra pipe to be used later.
+	b = []byte(fmt.Sprintf("%s|%d|%s|", name, s.timestamp(), b))
+	mac := createMac(hmac.New(s.hashFunc, s.hashKey), b[:len(b)-1])
+	// Append mac, remove name.
+	b = append(b, mac...)[len(name)+1:]
+	// 4. Encode to base64.
+	b = encode(b)
+	// 5. Check length.
 	if s.maxLength != 0 && len(b) > s.maxLength {
 		return "", errors.New("securecookie: the value is too long")
 	}
@@ -185,24 +185,17 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	if err != nil {
 		return err
 	}
-	// 3. Decrypt (optional).
-	if s.block != nil {
-		if b, err = decrypt(s.block, b); err != nil {
-			return err
-		}
-	}
-	// 4. Value is "date|serialized|mac". Split.
+	// 3. Verify MAC. Value is "date|value|mac".
 	parts := bytes.SplitN(b, []byte("|"), 3)
 	if len(parts) != 3 {
 		return errors.New("securecookie: invalid value %v")
 	}
-	// 5. Verify MAC: "name|date|serialized" against mac.
 	h := hmac.New(s.hashFunc, s.hashKey)
 	b = append([]byte(name+"|"), b[:len(b)-len(parts[2])-1]...)
 	if err = verifyMac(h, b, parts[2]); err != nil {
 		return err
 	}
-	// 6. Verify date ranges.
+	// 4. Verify date ranges.
 	var t1 int64
 	if t1, err = strconv.ParseInt(string(parts[0]), 10, 64); err != nil {
 		return errors.New("securecookie: invalid timestamp")
@@ -214,11 +207,17 @@ func (s *SecureCookie) Decode(name, value string, dst interface{}) error {
 	if s.maxAge != 0 && t1 < t2-s.maxAge {
 		return errors.New("securecookie: expired timestamp")
 	}
-	// 7. Deserialize.
+	// 5. Decrypt (optional).
 	b, err = decode(parts[1])
 	if err != nil {
 		return err
 	}
+	if s.block != nil {
+		if b, err = decrypt(s.block, b); err != nil {
+			return err
+		}
+	}
+	// 6. Deserialize.
 	if err = deserialize(b, dst); err != nil {
 		return err
 	}
