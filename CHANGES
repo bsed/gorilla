@@ -17,6 +17,9 @@ Development version
 - [Fix] rpc/json: DecodeClientResponse now properly returns the
 	error from the RPC call, if any, instead of trying to decode the
 	result. Thanks, Graham Miller.
+- Added package appengine/context: it creates a testing context
+	during tests but a standard appengine.Context when built in
+	production. THis was extracted from appengine/sessions.
 
 gorilla r2012.04.05
 -------------------
