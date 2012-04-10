@@ -37,6 +37,9 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, strictSlash bool) (*rout
 		defaultPattern = "[^.]+"
 		matchPrefix, strictSlash = false, false
 	}
+	if matchPrefix {
+		strictSlash = false
+	}
 	// Set a flag for strictSlash.
 	endSlash := false
 	if strictSlash && strings.HasSuffix(tpl, "/") {
