@@ -367,6 +367,41 @@ func testRoute(t *testing.T, id int, shouldMatch bool, route *Route,
 	}
 }
 
+func TestStrictSlash(t *testing.T) {
+	var r *Router
+	var req *http.Request
+	var route *Route
+	var match *RouteMatch
+	var matched bool
+
+	// StrictSlash should be ignored for path prefix.
+	r = NewRouter()
+	r.StrictSlash(true)
+	route = r.NewRoute().PathPrefix("/static/")
+	req, _ = http.NewRequest("GET", "http://localhost/static", nil)
+	match = new(RouteMatch)
+	matched = r.Match(req, match)
+	if matched {
+		t.Errorf("Should not match request %q -- %v", req.URL.Path, getRouteTemplate(route))
+	}
+	if match.Handler != nil {
+		t.Errorf("Should not redirect")
+	}
+
+	r = NewRouter()
+	r.StrictSlash(true)
+	route = r.NewRoute().PathPrefix("/static/")
+	req, _ = http.NewRequest("GET", "http://localhost/static/", nil)
+	match = new(RouteMatch)
+	matched = r.Match(req, match)
+	if !matched {
+		t.Errorf("Should match request %q -- %v", req.URL.Path, getRouteTemplate(route))
+	}
+	if match.Handler != nil {
+		t.Errorf("Should not redirect")
+	}
+}
+
 func mapToPairs(m map[string]string) []string {
 	var i int
 	p := make([]string, len(m)*2)
