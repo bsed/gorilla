@@ -3,15 +3,20 @@ About
 This file lists changes between tagged gorilla releases.
 
 New releases are tagged twice, as "go1" and using the release
-version, e.g. "r2012.04.05". Changes that are not backward
-compatible are highligthed in the release notes using an
-exclamation mark between brackets, as in "[!]".
+version, e.g. "r2012.04.05". So the go tool will always get the
+latest version and a specific version can be pulled using its tag.
+
+Changes that are not backward compatible are highligthed below
+using an exclamation mark between brackets, as in "[!]".
 
 Development version
 -------------------
 - [!] securecookie: changed decoding order to decrypt only after
 	HMAC was successfully verified. As a result existing values
 	will fail to decode.
+- [Fix] rpc/json: DecodeClientResponse now properly returns the
+	error from the RPC call, if any, instead of trying to decode the
+	result. Thanks, Graham Miller.
 
 gorilla r2012.04.05
 -------------------
