@@ -4,10 +4,11 @@
 
 // +build appengine
 
-package sessions
+package context
 
 import (
 	"appengine"
 )
 
-var newContext = appengine.NewContext
+// New returns a new appengine.Context.
+var New = appengine.NewContext

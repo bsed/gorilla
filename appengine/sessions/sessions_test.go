@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"testing"
 
+	"code.google.com/p/gorilla/appengine/context"
 	"code.google.com/p/gorilla/sessions"
 )
 
@@ -91,7 +92,7 @@ func TestMemcacheSessionFlashes(t *testing.T) {
 // ----------------------------------------------------------------------------
 
 func testSessionFlashes(t *testing.T, store sessions.Store) {
-	defer closeTestingContext()
+	defer context.Close()
 
 	var req *http.Request
 	var rsp *ResponseRecorder
