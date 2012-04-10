@@ -4,23 +4,19 @@
 
 // +build !appengine
 
-package sessions
+package context
 
 import (
 	"net/http"
 
 	"appengine"
-
 	"gae-go-testing.googlecode.com/git/appenginetesting"
 )
 
-// Testing hack :( ------------------------------------------------------------
-
-// context is a testing hack. We don't have a good testing story in App Engine
-// so we need this kind of stuff.
 var context appengine.Context
 
-func newContext(r *http.Request) appengine.Context {
+// New returns a new testing context.
+func New(r *http.Request) appengine.Context {
 	if appengine.IsDevAppServer() && r.Header.Get("App-Testing") != "" {
 		if context == nil {
 			var err error
@@ -33,9 +29,8 @@ func newContext(r *http.Request) appengine.Context {
 	return appengine.NewContext(r)
 }
 
-// closeTestingContext is part of a hack to make packages testable in
-// App Engine. :(
-func closeTestingContext() {
+// Close closes a testing context registered when New() is called.
+func Close() {
 	if context != nil {
 		context.(*appenginetesting.Context).Close()
 		context = nil
