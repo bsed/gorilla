@@ -31,23 +31,23 @@ func (r *Router) Add(meth, pat string, h http.Handler) *mux.Route {
 }
 
 // Del registers a pattern with a handler for DELETE requests.
-func (r *Router) Del(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
-	return r.Add("DELETE", pat, http.HandlerFunc(h))
+func (r *Router) Del(pat string, h http.HandlerFunc) *mux.Route {
+	return r.Add("DELETE", pat, h)
 }
 
 // Get registers a pattern with a handler for GET requests.
-func (r *Router) Get(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
-	return r.Add("GET", pat, http.HandlerFunc(h))
+func (r *Router) Get(pat string, h http.HandlerFunc) *mux.Route {
+	return r.Add("GET", pat, h)
 }
 
 // Post registers a pattern with a handler for POST requests.
-func (r *Router) Post(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
-	return r.Add("POST", pat, http.HandlerFunc(h))
+func (r *Router) Post(pat string, h http.HandlerFunc) *mux.Route {
+	return r.Add("POST", pat, h)
 }
 
 // Put registers a pattern with a handler for PUT requests.
-func (r *Router) Put(pat string, h func(http.ResponseWriter, *http.Request)) *mux.Route {
-	return r.Add("PUT", pat, http.HandlerFunc(h))
+func (r *Router) Put(pat string, h http.HandlerFunc) *mux.Route {
+	return r.Add("PUT", pat, h)
 }
 
 // ServeHTTP dispatches the handler registered in the matched route.
