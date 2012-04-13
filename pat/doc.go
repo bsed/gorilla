@@ -50,7 +50,7 @@ add a name to it:
 
 Then you can get it using the name and generate a URL:
 
-	url, err := r.Get("product").URL("key", "transmogrifier")
+	url, err := r.GetRoute("product").URL("key", "transmogrifier")
 
 ...and the result will be a url.URL with the following path:
 
