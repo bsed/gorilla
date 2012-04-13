@@ -9,7 +9,7 @@ latest version and a specific version can be pulled using its tag.
 Changes that are not backward compatible are highligthed below
 using an exclamation mark between brackets, as in "[!]".
 
-Development version
+gorilla r2012.04.13
 -------------------
 - [!] securecookie: changed decoding order to decrypt only after
 	HMAC was successfully verified. As a result existing values
@@ -19,6 +19,8 @@ Development version
 - [Fix] rpc/json: DecodeClientResponse now properly returns the
 	error from the RPC call, if any, instead of trying to decode the
 	result. Thanks, Graham Miller.
+- [Fix] color: applied a workaround for inconsistent float64 to
+	uint8 conversion in x86 and x64. Thanks, Guillermo Estrada.
 - Added package appengine/context: it creates a testing context
 	during tests but a standard appengine.Context when built in
 	production. This was extracted from appengine/sessions.

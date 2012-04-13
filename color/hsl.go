@@ -92,9 +92,7 @@ func HSLToRGB(h, s, l float64) (r, g, b uint8) {
 		fG = hueToRGB(p, q, h)
 		fB = hueToRGB(p, q, h-1.0/3)
 	}
-	r = uint8((fR * 255) + 0.5)
-	g = uint8((fG * 255) + 0.5)
-	b = uint8((fB * 255) + 0.5)
+	r, g, b = float64ToUint8(fR), float64ToUint8(fG), float64ToUint8(fB)
 	return
 }
 
@@ -116,4 +114,17 @@ func hueToRGB(p, q, t float64) float64 {
 		return p + (q-p)*(2.0/3-t)*6
 	}
 	return p
+}
+
+// floatToUint8 converts a float64 to uint8.
+//
+// See: http://code.google.com/p/go/issues/detail?id=3423
+func float64ToUint8(x float64) uint8 {
+	if x < 0 {
+		return 0
+	}
+	if x > 1 {
+		return 255
+	}
+	return uint8(int(x*255 + 0.5))
 }

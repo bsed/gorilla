@@ -95,8 +95,6 @@ func HSVToRGB(h, s, v float64) (r, g, b uint8) {
 	case 5:
 		fR, fG, fB = v, p, q
 	}
-	r = uint8((fR * 255) + 0.5)
-	g = uint8((fG * 255) + 0.5)
-	b = uint8((fB * 255) + 0.5)
+	r, g, b = float64ToUint8(fR), float64ToUint8(fG), float64ToUint8(fB)
 	return
 }
