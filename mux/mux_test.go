@@ -375,23 +375,12 @@ func TestStrictSlash(t *testing.T) {
 	var matched bool
 
 	// StrictSlash should be ignored for path prefix.
+	// So we register a route ending in slash but it doesn't attempt to add
+	// the slash for a path not ending in slash.
 	r = NewRouter()
 	r.StrictSlash(true)
 	route = r.NewRoute().PathPrefix("/static/")
-	req, _ = http.NewRequest("GET", "http://localhost/static", nil)
-	match = new(RouteMatch)
-	matched = r.Match(req, match)
-	if matched {
-		t.Errorf("Should not match request %q -- %v", req.URL.Path, getRouteTemplate(route))
-	}
-	if match.Handler != nil {
-		t.Errorf("Should not redirect")
-	}
-
-	r = NewRouter()
-	r.StrictSlash(true)
-	route = r.NewRoute().PathPrefix("/static/")
-	req, _ = http.NewRequest("GET", "http://localhost/static/", nil)
+	req, _ = http.NewRequest("GET", "http://localhost/static/logo.png", nil)
 	match = new(RouteMatch)
 	matched = r.Match(req, match)
 	if !matched {

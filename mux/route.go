@@ -285,6 +285,7 @@ func (r *Route) Path(tpl string) *Route {
 
 // PathPrefix adds a matcher for the URL path prefix.
 func (r *Route) PathPrefix(tpl string) *Route {
+	r.strictSlash = false
 	r.err = r.addRegexpMatcher(tpl, false, true)
 	return r
 }

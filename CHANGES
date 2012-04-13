@@ -14,14 +14,14 @@ Development version
 - [!] securecookie: changed decoding order to decrypt only after
 	HMAC was successfully verified. As a result existing values
 	will fail to decode.
+- [Fix] mux: the StrictSlash option is now ignored when a path
+	prefix is used. Thanks, Vasiliy Tolstov.
 - [Fix] rpc/json: DecodeClientResponse now properly returns the
 	error from the RPC call, if any, instead of trying to decode the
 	result. Thanks, Graham Miller.
 - Added package appengine/context: it creates a testing context
 	during tests but a standard appengine.Context when built in
-	production. THis was extracted from appengine/sessions.
-- mux: the StrictSlash option is now ignored for path prefixes,
-	as it must be.
+	production. This was extracted from appengine/sessions.
 
 gorilla r2012.04.05
 -------------------
