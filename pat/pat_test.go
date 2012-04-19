@@ -18,7 +18,7 @@ func testMatch(t *testing.T, meth, pat, path string, ok bool, vars map[string]st
 	r := New()
 	switch meth {
 	case "DELETE":
-		r.Del(pat, myHandler)
+		r.Delete(pat, myHandler)
 	case "GET":
 		r.Get(pat, myHandler)
 	case "POST":
