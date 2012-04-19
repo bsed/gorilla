@@ -70,7 +70,7 @@ const (
 )
 
 // tokenNames maps tokenType's to their names. Used for conversion to string.
-var tokenNames = map[tokenType]string {
+var tokenNames = map[tokenType]string{
 	TokenError:          "error",
 	TokenEOF:            "EOF",
 	TokenIdent:          "IDENT",
@@ -102,7 +102,7 @@ var tokenNames = map[tokenType]string {
 var macroRegexp = regexp.MustCompile(`\{[a-z]+\}`)
 
 // macros maps macro names to patterns to be expanded.
-var macros = map[string]string {
+var macros = map[string]string{
 	// must be escaped: `\.+*?()|[]{}^$`
 	"ident":      `-?{nmstart}{nmchar}*`,
 	"name":       `{nmchar}+`,
@@ -111,17 +111,17 @@ var macros = map[string]string {
 	"unicode":    `\\[0-9a-fA-F]{1,6}{wc}?`,
 	"escape":     "{unicode}|\\[\u0020-\u007E\u0080-\uD7FF\uE000-\uFFFD\U00010000-\U0010FFFF]",
 	"nmchar":     `[a-zA-Z0-9_-]|{nonascii}|{escape}`,
-	"num":	      `[0-9]+|[0-9]*\.[0-9]+`,
-	"string":	  `"(?:{stringchar}|')*"|'(?:{stringchar}|")*'`,
+	"num":        `[0-9]+|[0-9]*\.[0-9]+`,
+	"string":     `"(?:{stringchar}|')*"|'(?:{stringchar}|")*'`,
 	"stringchar": `{urlchar}|[ ]|\\{nl}`,
 	"urlchar":    "[\u0009\u0021\u0023-\u0026\u0027-\u007E]|{nonascii}|{escape}",
-	"nl":	      `[\n\r\f]|\r\n`,
-	"w":	      `{wc}*`,
-	"wc":	      `[\t\n\f\r ]`,
+	"nl":         `[\n\r\f]|\r\n`,
+	"w":          `{wc}*`,
+	"wc":         `[\t\n\f\r ]`,
 }
 
 // productions maps the list of tokens to patterns to be expanded.
-var productions = map[tokenType]string {
+var productions = map[tokenType]string{
 	TokenIdent:          `{ident}`,
 	TokenAtKeyword:      `@{ident}`,
 	TokenString:         `{string}`,
@@ -149,10 +149,9 @@ var productions = map[tokenType]string {
 //
 // The map is filled on init() using the macros and productions defined in
 // the CSS specification.
-var matchers = map[tokenType]*regexp.Regexp {
-}
+var matchers = map[tokenType]*regexp.Regexp{}
 
-var matchOrder = []tokenType {
+var matchOrder = []tokenType{
 	// The ones scanned using first-char shortcut are commented out.
 	//TokenS,
 	TokenURI,
