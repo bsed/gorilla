@@ -162,7 +162,6 @@ var matchOrder = []tokenType{
 	TokenPercentage,
 	TokenNumber,
 	TokenCDC,
-	TokenChar,
 }
 
 func init() {
@@ -185,19 +184,19 @@ func New(input string) *Scanner {
 	// Normalize newlines.
 	input = strings.Replace(input, "\r\n", "\n", -1)
 	return &Scanner{
-		input:  input,
-		line:   1,
-		column: 1,
+		input: input,
+		row:   1,
+		col:   1,
 	}
 }
 
 // Scanner scans an input and emits tokens following the CSS3 specification.
 type Scanner struct {
-	input  string
-	pos    int
-	line   int
-	column int
-	last   *Token
+	input string
+	pos   int
+	row   int
+	col   int
+	err   *Token
 }
 
 // Next returns the next token from the input.
@@ -207,24 +206,23 @@ type Scanner struct {
 // If the input can't be tokenized the token type is TokenError. This occurs
 // in case of unclosed quotation marks or comments.
 func (s *Scanner) Next() *Token {
-	if s.last != nil {
-		return s.last
+	if s.err != nil {
+		return s.err
 	}
 	if s.pos >= len(s.input) {
-		s.last = &Token{TokenEOF, "", -1, -1}
-		return s.last
+		s.err = &Token{TokenEOF, "", s.row, s.col}
+		return s.err
 	}
-	input := s.input[s.pos:]
 	if s.pos == 0 {
-		// Test BOM only at the beginning of the file.
-		if strings.HasPrefix(input, "\uFEFF") {
-			return s.emitToken(TokenBOM, "\uFEFF")
+		// Test BOM only once, at the beginning of the file.
+		if strings.HasPrefix(s.input, "\uFEFF") {
+			return s.emitSimple(TokenBOM, "\uFEFF")
 		}
 	}
-	// There's a lot we can guess based on the current rune so we'll take this
+	// There's a lot we can guess based on the first byte so we'll take a
 	// shortcut before testing multiple regexps.
-	r := input[0]
-	switch r {
+	input := s.input[s.pos:]
+	switch input[0] {
 	case '\t', '\n', '\f', '\r', ' ':
 		// Whitespace.
 		return s.emitToken(TokenS, matchers[TokenS].FindString(input))
@@ -233,45 +231,44 @@ func (s *Scanner) Next() *Token {
 		// We'll test if this is a Char; if it is followed by a number it is a
 		// dimension/percentage/number, and this will be matched later.
 		if len(input) > 1 && !unicode.IsDigit(rune(input[1])) {
-			return s.emitToken(TokenChar, ".")
+			return s.emitSimple(TokenChar, ".")
 		}
 	case '#':
-		// Hash is also a common one. If the regexp doesn't match it is a Char.
+		// Another common one: Hash or Char.
 		if match := matchers[TokenHash].FindString(input); match != "" {
-			return s.emitToken(TokenHash, match)
+			return s.emitSimple(TokenHash, match)
 		}
-		return s.emitToken(TokenChar, "#")
+		return s.emitSimple(TokenChar, "#")
 	case '@':
-		// Another common one. If the regexp doesn't match it is a Char.
+		// Another common one: AtKeyword or Char.
 		if match := matchers[TokenAtKeyword].FindString(input); match != "" {
-			return s.emitToken(TokenAtKeyword, match)
+			return s.emitSimple(TokenAtKeyword, match)
 		}
-		return s.emitToken(TokenChar, "@")
+		return s.emitSimple(TokenChar, "@")
 	case ':', ',', ';', '%', '&', '+', '=', '>', '(', ')', '[', ']', '{', '}':
 		// More common chars.
-		return s.emitToken(TokenChar, string(r))
+		return s.emitSimple(TokenChar, string(input[0]))
 	case '"', '\'':
 		// String or error.
 		match := matchers[TokenString].FindString(input)
 		if match != "" {
 			return s.emitToken(TokenString, match)
 		} else {
-			s.last = s.emitToken(TokenError, "unclosed quotation mark")
-			return s.last
+			s.err = &Token{TokenError, "unclosed quotation mark", s.row, s.col}
+			return s.err
 		}
 	case '/':
+		// Comment, error or Char.
 		if len(input) > 1 && input[1] == '*' {
-			// Comment or error.
 			match := matchers[TokenComment].FindString(input)
 			if match != "" {
 				return s.emitToken(TokenComment, match)
 			} else {
-				s.last = s.emitToken(TokenError, "unclosed comment")
-				return s.last
+				s.err = &Token{TokenError, "unclosed comment", s.row, s.col}
+				return s.err
 			}
 		}
-		// A simple char.
-		return s.emitToken(TokenChar, "/")
+		return s.emitSimple(TokenChar, "/")
 	case '~':
 		// Includes or Char.
 		return s.emitPrefixOrChar(TokenIncludes, "~=")
@@ -297,36 +294,53 @@ func (s *Scanner) Next() *Token {
 			return s.emitToken(token, match)
 		}
 	}
-	s.last = s.emitToken(TokenError, "impossible to tokenize")
-	return s.last
+	// We already handled unclosed quotation marks and comments,
+	// so this can only be a Char.
+	r, width := utf8.DecodeRuneInString(input)
+	token := &Token{TokenChar, string(r), s.row, s.col}
+	s.col += width
+	s.pos += width
+	return token
 }
 
 // updatePosition updates input coordinates based on the consumed text.
 func (s *Scanner) updatePosition(text string) {
-	count := utf8.RuneCountInString(text)
+	width := utf8.RuneCountInString(text)
 	lines := strings.Count(text, "\n")
-	s.line += lines
+	s.row += lines
 	if lines == 0 {
-		s.column += count
+		s.col += width
 	} else {
-		s.column = utf8.RuneCountInString(text[strings.LastIndex(text, "\n"):])
+		s.col = utf8.RuneCountInString(text[strings.LastIndex(text, "\n"):])
 	}
-	s.pos += count
+	s.pos += width
 }
 
 // emitToken returns a Token for the string v and updates the scanner position.
 func (s *Scanner) emitToken(t tokenType, v string) *Token {
-	token := &Token{t, v, s.line, s.column}
+	token := &Token{t, v, s.row, s.col}
 	s.updatePosition(v)
+	return token
+}
+
+// emitSimple is a shortcut to emit a token with simplified position updates.
+//
+// The string is known to have only ASCII characters and to not have a newline.
+func (s *Scanner) emitSimple(t tokenType, v string) *Token {
+	token := &Token{t, v, s.row, s.col}
+	s.col += len(v)
+	s.pos += len(v)
 	return token
 }
 
 // emitPrefixOrChar returns a Token for type t if the current position
 // matches the given prefix. Otherwise it returns a Char token using the
 // first character from the prefix.
+//
+// The prefix is known to have only ASCII characters and to not have a newline.
 func (s *Scanner) emitPrefixOrChar(t tokenType, prefix string) *Token {
 	if strings.HasPrefix(s.input[s.pos:], prefix) {
-		return s.emitToken(t, prefix)
+		return s.emitSimple(t, prefix)
 	}
-	return s.emitToken(TokenChar, string(prefix[0]))
+	return s.emitSimple(TokenChar, string(prefix[0]))
 }
