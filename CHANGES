@@ -11,6 +11,9 @@ using an exclamation mark between brackets, as in "[!]".
 
 Development version
 -------------------
+- [!] pat: renamed Router.Del method to Delete. It doesn't make sense
+	to shorten the HTTP method name, even less to save only three
+	letters.
 - Added package css/scanner, a compliant tokenizer for CSS3.
 
 gorilla r2012.04.13
