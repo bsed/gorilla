@@ -30,8 +30,8 @@ func (r *Router) Add(meth, pat string, h http.Handler) *mux.Route {
 	return r.NewRoute().PathPrefix(pat).Handler(h).Methods(meth)
 }
 
-// Del registers a pattern with a handler for DELETE requests.
-func (r *Router) Del(pat string, h http.HandlerFunc) *mux.Route {
+// Delete registers a pattern with a handler for DELETE requests.
+func (r *Router) Delete(pat string, h http.HandlerFunc) *mux.Route {
 	return r.Add("DELETE", pat, h)
 }
 

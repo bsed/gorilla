@@ -11,17 +11,20 @@ import (
 	"code.google.com/p/gorilla/mux"
 )
 
+func myHandler(w http.ResponseWriter, r *http.Request) {
+}
+
 func testMatch(t *testing.T, meth, pat, path string, ok bool, vars map[string]string) {
 	r := New()
 	switch meth {
 	case "DELETE":
-		r.Del(pat, nil)
+		r.Del(pat, myHandler)
 	case "GET":
-		r.Get(pat, nil)
+		r.Get(pat, myHandler)
 	case "POST":
-		r.Post(pat, nil)
+		r.Post(pat, myHandler)
 	case "PUT":
-		r.Put(pat, nil)
+		r.Put(pat, myHandler)
 	}
 	req, _ := http.NewRequest(meth, "http://localhost"+path, nil)
 	m := mux.RouteMatch{}
