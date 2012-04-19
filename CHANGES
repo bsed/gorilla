@@ -9,6 +9,10 @@ latest version and a specific version can be pulled using its tag.
 Changes that are not backward compatible are highligthed below
 using an exclamation mark between brackets, as in "[!]".
 
+Development version
+-------------------
+- Added package css/scanner, a compliant tokenizer for CSS3.
+
 gorilla r2012.04.13
 -------------------
 - [!] securecookie: changed decoding order to decrypt only after
