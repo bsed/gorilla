@@ -493,3 +493,26 @@ func TestSimpleExample(t *testing.T) {
 		}
 	}
 }
+
+// ----------------------------------------------------------------------------
+
+type S4 struct {
+	F01 int64
+	F02 float64
+	F03 bool
+}
+
+func TestConversionError(t *testing.T) {
+	data := map[string][]string{
+		"F01": {"foo"},
+		"F02": {"bar"},
+		"F03": {"baz"},
+	}
+	s := &S4{}
+	e := NewDecoder().Decode(s, data)
+
+	m := e.(MultiError)
+	if len(m) != 3 {
+		t.Errorf("Expected 3 errors, got %v", m)
+	}
+}
