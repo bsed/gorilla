@@ -151,9 +151,9 @@ var productions = map[tokenType]string{
 // the CSS specification.
 var matchers = map[tokenType]*regexp.Regexp{}
 
+// matchOrder is the order to test regexps when first-char shortcuts
+// can't be used.
 var matchOrder = []tokenType{
-	// The ones scanned using first-char shortcut are commented out.
-	//TokenS,
 	TokenURI,
 	TokenFunction,
 	TokenUnicodeRange,
@@ -161,19 +161,8 @@ var matchOrder = []tokenType{
 	TokenDimension,
 	TokenPercentage,
 	TokenNumber,
-	//TokenHash,
-	TokenComment,
-	//TokenString,
-	TokenAtKeyword,
-	//TokenIncludes,
-	//TokenDashMatch,
-	//TokenPrefixMatch,
-	//TokenSuffixMatch,
-	//TokenSubstringMatch,
-	//TokenCDO,
 	TokenCDC,
 	TokenChar,
-	//TokenBOM
 }
 
 func init() {
@@ -233,7 +222,7 @@ func (s *Scanner) Next() *Token {
 		}
 	}
 	// There's a lot we can guess based on the current rune so we'll take this
-	// shortcut before testing multiple regexp's.
+	// shortcut before testing multiple regexps.
 	r := input[0]
 	switch r {
 	case '\t', '\n', '\f', '\r', ' ':
@@ -252,8 +241,14 @@ func (s *Scanner) Next() *Token {
 			return s.emitToken(TokenHash, match)
 		}
 		return s.emitToken(TokenChar, "#")
+	case '@':
+		// Another common one. If the regexp doesn't match it is a Char.
+		if match := matchers[TokenAtKeyword].FindString(input); match != "" {
+			return s.emitToken(TokenAtKeyword, match)
+		}
+		return s.emitToken(TokenChar, "@")
 	case ':', ',', ';', '%', '&', '+', '=', '>', '(', ')', '[', ']', '{', '}':
-		// Other common chars.
+		// More common chars.
 		return s.emitToken(TokenChar, string(r))
 	case '"', '\'':
 		// String or error.
@@ -264,6 +259,19 @@ func (s *Scanner) Next() *Token {
 			s.last = s.emitToken(TokenError, "unclosed quotation mark")
 			return s.last
 		}
+	case '/':
+		if len(input) > 1 && input[1] == '*' {
+			// Comment or error.
+			match := matchers[TokenComment].FindString(input)
+			if match != "" {
+				return s.emitToken(TokenComment, match)
+			} else {
+				s.last = s.emitToken(TokenError, "unclosed comment")
+				return s.last
+			}
+		}
+		// A simple char.
+		return s.emitToken(TokenChar, "/")
 	case '~':
 		// Includes or Char.
 		return s.emitPrefixOrChar(TokenIncludes, "~=")
