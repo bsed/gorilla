@@ -6,6 +6,7 @@ package schema
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -39,16 +40,25 @@ func (d *Decoder) Decode(dst interface{}, src map[string][]string) error {
 	}
 	v = v.Elem()
 	t := v.Type()
+	var errors MultiError
 	for path, values := range src {
 		if parts, err := d.cache.parsePath(path, t); err == nil {
-			d.decode(v, parts, values)
+			if err = d.decode(v, path, parts, values); err != nil {
+				errors = append(errors, err)
+			}
+		} else {
+			errors = append(errors, fmt.Errorf("Invalid path: %q", path))
 		}
+	}
+	if len(errors) > 0 {
+		return errors
 	}
 	return nil
 }
 
 // decode fills a struct field using a parsed path.
-func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
+func (d *Decoder) decode(v reflect.Value, path string, parts []pathPart,
+	values []string) error {
 	// Get the field walking the struct fields by index.
 	for _, idx := range parts[0].path {
 		if v.Type().Kind() == reflect.Ptr {
@@ -81,8 +91,7 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 			}
 			v.Set(value)
 		}
-		d.decode(v.Index(idx), parts[1:], values)
-		return
+		return d.decode(v.Index(idx), path, parts[1:], values)
 	}
 
 	// Simple case.
@@ -95,7 +104,7 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 		}
 		conv := d.cache.conv[elemT]
 		if conv == nil {
-			return
+			return fmt.Errorf("schema: converter not found for %v", elemT)
 		}
 		for key, value := range values {
 			if item := conv(value); item.IsValid() {
@@ -108,7 +117,7 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 			} else {
 				// If a single value is invalid should we give up
 				// or set a zero value?
-				return
+				return ConversionError{path, key, elemT, value}
 			}
 		}
 		value := reflect.Append(reflect.MakeSlice(t, 0, 0), items...)
@@ -117,7 +126,50 @@ func (d *Decoder) decode(v reflect.Value, parts []pathPart, values []string) {
 		if conv := d.cache.conv[t]; conv != nil {
 			if value := conv(values[0]); value.IsValid() {
 				v.Set(value)
+			} else {
+				return ConversionError{path, 0, t, values[0]}
 			}
+		} else {
+			return fmt.Errorf("schema: converter not found for %v", t)
 		}
 	}
+	return nil
+}
+
+// Errors ---------------------------------------------------------------------
+
+// ConversionError stores information about a failed conversion.
+type ConversionError struct {
+	Key   string
+	Index int
+	Type  reflect.Type
+	Value string
+}
+
+func (e ConversionError) Error() string {
+	return fmt.Sprintf("Error converting %q to %v (key: %q, index: %d)",
+		e.Value, e.Type, e.Key, e.Index)
+}
+
+// MultiError stores multiple conversion errors.
+//
+// Borrowed from the App Engine SDK.
+type MultiError []error
+
+func (e MultiError) Error() string {
+	s := ""
+	for n, err := range e {
+		if n == 0 {
+			s = err.Error()
+		}
+	}
+	switch len(e) {
+	case 0:
+		return "(0 errors)"
+	case 1:
+		return s
+	case 2:
+		return s + " (and 1 other error)"
+	}
+	return fmt.Sprintf("%s (and %d other errors)", s, len(e)-1)
 }
