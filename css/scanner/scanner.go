@@ -122,6 +122,7 @@ var macros = map[string]string{
 
 // productions maps the list of tokens to patterns to be expanded.
 var productions = map[tokenType]string{
+	// Unused regexps (matched using other methods) are commented out.
 	TokenIdent:          `{ident}`,
 	TokenAtKeyword:      `@{ident}`,
 	TokenString:         `{string}`,
@@ -131,18 +132,18 @@ var productions = map[tokenType]string{
 	TokenDimension:      `{num}{ident}`,
 	TokenURI:            `url\({w}(?:{string}|{urlchar}*){w}\)`,
 	TokenUnicodeRange:   `U\+[0-9A-F\?]{1,6}(?:-[0-9A-F]{1,6})?`,
-	TokenCDO:            `<!--`,
+	//TokenCDO:            `<!--`,
 	TokenCDC:            `-->`,
 	TokenS:              `{wc}+`,
 	TokenComment:        `/\*[^\*]*[\*]+(?:[^/][^\*]*[\*]+)*/`,
 	TokenFunction:       `{ident}\(`,
-	TokenIncludes:       `~=`,
-	TokenDashMatch:      `\|=`,
-	TokenPrefixMatch:    `\^=`,
-	TokenSuffixMatch:    `\$=`,
-	TokenSubstringMatch: `\*=`,
-	TokenChar:           `[^"']`,
-	TokenBOM:            "\uFEFF",
+	//TokenIncludes:       `~=`,
+	//TokenDashMatch:      `\|=`,
+	//TokenPrefixMatch:    `\^=`,
+	//TokenSuffixMatch:    `\$=`,
+	//TokenSubstringMatch: `\*=`,
+	//TokenChar:           `[^"']`,
+	//TokenBOM:            "\uFEFF",
 }
 
 // matchers maps the list of tokens to compiled regular expressions.
