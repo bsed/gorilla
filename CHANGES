@@ -15,6 +15,8 @@ Development version
 	to shorten the HTTP method name, even less to save only three
 	letters.
 - Added package css/scanner, a compliant tokenizer for CSS3.
+- sessions: FilesystemStore's filenames now use alphanumeric
+	characters only.
 
 gorilla r2012.04.13
 -------------------
