@@ -80,7 +80,12 @@ func registerVars(r *http.Request, vars map[string]string) {
 		parts[i] = url.QueryEscape(":"+key) + "=" + url.QueryEscape(value)
 		i++
 	}
-	r.URL.RawQuery = strings.Join(parts, "&") + "&" + r.URL.RawQuery
+	q := strings.Join(parts, "&")
+	if r.URL.RawQuery == "" {
+		r.URL.RawQuery = q
+	} else {
+		r.URL.RawQuery += "&" + q
+	}
 }
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
