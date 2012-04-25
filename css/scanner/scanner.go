@@ -324,7 +324,8 @@ func (s *Scanner) emitToken(t tokenType, v string) *Token {
 	return token
 }
 
-// emitSimple is a shortcut to emit a token with simplified position updates.
+// emitSimple returns a Token for the string v and updates the scanner
+// position in a simplified manner.
 //
 // The string is known to have only ASCII characters and to not have a newline.
 func (s *Scanner) emitSimple(t tokenType, v string) *Token {
