@@ -17,6 +17,8 @@ Development version
 - Added package css/scanner, a compliant tokenizer for CSS3.
 - sessions: FilesystemStore's filenames now use alphanumeric
 	characters only.
+- schema: an error that is a map[path]error is returned in case of
+	conversion errors. empty values are ignored.
 
 gorilla r2012.04.13
 -------------------
