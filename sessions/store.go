@@ -5,9 +5,11 @@
 package sessions
 
 import (
+	"encoding/base32"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"code.google.com/p/gorilla/securecookie"
@@ -167,7 +169,11 @@ func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
 func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	session *Session) error {
 	if session.ID == "" {
-		session.ID = string(securecookie.GenerateRandomKey(32))
+		// Because the ID is used in the filename, encode it to
+		// use alphanumeric characters only.
+		session.ID = strings.TrimRight(
+			base32.StdEncoding.EncodeToString(
+				securecookie.GenerateRandomKey(32)), "=")
 	}
 	if err := s.save(session); err != nil {
 		return err
