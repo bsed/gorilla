@@ -32,7 +32,7 @@ because it caches meta-data about structs, and a instance can be shared safely:
 	var decoder = schema.NewDecoder()
 
 To define custom names for fields, use a struct tag "schema". To not populate
-certain fields, use a dash as the name and it will be ignored:
+certain fields, use a dash for the name and it will be ignored:
 
 	type Person struct {
 		Name  string `schema:"name"`  // custom name

@@ -40,14 +40,14 @@ func (d *Decoder) Decode(dst interface{}, src map[string][]string) error {
 	}
 	v = v.Elem()
 	t := v.Type()
-	var errors MultiError
+	errors := MultiError{}
 	for path, values := range src {
 		if parts, err := d.cache.parsePath(path, t); err == nil {
 			if err = d.decode(v, path, parts, values); err != nil {
-				errors = append(errors, err)
+				errors[path] = err
 			}
 		} else {
-			errors = append(errors, fmt.Errorf("Invalid path: %q", path))
+			errors[path] = fmt.Errorf("schema: invalid path %q", path)
 		}
 	}
 	if len(errors) > 0 {
@@ -107,7 +107,10 @@ func (d *Decoder) decode(v reflect.Value, path string, parts []pathPart,
 			return fmt.Errorf("schema: converter not found for %v", elemT)
 		}
 		for key, value := range values {
-			if item := conv(value); item.IsValid() {
+			if value == "" {
+				// We are just ignoring empty values for now.
+				continue
+			} else if item := conv(value); item.IsValid() {
 				if isPtrElem {
 					ptr := reflect.New(elemT)
 					ptr.Elem().Set(item)
@@ -117,17 +120,20 @@ func (d *Decoder) decode(v reflect.Value, path string, parts []pathPart,
 			} else {
 				// If a single value is invalid should we give up
 				// or set a zero value?
-				return ConversionError{path, key, elemT, value}
+				return ConversionError{path, key}
 			}
 		}
 		value := reflect.Append(reflect.MakeSlice(t, 0, 0), items...)
 		v.Set(value)
 	} else {
-		if conv := d.cache.conv[t]; conv != nil {
+		if values[0] == "" {
+			// We are just ignoring empty values for now.
+			return nil
+		} else if conv := d.cache.conv[t]; conv != nil {
 			if value := conv(values[0]); value.IsValid() {
 				v.Set(value)
 			} else {
-				return ConversionError{path, 0, t, values[0]}
+				return ConversionError{path, -1}
 			}
 		} else {
 			return fmt.Errorf("schema: converter not found for %v", t)
@@ -140,28 +146,28 @@ func (d *Decoder) decode(v reflect.Value, path string, parts []pathPart,
 
 // ConversionError stores information about a failed conversion.
 type ConversionError struct {
-	Key   string
-	Index int
-	Type  reflect.Type
-	Value string
+	Key   string // key from the source map.
+	Index int    // index for multi-value fields; -1 for single-value fields.
 }
 
 func (e ConversionError) Error() string {
-	return fmt.Sprintf("Error converting %q to %v (key: %q, index: %d)",
-		e.Value, e.Type, e.Key, e.Index)
+	if e.Index < 0 {
+		return fmt.Sprintf("schema: error converting value for %q", e.Key)
+	}
+	return fmt.Sprintf("schema: error converting value for index %d of %q",
+		e.Index, e.Key)
 }
 
-// MultiError stores multiple conversion errors.
+// MultiError stores multiple decoding errors.
 //
 // Borrowed from the App Engine SDK.
-type MultiError []error
+type MultiError map[string]error
 
 func (e MultiError) Error() string {
 	s := ""
-	for n, err := range e {
-		if n == 0 {
-			s = err.Error()
-		}
+	for _, err := range e {
+		s = err.Error()
+		break
 	}
 	switch len(e) {
 	case 0:
