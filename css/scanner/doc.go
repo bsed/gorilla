@@ -3,8 +3,9 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/css/scanner scans an input and emits tokens following the CSS3
-specification located at:
+Package gorilla/css/scanner generates tokens for a CSS3 input.
+
+It follows the CSS3 specification located at:
 
 	http://www.w3.org/TR/css3-syntax/
 
@@ -19,6 +20,11 @@ the token returned has type TokenEOF or TokenError:
 		}
 		// Do something with the token...
 	}
+
+Following the CSS3 specification, an error can only occur when the scanner
+finds an unclosed quote or unclosed comment. In these cases the text becomes
+"untokenizable". Everything else is tokenizable and it is up to a parser
+to make sense of the token stream (or ignore nonsensical token sequences).
 
 Note: the scanner doesn't perform lexical analysis or, in other words, it
 doesn't care about the token context. It is intended to be used by a
