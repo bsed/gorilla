@@ -67,6 +67,7 @@ func (s *DatastoreStore) Get(r *http.Request, name string) (*sessions.Session,
 func (s *DatastoreStore) New(r *http.Request, name string) (*sessions.Session,
 	error) {
 	session := sessions.NewSession(s, name)
+	session.Options = &(*s.Options)
 	session.IsNew = true
 	var err error
 	if c, errCookie := r.Cookie(name); errCookie == nil {
@@ -95,11 +96,8 @@ func (s *DatastoreStore) Save(r *http.Request, w http.ResponseWriter,
 	if err != nil {
 		return err
 	}
-	options := s.Options
-	if session.Options != nil {
-		options = session.Options
-	}
-	http.SetCookie(w, sessions.NewCookie(session.Name(), encoded, options))
+	http.SetCookie(w, sessions.NewCookie(session.Name(), encoded,
+		session.Options))
 	return nil
 }
 
@@ -185,6 +183,7 @@ func (s *MemcacheStore) Get(r *http.Request, name string) (*sessions.Session,
 func (s *MemcacheStore) New(r *http.Request, name string) (*sessions.Session,
 	error) {
 	session := sessions.NewSession(s, name)
+	session.Options = &(*s.Options)
 	session.IsNew = true
 	var err error
 	if c, errCookie := r.Cookie(name); errCookie == nil {
@@ -213,11 +212,8 @@ func (s *MemcacheStore) Save(r *http.Request, w http.ResponseWriter,
 	if err != nil {
 		return err
 	}
-	options := s.Options
-	if session.Options != nil {
-		options = session.Options
-	}
-	http.SetCookie(w, sessions.NewCookie(session.Name(), encoded, options))
+	http.SetCookie(w, sessions.NewCookie(session.Name(), encoded,
+		session.Options))
 	return nil
 }
 
