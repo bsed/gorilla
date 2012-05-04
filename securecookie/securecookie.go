@@ -332,10 +332,9 @@ func decode(value []byte) ([]byte, error) {
 
 // Helpers --------------------------------------------------------------------
 
-// GenerateRandomKey is a convenience function to create a random key using
-// crypto/rand.
-func GenerateRandomKey(length int) []byte {
-	k := make([]byte, length)
+// GenerateRandomKey creates a random key with the given strength.
+func GenerateRandomKey(strength int) []byte {
+	k := make([]byte, strength)
 	if _, err := rand.Read(k); err != nil {
 		return nil
 	}
