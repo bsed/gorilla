@@ -19,6 +19,9 @@ Development version
 	characters only.
 - schema: an error that is a map[path]error is returned in case of
 	conversion errors. empty values are ignored.
+- sessions: when a session is created, default Options are set,
+	so that session.Options is immediately available for use.
+
 
 gorilla r2012.04.13
 -------------------
