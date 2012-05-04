@@ -9,7 +9,7 @@ latest version and a specific version can be pulled using its tag.
 Changes that are not backward compatible are highligthed below
 using an exclamation mark between brackets, as in "[!]".
 
-Development version
+gorilla r2012.05.04
 -------------------
 - [!] pat: renamed Router.Del method to Delete. It doesn't make sense
 	to shorten the HTTP method name, even less to save only three
