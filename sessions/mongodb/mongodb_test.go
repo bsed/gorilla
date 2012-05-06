@@ -78,20 +78,11 @@ func getRequest() *http.Request {
 // ----------------------------------------------------------------------------
 
 func TestMongoFlashes(t *testing.T) {
-	session, err := mgo.Dial("mongodb://127.0.0.1:27017")
+	s, err := mgo.Dial("localhost")
 	if err != nil {
 		t.Fatal(err)
 	}
-	db := &mgo.Database{
-		Session: session,
-		Name:    "mydb",
-	}
-	collection := &mgo.Collection{
-		Database: db,
-		Name:     "collection",
-		FullName: "db.collection",
-	}
-	store := NewMongoStore(collection, []byte("secret-key"))
+	store := NewMongoStore(s.DB("db").C("collection"), []byte("secret-key"))
 	testSessionFlashes(t, store)
 }
 
