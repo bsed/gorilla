@@ -87,10 +87,6 @@ func (s *MongoStore) Save(r *http.Request, w http.ResponseWriter,
 }
 
 func (s *MongoStore) save(session *sessions.Session) error {
-	if len(session.Values) == 0 {
-		// Don't need to write anything.
-		return nil
-	}
 	encoded, err := securecookie.EncodeMulti(session.Name(),
 		session.Values,
 		s.Codecs...)

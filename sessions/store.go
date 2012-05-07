@@ -187,10 +187,6 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 
 // save writes encoded session.Values to a file.
 func (s *FilesystemStore) save(session *Session) error {
-	if len(session.Values) == 0 {
-		// Don't need to write anything.
-		return nil
-	}
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
 		s.Codecs...)
 	if err != nil {
