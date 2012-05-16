@@ -13,6 +13,7 @@ Development version
 -------------------
 - sessions: FilesystemStore no longer skips saving empty sessions.
 - Added package http/auth, to parse "Authorization" headers.
+- Added package http/parser, with utilities to parse HTTP headers.
 
 gorilla r2012.05.04
 -------------------
