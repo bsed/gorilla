@@ -17,6 +17,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+
+	"code.google.com/p/gorilla/http/parser"
 )
 
 // ParseRequest extracts an "Authorization" header from a request and returns
@@ -80,18 +82,32 @@ type Basic struct {
 
 // ----------------------------------------------------------------------------
 
-/*
 // NewDigestFromRequest extracts an "Authorization" header from a request and
 // returns the parsed credentials from a "digest" http authentication scheme.
-func NewDigestRequest(r *http.Request) (*Digest, error) {
-	return nil, nil
+func NewDigestFromRequest(r *http.Request) (*Digest, error) {
+	scheme, credentials, err := ParseRequest(r)
+	if err == nil {
+		if scheme == "Digest" {
+			return NewDigest(credentials)
+		} else {
+			err = errors.New("The digest authentication header is invalid.")
+		}
+	}
+	return nil, err
 }
 
 // NewDigest parses credentials from a "digest" http authentication scheme.
 func NewDigest(credentials string) (*Digest, error) {
-	return nil, nil
+	// TODO: validate required keys.
+	return &Digest{Values: parser.ParsePairs(credentials)}, nil
 }
 
+// Basic stores credentials for the "digest" http authentication scheme.
+// Reference:
+//
+//    http://tools.ietf.org/html/rfc2617#section-2
+//
+// This is just a placeholder.
 type Digest struct {
+	Values map[string]string
 }
-*/
