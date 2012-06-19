@@ -42,6 +42,15 @@ var reverseTests = []reverseTest{
 		invalidKwds:   map[string]string{"foo": "c"},
 		invalidResult: "7cd0",
 	},
+	reverseTest{
+		pattern:       `(?P<foo>\d+)`,
+		validArgs:     []string{"1"},
+		validKwds:     nil,
+		validResult:   "1",
+		invalidArgs:   []string{"a"},
+		invalidKwds:   nil,
+		invalidResult: "a",
+	},
 }
 
 func TestReverseRegexp(t *testing.T) {
@@ -76,4 +85,63 @@ func TestReverseRegexp(t *testing.T) {
 			t.Errorf("Expected error for %q", test.pattern)
 		}
 	}
+}
+
+type groupTest struct {
+	pattern string
+	groups  []string
+	indices []int
+}
+
+var groupTests = []groupTest{
+	groupTest{
+		pattern: `^1(\d+)3$`,
+		groups:  []string{""},
+		indices: []int{1},
+	},
+	groupTest{
+		pattern: `^1(\d+([a-z]+)(\d+([a-z]+)))(?P<foo>\d+)3([a-z]+(\d+))(?P<bar>\d+)$`,
+		groups:  []string{"", "foo", "", "bar"},
+		indices: []int{1, 5, 6, 8},
+	},
+}
+
+func TestGroups(t *testing.T) {
+	for _, test := range groupTests {
+		r, err := Compile(test.pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		groups, indices := r.Groups()
+		if !stringSliceEqual(test.groups, groups) {
+			t.Errorf("Expected %v, got %v", test.groups, groups)
+		}
+		if !intSliceEqual(test.indices, indices) {
+			t.Errorf("Expected %v, got %v", test.indices, indices)
+		}
+	}
+}
+
+func intSliceEqual(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if v != b[k] {
+			return false
+		}
+	}
+	return true
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if v != b[k] {
+			return false
+		}
+	}
+	return true
 }
