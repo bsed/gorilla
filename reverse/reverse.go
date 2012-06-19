@@ -15,9 +15,9 @@ import (
 // This also works for named capturing groups: we can revert `1(?P<two>\d+)3`
 // calling re.Revert(nil, map[string]string{"two": "2"}).
 //
-// There are a few gotchas:
+// There are a few limitations that can't be changed:
 //
-// 1. Nested capturing groups are ignored; only the outermost group becomes
+// 1. Nested capturing groups are ignored; only the outermost groups become
 // a placeholder. So in `1(\d+([a-z]+))3` there is only one placeholder
 // although there are two capturing groups: re.Revert([]string{"2", "a"}, nil)
 // results in "123" and not "12a3".
@@ -29,6 +29,7 @@ type Regexp struct {
 	template string         // reverse template
 	groups   []string       // order of positional and named capturing groups;
 							// names for named and empty strings for positional
+	indices  []int          // indices of the outermost groups
 }
 
 // Compile compiles the regular expression pattern and creates a template
@@ -38,13 +39,13 @@ func Compile(pattern string) (*Regexp, error) {
 	if err != nil {
 		return nil, err
 	}
-	var template bytes.Buffer
-	var groups []string
-	writeTemplate(&template, &groups, re)
+	tpl := &template{buffer: new(bytes.Buffer)}
+	tpl.write(re)
 	return &Regexp{
 		compiled: regexp.MustCompile(pattern),
-		template: template.String(),
-		groups:   groups,
+		template: tpl.buffer.String(),
+		groups:   tpl.groups,
+		indices:  tpl.indices,
 	}, nil
 }
 
@@ -54,12 +55,12 @@ func (r *Regexp) Regexp() *regexp.Regexp {
 }
 
 // Groups returns an ordered list of the outermost capturing groups found in
-// the regexp.
+// the regexp, and the indices of these groups.
 //
 // Positional groups are listed as an empty string and named groups use
 // the group name.
-func (r *Regexp) Groups() []string {
-	return r.groups
+func (r *Regexp) Groups() ([]string, []int) {
+	return r.groups, r.indices
 }
 
 // Revert builds a string for this regexp using the given values.
@@ -103,22 +104,43 @@ func (r *Regexp) ValidRevert(args []string, kwds map[string]string) (string, err
 	return reverse, nil
 }
 
-// writeTemplate writes a reverse template for a regexp to the buffer.
-func writeTemplate(b *bytes.Buffer, groups *[]string, re *syntax.Regexp) {
+// template builds a reverse template for a regexp.
+type template struct {
+	buffer  *bytes.Buffer
+	groups  []string      // outermost capturing groups: empty string for
+						  // positional or name for named groups
+	indices []int         // indices of outermost capturing groups
+	index   int           // current group index
+	level   int           // capturing group nesting level
+}
+
+// write writes a reverse template to the buffer.
+func (t *template) write(re *syntax.Regexp) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		for _, r := range re.Rune {
-			b.WriteRune(r)
-			if r == '%' {
-				b.WriteRune('%')
+		if t.level <= 1 {
+			for _, r := range re.Rune {
+				t.buffer.WriteRune(r)
+				if r == '%' {
+					t.buffer.WriteRune('%')
+				}
 			}
 		}
 	case syntax.OpCapture:
-		*groups = append(*groups, re.Name)
-		b.WriteString("%s")
+		t.level++
+		t.index++
+		if t.level == 1 {
+			t.groups = append(t.groups, re.Name)
+			t.indices = append(t.indices, t.index)
+			t.buffer.WriteString("%s")
+		}
+		for _, sub := range re.Sub {
+			t.write(sub)
+		}
+		t.level--
 	case syntax.OpConcat:
 		for _, sub := range re.Sub {
-			writeTemplate(b, groups, sub)
+			t.write(sub)
 		}
 	}
 }
