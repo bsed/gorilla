@@ -115,14 +115,14 @@ type template struct {
 						  // positional or name for named groups
 	indices []int         // indices of outermost capturing groups
 	index   int           // current group index
-	level   int           // capturing group nesting level
+	level   int           // current capturing group nesting level
 }
 
 // write writes a reverse template to the buffer.
 func (t *template) write(re *syntax.Regexp) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		if t.level <= 1 {
+		if t.level == 0 {
 			for _, r := range re.Rune {
 				t.buffer.WriteRune(r)
 				if r == '%' {
