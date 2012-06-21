@@ -13,9 +13,9 @@ Let's start registering a couple of URL paths and handlers:
 
 	func main() {
 		r := pat.New()
-		r.Get("/", HomeHandler)
 		r.Get("/products", ProductsHandler)
 		r.Get("/articles", ArticlesHandler)
+		r.Get("/", HomeHandler)
 		http.Handle("/", r)
 	}
 
