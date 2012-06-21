@@ -43,8 +43,8 @@ func TestGettext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := new(Catalog)
-	if err := c.Read(bytes.NewReader(b)); err != nil {
+	c := NewCatalog()
+	if err := c.ReadMO(bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
 

@@ -29,21 +29,31 @@ type Reader interface {
 // disambiguation.
 type ContextSelector func(ctx string) bool
 
+// NewCatalog returns a new Catalog, initializing its internal fields.
+func NewCatalog() *Catalog {
+	return &Catalog{
+		messages: make(map[string]string),
+		mPlurals: make(map[string][]string),
+		tPlurals: make(map[string][]string),
+	}
+}
+
 // Catalog stores gettext translations.
 //
 // Inspired by Python's gettext.GNUTranslations.
 //
 // TODO: Gettextf(msg, replacements...) to use with fmt.Sprintf?
 type Catalog struct {
-	Messages    map[string]string
-	Plurals     map[string][]string
-	Fallback    *Catalog
-	ContextFunc ContextSelector
+	Fallback    *Catalog            // used when a translation is not found
+	ContextFunc ContextSelector     // used to select context to load
+	messages    map[string]string   // original messages
+	mPlurals    map[string][]string // message plurals
+	tPlurals    map[string][]string	// translation plurals
 }
 
 // Gettext returns a translation for the given message.
 func (c *Catalog) Gettext(msg string) string {
-	if trans, ok := c.Messages[msg]; ok {
+	if trans, ok := c.messages[msg]; ok {
 		return trans
 	}
 	if c.Fallback != nil {
@@ -58,7 +68,7 @@ func (c *Catalog) Gettext(msg string) string {
 // msg1 is used to lookup for a translation, and msg2 is used as the plural
 // form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
-	if plurals, ok := c.Plurals[msg1]; ok {
+	if plurals, ok := c.tPlurals[msg1]; ok {
 		if idx := c.pluralIndex(n); idx < len(plurals) {
 			return plurals[idx]
 		}
@@ -87,7 +97,7 @@ func (c *Catalog) pluralIndex(n int) int {
 	return 1
 }
 
-// Read reads a GNU MO file and writes its messages and translations
+// ReadMO reads a GNU MO file and writes its messages and translations
 // to the catalog.
 //
 // GNU MO file format specification:
@@ -96,13 +106,7 @@ func (c *Catalog) pluralIndex(n int) int {
 //
 // TODO: check if the format version is supported
 // TODO: parse file header; specially Content-Type and Plural-Forms values.
-func (c *Catalog) Read(r Reader) error {
-	if c.Messages == nil {
-		c.Messages = make(map[string]string)
-	}
-	if c.Plurals == nil {
-		c.Plurals = make(map[string][]string)
-	}
+func (c *Catalog) ReadMO(r Reader) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
 	var magic uint32
@@ -183,12 +187,14 @@ func (c *Catalog) Read(r Reader) error {
 		if pIdx := strings.Index(mStr, "\x00"); pIdx != -1 {
 			// Store only the singular of the original string and translation
 			// in the messages map, and all plural forms in the plurals map.
-			mStr = mStr[:pIdx]
+			mPlurals := strings.Split(mStr, "\x00")
 			tPlurals := strings.Split(tStr, "\x00")
-			c.Messages[mStr] = tPlurals[0]
-			c.Plurals[mStr] = tPlurals
+			mStr = mPlurals[0]
+			c.messages[mStr] = tPlurals[0]
+			c.mPlurals[mStr] = mPlurals
+			c.tPlurals[mStr] = tPlurals
 		} else {
-			c.Messages[mStr] = tStr
+			c.messages[mStr] = tStr
 		}
 	}
 	return nil
