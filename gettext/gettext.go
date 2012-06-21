@@ -16,25 +16,32 @@ const (
 	magicLittleEndian = 0x950412de
 )
 
+// Reader wraps the interfaces used to read compiled catalogs.
+//
+// Typically catalogs are provided as os.File.
 type Reader interface {
 	io.Reader
 	io.ReaderAt
 	io.Seeker
 }
 
-// Catalog stores translations for a GNU MO file.
+// ContextSelector is used to select the context stored for message
+// disambiguation.
+type ContextSelector func(ctx string) bool
+
+// Catalog stores gettext translations.
 //
 // Inspired by Python's gettext.GNUTranslations.
 //
 // TODO: Gettextf(msg, replacements...) to use with fmt.Sprintf?
 type Catalog struct {
-	Fallback *Catalog
-	Contexts map[string]string
-	Messages map[string]string
-	Plurals  map[string][]string
+	Messages    map[string]string
+	Plurals     map[string][]string
+	Fallback    *Catalog
+	ContextFunc ContextSelector
 }
 
-// Gettext returns a translation for msg.
+// Gettext returns a translation for the given message.
 func (c *Catalog) Gettext(msg string) string {
 	if trans, ok := c.Messages[msg]; ok {
 		return trans
@@ -45,7 +52,11 @@ func (c *Catalog) Gettext(msg string) string {
 	return msg
 }
 
-// Ngettext returns a plural translation for msg1 according to the amount n.
+// Ngettext returns a plural translation for a message according to the
+// amount n.
+//
+// msg1 is used to lookup for a translation, and msg2 is used as the plural
+// form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 	if plurals, ok := c.Plurals[msg1]; ok {
 		if idx := c.pluralIndex(n); idx < len(plurals) {
@@ -68,33 +79,16 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 //
 //     Plural-Forms: nplurals=2; plural=n != 1;
 //
-// ...which translates to the exoression in the body of this function.
+// ...which translates to the expression in the body of this function.
 func (c *Catalog) pluralIndex(n int) int {
-	if n != 1 {
-		return 1
+	if n == 1 {
+		return 0
 	}
-	return 0
+	return 1
 }
 
-// New catalog builds a translations catalog from a GNU MO file contents.
-//
-// GNU MO file format specification:
-//
-//     http://www.gnu.org/software/gettext/manual/gettext.html#MO-Files
-func NewCatalog(r Reader) (*Catalog, error) {
-	c := &Catalog{
-		Contexts: make(map[string]string),
-		Messages: make(map[string]string),
-		Plurals:  make(map[string][]string),
-	}
-	if err := WriteCatalog(c, r); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
-
-// WriteCatalog parses the GNU MO contents from the reader and writes
-// the messages and translations to the given catalog.
+// Read reads a GNU MO file and writes its messages and translations
+// to the catalog.
 //
 // GNU MO file format specification:
 //
@@ -102,7 +96,13 @@ func NewCatalog(r Reader) (*Catalog, error) {
 //
 // TODO: check if the format version is supported
 // TODO: parse file header; specially Content-Type and Plural-Forms values.
-func WriteCatalog(c *Catalog, r Reader) error {
+func (c *Catalog) Read(r Reader) error {
+	if c.Messages == nil {
+		c.Messages = make(map[string]string)
+	}
+	if c.Plurals == nil {
+		c.Plurals = make(map[string][]string)
+	}
 	// First word identifies the byte order.
 	var order binary.ByteOrder
 	var magic uint32
@@ -118,9 +118,9 @@ func WriteCatalog(c *Catalog, r Reader) error {
 	}
 	// Next six words:
 	// - major+minor format version numbers (ignored)
-	// - number of strings
-	// - offset of strings table
-	// - offset of translations table
+	// - number of messages
+	// - index of messages table
+	// - index of translations table
 	// - size of hashing table (ignored)
 	// - offset of hashing table (ignored)
 	w := make([]uint32, 6)
@@ -174,6 +174,10 @@ func WriteCatalog(c *Catalog, r Reader) error {
 		if cIdx := strings.Index(mStr, "\x04"); cIdx != -1 {
 			ctx = mStr[:cIdx]
 			mStr = mStr[cIdx+1:]
+			if c.ContextFunc != nil && !c.ContextFunc(ctx) {
+				// Context is not valid.
+				continue
+			}
 		}
 		// Check for plurals.
 		if pIdx := strings.Index(mStr, "\x00"); pIdx != -1 {
@@ -185,9 +189,6 @@ func WriteCatalog(c *Catalog, r Reader) error {
 			c.Plurals[mStr] = tPlurals
 		} else {
 			c.Messages[mStr] = tStr
-		}
-		if ctx != "" {
-			c.Contexts[mStr] = ctx
 		}
 	}
 	return nil
