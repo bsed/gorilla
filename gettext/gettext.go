@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"code.google.com/p/gorilla/gettext/pluralforms"
 )
 
 const (
@@ -26,33 +27,15 @@ type Reader interface {
 }
 
 // ContextFunc is used to select the context stored for message disambiguation.
-type ContextFunc func(ctx string) bool
-
-// pluralFunc is used to select the plural form index.
-type pluralFunc func(int) int
-
-// defaultPluralFunc returns the plural form index for the amount n.
-//
-// This depends on parsing the Plural-Forms header and is still not supported.
-// E.g., expression for English and many others:
-//
-//     Plural-Forms: nplurals=2; plural=n != 1;
-//
-// ...which translates to the expression in the body of this function.
-func defaultPluralFunc(n int) int {
-	if n == 1 {
-		return 0
-	}
-	return 1
-}
+type ContextFunc func(string) bool
 
 // NewCatalog returns a new Catalog, initializing its internal fields.
 func NewCatalog() *Catalog {
 	return &Catalog{
+		PluralFunc: pluralforms.DefaultPluralFunc,
 		messages:   make(map[string]string),
 		mPlurals:   make(map[string][]string),
 		tPlurals:   make(map[string][]string),
-		pluralFunc: defaultPluralFunc,
 	}
 }
 
@@ -62,12 +45,12 @@ func NewCatalog() *Catalog {
 //
 // TODO: Gettextf(msg, replacements...) to use with fmt.Sprintf?
 type Catalog struct {
-	Fallback    *Catalog            // used when a translation is not found
-	ContextFunc ContextFunc         // used to select context to load
-	messages    map[string]string   // original messages
-	mPlurals    map[string][]string // message plurals
-	tPlurals    map[string][]string	// translation plurals
-	pluralFunc  pluralFunc          // used to select the plural form index
+	Fallback    *Catalog               // used when a translation is not found
+	ContextFunc ContextFunc            // used to select context to load
+	PluralFunc  pluralforms.PluralFunc // used to select the plural form index
+	messages    map[string]string      // original messages
+	mPlurals    map[string][]string    // message plurals
+	tPlurals    map[string][]string	   // translation plurals
 }
 
 // Gettext returns a translation for the given message.
@@ -88,7 +71,7 @@ func (c *Catalog) Gettext(msg string) string {
 // form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 	if plurals, ok := c.tPlurals[msg1]; ok {
-		if idx := c.pluralFunc(n); idx < len(plurals) {
+		if idx := c.PluralFunc(n); idx < len(plurals) {
 			return plurals[idx]
 		}
 	}
@@ -109,6 +92,7 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 //     http://www.gnu.org/software/gettext/manual/gettext.html#MO-Files
 //
 // TODO: check if the format version is supported
+//
 // TODO: parse file header; specially Content-Type and Plural-Forms values.
 func (c *Catalog) ReadMO(r Reader) error {
 	// First word identifies the byte order.
@@ -139,8 +123,7 @@ func (c *Catalog) ReadMO(r Reader) error {
 	}
 	count, mTableIdx, tTableIdx := w[1], w[2], w[3]
 	// Build a translations table of strings and translations.
-	// Plurals are stored separately because they don't belong to the
-	// same lookup table, per spec.
+	// Plurals are stored separately with the first message as key.
 	var mLen, mIdx, tLen, tIdx uint32
 	for i := 0; i < int(count); i++ {
 		// Get original message length and position.
@@ -189,8 +172,8 @@ func (c *Catalog) ReadMO(r Reader) error {
 		}
 		// Check for plurals.
 		if pIdx := strings.Index(mStr, "\x00"); pIdx != -1 {
-			// Store only the singular of the original string and translation
-			// in the messages map, and all plural forms in the plurals map.
+			// Store only the first original string and translation in the
+			// messages map, and all versions in the two other maps.
 			mPlurals := strings.Split(mStr, "\x00")
 			tPlurals := strings.Split(tStr, "\x00")
 			mStr = mPlurals[0]
@@ -201,9 +184,5 @@ func (c *Catalog) ReadMO(r Reader) error {
 			c.messages[mStr] = tStr
 		}
 	}
-	return nil
-}
-
-func parsePluralForms(expr string) pluralFunc {
 	return nil
 }
