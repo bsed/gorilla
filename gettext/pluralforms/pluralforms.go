@@ -18,8 +18,9 @@ var DefaultPluralFunc = pluralFunc2
 // Parse parses a Plural-Forms expression and returns a PluralFunc
 // capable of evaluating it.
 //
-// If the expression is malformed it returns an error. When the function is
-// called, if the evaluation result is not an int, it returns -1.
+// If the expression is malformed it returns an error. Even if it doesn't
+// return an error, the returned PluralFunc can still fail to evaluate.
+// In this case it returns -1 (an invalid index).
 func Parse(expr string) (PluralFunc, error) {
 	expr = strings.Replace(expr, " ", "", -1)
 	if f, ok := pluralFuncs[expr]; ok {
