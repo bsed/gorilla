@@ -118,7 +118,7 @@ func (p *parser) parsePrimary() (node, error) {
 		}
 		return n, nil
 	} else if isValue(t) {
-		return newValueNode(t)
+		return newValueNode(t), nil
 	}
 	return nil, fmt.Errorf("Unexpected token %q", t)
 }
@@ -142,7 +142,7 @@ func (p *parser) parseIf(n node) (node, error) {
 		if err != nil {
 			return nil, err
 		}
-		n = newIfNode(n, n1, n2)
+		n = &ifNode{n, n1, n2}
 	}
 	p.stream.push(t)
 	return n, nil
@@ -162,12 +162,6 @@ func isBinaryOp(t token) bool {
 	return false
 }
 
-// newBinaryOpNode returns a tree for the given binary operator
-// and child nodes.
-func newBinaryOpNode(t token, n1, n2 node) node {
-	return &binaryOpNode{op: t.typ, n1: n1, n2: n2}
-}
-
 // isUnaryOp returns true if the given token is a unary operator.
 func isUnaryOp(t token) bool {
 	switch t.typ {
@@ -175,11 +169,6 @@ func isUnaryOp(t token) bool {
 		return true
 	}
 	return false
-}
-
-// newUnaryOpNode returns a tree for the given unary operator and child node.
-func newUnaryOpNode(t token, n1 node) node {
-	return &unaryOpNode{op: t.typ, n1: n1}
 }
 
 // isValue returns true if the given token is a literal or variable.
@@ -191,14 +180,64 @@ func isValue(t token) bool {
 	return false
 }
 
-// newValueNode returns a node for the given literal or variable.
-func newValueNode(t token) (node, error) {
-	// bool is never extracted directly from the expression
+// ----------------------------------------------------------------------------
+
+// newBinaryOpNode returns a tree for the given binary operator
+// and child nodes.
+func newBinaryOpNode(t token, n1, n2 node) node {
 	switch t.typ {
+	case tokenMul:
+		return &mulNode{n1: n1, n2: n2}
+	case tokenDiv:
+		return &divNode{n1: n1, n2: n2}
+	case tokenMod:
+		return &modNode{n1: n1, n2: n2}
+	case tokenAdd:
+		return &addNode{n1: n1, n2: n2}
+	case tokenSub:
+		return &subNode{n1: n1, n2: n2}
+	case tokenEq:
+		return &eqNode{n1: n1, n2: n2}
+	case tokenNotEq:
+		return &notEqNode{n1: n1, n2: n2}
+	case tokenGt:
+		return &gtNode{n1: n1, n2: n2}
+	case tokenGte:
+		return &gteNode{n1: n1, n2: n2}
+	case tokenLt:
+		return &ltNode{n1: n1, n2: n2}
+	case tokenLte:
+		return &lteNode{n1: n1, n2: n2}
+	case tokenOr:
+		return &orNode{n1: n1, n2: n2}
+	case tokenAnd:
+		return &andNode{n1: n1, n2: n2}
+	}
+	panic("unreachable")
+
+}
+
+// newUnaryOpNode returns a tree for the given unary operator and child node.
+func newUnaryOpNode(t token, n1 node) node {
+	switch t.typ {
+	case tokenNot:
+		return &notNode{n1: n1}
+	}
+	panic("unreachable")
+}
+
+// newValueNode returns a node for the given literal or variable.
+func newValueNode(t token) node {
+	switch t.typ {
+	case tokenBool:
+		return boolNode(false)
 	case tokenInt:
-		return newIntNode(t.val)
+		if value, err := strconv.ParseInt(t.val, 10, 0); err == nil {
+			return intNode(value)
+		}
+		return invalidExpression
 	case tokenVar:
-		return &varNode{}, nil
+		return varNode(0)
 	}
 	panic("unreachable")
 }
@@ -207,8 +246,6 @@ func newValueNode(t token) (node, error) {
 
 type node interface {
 	Eval(ctx int) node
-	BinaryOp(ctx int, op tokenType, n2 node) node
-	UnaryOp(ctx int, op tokenType) node
 	String() string
 }
 
@@ -222,63 +259,8 @@ func (n errorNode) Eval(ctx int) node {
 	return n
 }
 
-func (n errorNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	return n
-}
-
-func (n errorNode) UnaryOp(ctx int, op tokenType) node {
-	return n
-}
-
 func (n errorNode) String() string {
 	return string(n)
-}
-
-// ----------------------------------------------------------------------------
-
-type binaryOpNode struct {
-	op tokenType
-	n1 node
-	n2 node
-}
-
-func (n *binaryOpNode) Eval(ctx int) node {
-	return n.n1.BinaryOp(ctx, n.op, n.n2)
-}
-
-func (n *binaryOpNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	return n.Eval(ctx).BinaryOp(ctx, op, n2)
-}
-
-func (n *binaryOpNode) UnaryOp(ctx int, op tokenType) node {
-	return n.Eval(ctx).UnaryOp(ctx, op)
-}
-
-func (n *binaryOpNode) String() string {
-	return fmt.Sprintf("(%s%s%s)", n.n1, n.op, n.n2)
-}
-
-// ----------------------------------------------------------------------------
-
-type unaryOpNode struct {
-	op tokenType
-	n1 node
-}
-
-func (n *unaryOpNode) Eval(ctx int) node {
-	return n.n1.UnaryOp(ctx, n.op)
-}
-
-func (n *unaryOpNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	return n.Eval(ctx).BinaryOp(ctx, op, n2)
-}
-
-func (n *unaryOpNode) UnaryOp(ctx int, op tokenType) node {
-	return n.Eval(ctx).UnaryOp(ctx, op)
-}
-
-func (n *unaryOpNode) String() string {
-	return fmt.Sprintf("(%s%s)", n.op, n.n1)
 }
 
 // ----------------------------------------------------------------------------
@@ -289,91 +271,16 @@ func (n boolNode) Eval(ctx int) node {
 	return n
 }
 
-func (x boolNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	switch y := n2.(type) {
-	case errorNode:
-		return y
-	case *binaryOpNode:
-		return y.BinaryOp(ctx, op, x)
-	case boolNode:
-		switch op {
-		case tokenAnd:
-			return boolNode(x && y)
-		case tokenOr:
-			return boolNode(x || y)
-		case tokenEq:
-			return boolNode(x == y)
-		case tokenNotEq:
-			return boolNode(x != y)
-		}
-	}
-	return invalidExpression
-}
-
-func (n boolNode) UnaryOp(ctx int, op tokenType) node {
-	// Shortcut. We only have one unary op, which is "logical not", and only
-	// works for bool.
-	return !n
-}
-
 func (n boolNode) String() string {
 	return fmt.Sprintf("%v", bool(n))
 }
 
 // ----------------------------------------------------------------------------
 
-func newIntNode(src string) (intNode, error) {
-	if value, err := strconv.ParseInt(src, 10, 0); err == nil {
-		return intNode(value), nil
-	}
-	return 0, fmt.Errorf("Invalid int %q", src)
-}
-
 type intNode int
 
 func (n intNode) Eval(ctx int) node {
 	return n
-}
-
-func (x intNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	switch y := n2.(type) {
-	case errorNode:
-		return y
-	case *varNode:
-		return x.BinaryOp(ctx, op, intNode(ctx))
-	case *binaryOpNode:
-		return y.BinaryOp(ctx, op, x)
-	case intNode:
-		switch op {
-		case tokenMul:
-			return x * y
-		case tokenDiv:
-			return x / y
-		case tokenMod:
-			return x % y
-		case tokenAdd:
-			return x + y
-		case tokenSub:
-			return x - y
-		case tokenEq:
-			return boolNode(x == y)
-		case tokenNotEq:
-			return boolNode(x != y)
-		case tokenGt:
-			return boolNode(x > y)
-		case tokenGte:
-			return boolNode(x >= y)
-		case tokenLt:
-			return boolNode(x < y)
-		case tokenLte:
-			return boolNode(x <= y)
-		}
-	}
-	return invalidExpression
-}
-
-func (n intNode) UnaryOp(ctx int, op tokenType) node {
-	return invalidExpression
 }
 
 func (n intNode) String() string {
@@ -382,33 +289,304 @@ func (n intNode) String() string {
 
 // ----------------------------------------------------------------------------
 
-type varNode struct{}
+type varNode int
 
-func (n *varNode) Eval(ctx int) node {
+func (n varNode) Eval(ctx int) node {
 	return intNode(ctx)
 }
 
-func (n *varNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	return n.Eval(ctx).BinaryOp(ctx, op, n2)
-}
-
-func (n *varNode) UnaryOp(ctx int, op tokenType) node {
-	return n.Eval(ctx).UnaryOp(ctx, op)
-}
-
-func (n *varNode) String() string {
+func (n varNode) String() string {
 	return "n"
 }
 
 // ----------------------------------------------------------------------------
 
-func newIfNode(cond, n1, n2 node) *ifNode {
-	return &ifNode{
-		cond: cond,
-		n1:   n1,
-		n2:   n2,
-	}
+type notNode struct {
+	n1 node
 }
+
+func (n *notNode) Eval(ctx int) node {
+	if x, ok := n.n1.Eval(ctx).(boolNode); ok {
+		return !x
+	}
+	return invalidExpression
+}
+
+func (n *notNode) String() string {
+	return fmt.Sprintf("(!%s)", n.n1)
+}
+
+// ----------------------------------------------------------------------------
+
+type mulNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *mulNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return x * y
+	}
+	return invalidExpression
+}
+
+func (n *mulNode) String() string {
+	return fmt.Sprintf("(%s*%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type divNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *divNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return x / y
+	}
+	return invalidExpression
+}
+
+func (n *divNode) String() string {
+	return fmt.Sprintf("(%s/%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type modNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *modNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return x % y
+	}
+	return invalidExpression
+}
+
+func (n *modNode) String() string {
+	return fmt.Sprintf("(%s%%%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type addNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *addNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return x + y
+	}
+	return invalidExpression
+}
+
+func (n *addNode) String() string {
+	return fmt.Sprintf("(%s+%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type subNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *subNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return x - y
+	}
+	return invalidExpression
+}
+
+func (n *subNode) String() string {
+	return fmt.Sprintf("(%s-%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type eqNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *eqNode) Eval(ctx int) node {
+	switch x := n.n1.Eval(ctx).(type) {
+	case boolNode:
+		if y, ok := n.n2.Eval(ctx).(boolNode); ok {
+			return boolNode(x == y)
+		}
+	case intNode:
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return boolNode(x == y)
+		}
+	}
+	return invalidExpression
+}
+
+func (n *eqNode) String() string {
+	return fmt.Sprintf("(%s==%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type notEqNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *notEqNode) Eval(ctx int) node {
+	switch x := n.n1.Eval(ctx).(type) {
+	case boolNode:
+		if y, ok := n.n2.Eval(ctx).(boolNode); ok {
+			return boolNode(x != y)
+		}
+	case intNode:
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return boolNode(x != y)
+		}
+	}
+	return invalidExpression
+}
+
+func (n *notEqNode) String() string {
+	return fmt.Sprintf("(%s!=%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type gtNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *gtNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return boolNode(x > y)
+	}
+	return invalidExpression
+}
+
+func (n *gtNode) String() string {
+	return fmt.Sprintf("(%s>%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type gteNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *gteNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return boolNode(x >= y)
+	}
+	return invalidExpression
+}
+
+func (n *gteNode) String() string {
+	return fmt.Sprintf("(%s>=%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type ltNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *ltNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return boolNode(x < y)
+	}
+	return invalidExpression
+}
+
+func (n *ltNode) String() string {
+	return fmt.Sprintf("(%s<%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type lteNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *lteNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(intNode)
+	y, ok2 := n.n2.Eval(ctx).(intNode)
+	if ok1 && ok2 {
+		return boolNode(x <= y)
+	}
+	return invalidExpression
+}
+
+func (n *lteNode) String() string {
+	return fmt.Sprintf("(%s<=%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type orNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *orNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(boolNode)
+	y, ok2 := n.n2.Eval(ctx).(boolNode)
+	if ok1 && ok2 {
+		return boolNode(x || y)
+	}
+	return invalidExpression
+}
+
+func (n *orNode) String() string {
+	return fmt.Sprintf("(%s||%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
+
+type andNode struct {
+	n1 node
+	n2 node
+}
+
+func (n *andNode) Eval(ctx int) node {
+	x, ok1 := n.n1.Eval(ctx).(boolNode)
+	y, ok2 := n.n2.Eval(ctx).(boolNode)
+	if ok1 && ok2 {
+		return boolNode(x && y)
+	}
+	return invalidExpression
+}
+
+func (n *andNode) String() string {
+	return fmt.Sprintf("(%s&&%s)", n.n1, n.n2)
+}
+
+// ----------------------------------------------------------------------------
 
 type ifNode struct {
 	cond node
@@ -417,23 +595,14 @@ type ifNode struct {
 }
 
 func (n *ifNode) Eval(ctx int) node {
-	switch ok := n.cond.Eval(ctx).(type) {
-	case boolNode:
-		if ok {
+	if x, ok := n.cond.Eval(ctx).(boolNode); ok {
+		if x {
 			return n.n1.Eval(ctx)
 		} else {
 			return n.n2.Eval(ctx)
 		}
 	}
 	return invalidExpression
-}
-
-func (n *ifNode) BinaryOp(ctx int, op tokenType, n2 node) node {
-	return n.Eval(ctx).BinaryOp(ctx, op, n2)
-}
-
-func (n *ifNode) UnaryOp(ctx int, op tokenType) node {
-	return n.Eval(ctx).UnaryOp(ctx, op)
 }
 
 func (n *ifNode) String() string {
