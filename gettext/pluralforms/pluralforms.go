@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// PluralFunc is used to select the plural form index.
+// PluralFunc is used to select a plural form index for a given amount.
 type PluralFunc func(int) int
 
 // DefaultPluralFunc is the default plural selector, used for English
@@ -19,8 +19,8 @@ var DefaultPluralFunc = pluralFunc2
 // capable of evaluating it.
 //
 // If the expression is malformed it returns an error. Even if it doesn't
-// return an error, the returned PluralFunc can still fail to evaluate.
-// In this case it returns -1 (an invalid index).
+// return an error the returned PluralFunc can still fail to evaluate.
+// If this occurs it returns -1 (an invalid index).
 func Parse(expr string) (PluralFunc, error) {
 	expr = strings.Replace(expr, " ", "", -1)
 	if f, ok := pluralFuncs[expr]; ok {
