@@ -5,11 +5,11 @@
 package gettext
 
 import (
+	"code.google.com/p/gorilla/gettext/pluralforms"
 	"encoding/binary"
 	"errors"
 	"io"
 	"strings"
-	"code.google.com/p/gorilla/gettext/pluralforms"
 )
 
 const (
@@ -50,7 +50,7 @@ type Catalog struct {
 	PluralFunc  pluralforms.PluralFunc // used to select the plural form index
 	messages    map[string]string      // original messages
 	mPlurals    map[string][]string    // message plurals
-	tPlurals    map[string][]string	   // translation plurals
+	tPlurals    map[string][]string    // translation plurals
 }
 
 // Gettext returns a translation for the given message.
@@ -70,7 +70,7 @@ func (c *Catalog) Gettext(msg string) string {
 // msg1 is used to lookup for a translation, and msg2 is used as the plural
 // form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
-	if plurals, ok := c.tPlurals[msg1]; ok {
+	if plurals, ok := c.tPlurals[msg1]; ok && c.PluralFunc != nil {
 		if idx := c.PluralFunc(n); idx < len(plurals) {
 			return plurals[idx]
 		}
