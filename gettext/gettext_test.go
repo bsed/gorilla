@@ -6,8 +6,8 @@ package gettext
 
 import (
 	"bytes"
-	"testing"
 	"encoding/base64"
+	"testing"
 )
 
 // From Python's gettext tests

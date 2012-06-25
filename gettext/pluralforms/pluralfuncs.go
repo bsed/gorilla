@@ -18,9 +18,9 @@ var DefaultPluralFunc = pluralFunc2
 //
 // Send us variants or new ones to be added to this list.
 var pluralFuncs = map[string]PluralFunc{
-	"0":                                                                pluralFunc1,
-	"n!=1":                                                             pluralFunc2,
-	"n>1":                                                              pluralFunc3,
+	"0":    pluralFunc1,
+	"n!=1": pluralFunc2,
+	"n>1":  pluralFunc3,
 	"n%10==1&&n%100!=11?0:n!=0?1:2":                                    pluralFunc4,
 	"n==1?0:n==2?1:2":                                                  pluralFunc5,
 	"n==1?0:(n==0||(n%100>0&&n%100<20))?1:2":                           pluralFunc6,
@@ -67,7 +67,7 @@ func pluralFunc3(n int) int {
 //     Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n != 0 ? 1 : 2;
 //
 func pluralFunc4(n int) int {
-	if n % 10 == 1 && n % 100 != 11 {
+	if n%10 == 1 && n%100 != 11 {
 		return 0
 	}
 	if n != 0 {
@@ -98,7 +98,7 @@ func pluralFunc6(n int) int {
 	if n == 1 {
 		return 0
 	}
-	if n == 0 || (n % 100 > 0 && n % 100 < 20) {
+	if n == 0 || (n%100 > 0 && n%100 < 20) {
 		return 1
 	}
 	return 2
@@ -109,10 +109,10 @@ func pluralFunc6(n int) int {
 //     Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && (n%100<10 || n%100>=20) ? 1 : 2;
 //
 func pluralFunc7(n int) int {
-	if n % 10 == 1 && n % 100 != 11 {
+	if n%10 == 1 && n%100 != 11 {
 		return 0
 	}
-	if n % 10 >= 2 && (n % 100 < 10 || n % 100 >= 20) {
+	if n%10 >= 2 && (n%100 < 10 || n%100 >= 20) {
 		return 1
 	}
 	return 2
@@ -124,10 +124,10 @@ func pluralFunc7(n int) int {
 //     Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;
 //
 func pluralFunc8(n int) int {
-	if n % 10 == 1 && n % 100 != 11 {
+	if n%10 == 1 && n%100 != 11 {
 		return 0
 	}
-	if n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) {
+	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
 		return 1
 	}
 	return 2
@@ -155,7 +155,7 @@ func pluralFunc10(n int) int {
 	if n == 1 {
 		return 0
 	}
-	if n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) {
+	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
 		return 1
 	}
 	return 2
@@ -166,13 +166,13 @@ func pluralFunc10(n int) int {
 //     Plural-Forms: nplurals=4; plural=n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || n%100==4 ? 2 : 3;
 //
 func pluralFunc11(n int) int {
-	if n % 100 == 1 {
+	if n%100 == 1 {
 		return 0
 	}
-	if n % 100 == 2 {
+	if n%100 == 2 {
 		return 1
 	}
-	if n % 100 == 3 || n % 100 == 4 {
+	if n%100 == 3 || n%100 == 4 {
 		return 2
 	}
 	return 3
