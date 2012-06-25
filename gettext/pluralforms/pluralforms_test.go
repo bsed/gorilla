@@ -21,9 +21,9 @@ func TestParse(t *testing.T) {
 				expected := fn(i)
 				result := fn2(i)
 				if result != expected {
-					t.Errorf("pluralFunc%d: expected %d, got %d during iteration %d.", fNumber, expected, result, i, expr)
+					t.Errorf("pluralFunc%d: expected %d, got %d for n %d.", fNumber, expected, result, i)
 				}
-				t.Logf("pluralFunc%d: expected %d, got %d during iteration %d.", fNumber, expected, result, i)
+				t.Logf("pluralFunc%d: expected %d, got %d for n %d.", fNumber, expected, result, i)
 			}
 		}
 		fNumber++
@@ -47,7 +47,7 @@ func TestParse(t *testing.T) {
 				expected := -1
 				result := fn(i)
 				if result != expected {
-					t.Fatalf("Expected %d, got %d during iteration %d. Expression: %s", expected, result, i, expr)
+					t.Errorf("Expected %d, got %d for n %d. Expression: %s", expected, result, i)
 				}
 			}
 		}

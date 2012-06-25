@@ -137,10 +137,10 @@ func (l *lexer) next() token {
 	for {
 		r := l.nextRune()
 		switch r {
-		case eof:
-			return token{typ: tokenEOF}
 		case ' ':
 			// ignore spaces.
+		case eof:
+			return token{typ: tokenEOF}
 		case 'n':
 			return token{typ: tokenVar}
 		case '*', '/', '%', '+', '-', '?', ':', '(', ')':
