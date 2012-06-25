@@ -13,7 +13,7 @@ import (
 const (
 	eof     = -1
 	numbers = "0123456789"
-	symbols = "*/%+-=!<>|&?:n"
+	symbols = "*/%+-=!<>|&?:"
 )
 
 // tokenType is the type of lex tokens.
@@ -99,7 +99,6 @@ var stringToToken = map[string]tokenType{
 	"!":  tokenNot,
 	"(":  tokenLeftParen,
 	")":  tokenRightParen,
-	"n":  tokenVar,
 }
 
 // ----------------------------------------------------------------------------
@@ -141,11 +140,11 @@ func (l *lexer) next() token {
 		case eof:
 			return token{typ: tokenEOF}
 		case ' ':
-			// just ignore spaces.
-		case '(':
-			return token{typ: tokenLeftParen}
-		case ')':
-			return token{typ: tokenRightParen}
+			// ignore spaces.
+		case 'n':
+			return token{typ: tokenVar}
+		case '*', '/', '%', '+', '-', '?', ':', '(', ')':
+			return token{typ: stringToToken[string(r)]}
 		default:
 			l.backup()
 			if s := l.nextRun(numbers); s != "" {
@@ -157,7 +156,7 @@ func (l *lexer) next() token {
 				}
 			}
 			return token{tokenError,
-				fmt.Sprintf("Invalid character %q", string(r))}
+				fmt.Sprintf("Invalid character %s", string(r))}
 		}
 	}
 	panic("unreachable")

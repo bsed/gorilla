@@ -25,13 +25,25 @@ func Parse(expr string) (PluralFunc, error) {
 	if f, ok := pluralFuncs[expr]; ok {
 		return f, nil
 	}
+	return createPluralFunc(expr)
+}
+
+// createPluralFunc parses a Plural-Forms expression and returns a PluralFunc
+// capable of evaluating it.
+func createPluralFunc(expr string) (PluralFunc, error) {
 	tree, err := parse(expr)
 	if err != nil {
 		return nil, err
 	}
 	return func(n int) int {
-		if idx, ok := tree.Eval(n).(intNode); ok {
-			return int(idx)
+		switch v := tree.Eval(n).(type) {
+		case intNode:
+			return int(v)
+		case boolNode:
+			if v {
+				return 1
+			}
+			return 0
 		}
 		return -1
 	}, nil
