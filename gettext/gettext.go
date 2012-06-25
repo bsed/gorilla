@@ -71,7 +71,7 @@ func (c *Catalog) Gettext(msg string) string {
 // form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 	if plurals, ok := c.tPlurals[msg1]; ok && c.PluralFunc != nil {
-		if idx := c.PluralFunc(n); idx < len(plurals) {
+		if idx := c.PluralFunc(n); idx >= 0 && idx < len(plurals) {
 			return plurals[idx]
 		}
 	}

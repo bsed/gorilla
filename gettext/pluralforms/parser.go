@@ -1,3 +1,7 @@
+// Copyright 2012 The Gorilla Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package pluralforms
 
 import (
@@ -89,6 +93,9 @@ func (p *parser) parseExpression(prec int) (node, error) {
 		n = newBinaryOpNode(t, n, n1)
 	}
 	p.stream.push(t)
+	if prec == 0 && t.typ == tokenIf {
+		return p.parseIf(n)
+	}
 	return n, nil
 }
 
@@ -118,6 +125,31 @@ func (p *parser) parsePrimary() (node, error) {
 		return n, nil
 	}
 	return nil, fmt.Errorf("Unexpected token %q", t)
+}
+
+// parseIf parses and returns a ternary operator node.
+func (p *parser) parseIf(n node) (node, error) {
+	var t token
+	for {
+		t = p.stream.pop()
+		if t.typ != tokenIf {
+			break
+		}
+		n1, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		if err := p.expect(tokenElse); err != nil {
+			return nil, err
+		}
+		n2, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		n = newIfNode(n, n1, n2)
+	}
+	p.stream.push(t)
+	return n, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -227,7 +259,7 @@ func (n *binaryOpNode) UnaryOp(ctx int, op tokenType) node {
 }
 
 func (n *binaryOpNode) String() string {
-	return fmt.Sprintf("<%s%s%s>", n.n1, n.op, n.n2)
+	return fmt.Sprintf("(%s%s%s)", n.n1, n.op, n.n2)
 }
 
 // ----------------------------------------------------------------------------
@@ -250,7 +282,7 @@ func (n *unaryOpNode) UnaryOp(ctx int, op tokenType) node {
 }
 
 func (n *unaryOpNode) String() string {
-	return fmt.Sprintf("<%s%s>", n.op, n.n1)
+	return fmt.Sprintf("(%s%s)", n.op, n.n1)
 }
 
 // ----------------------------------------------------------------------------
@@ -365,9 +397,49 @@ func (n *varNode) BinaryOp(ctx int, op tokenType, n2 node) node {
 }
 
 func (n *varNode) UnaryOp(ctx int, op tokenType) node {
-	return invalidExpression
+	return n.Eval(ctx).UnaryOp(ctx, op)
 }
 
 func (n *varNode) String() string {
 	return "n"
+}
+
+// ----------------------------------------------------------------------------
+
+func newIfNode(cond, n1, n2 node) *ifNode {
+	return &ifNode{
+		cond: cond,
+		n1:   n1,
+		n2:   n2,
+	}
+}
+
+type ifNode struct {
+	cond node
+	n1   node
+	n2   node
+}
+
+func (n *ifNode) Eval(ctx int) node {
+	switch ok := n.cond.Eval(ctx).(type) {
+	case boolNode:
+		if ok {
+			return n.n1.Eval(ctx)
+		} else {
+			return n.n2.Eval(ctx)
+		}
+	}
+	return invalidExpression
+}
+
+func (n *ifNode) BinaryOp(ctx int, op tokenType, n2 node) node {
+	return n.Eval(ctx).BinaryOp(ctx, op, n2)
+}
+
+func (n *ifNode) UnaryOp(ctx int, op tokenType) node {
+	return n.Eval(ctx).UnaryOp(ctx, op)
+}
+
+func (n *ifNode) String() string {
+	return fmt.Sprintf("(%s?%s:%s)", n.cond, n.n1, n.n2)
 }

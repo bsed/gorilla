@@ -4,12 +4,38 @@
 
 package pluralforms
 
+import (
+	"strings"
+)
+
 // PluralFunc is used to select the plural form index.
 type PluralFunc func(int) int
 
 // DefaultPluralFunc is the default plural selector, used for English
 // and others.
 var DefaultPluralFunc = pluralFunc2
+
+// Parse parses a Plural-Forms expression and returns a PluralFunc
+// capable of evaluating it.
+//
+// If the expression is malformed it returns an error. When the function is
+// called, if the evaluation result is not an int, it returns -1.
+func Parse(expr string) (PluralFunc, error) {
+	expr = strings.Replace(expr, " ", "", -1)
+	if f, ok := pluralFuncs[expr]; ok {
+		return f, nil
+	}
+	tree, err := parse(expr)
+	if err != nil {
+		return nil, err
+	}
+	return func(n int) int {
+		if idx, ok := tree.Eval(n).(intNode); ok {
+			return int(idx)
+		}
+		return -1
+	}, nil
+}
 
 // Precomputed plural funcs taken from the gettext manual. We avoid parsing
 // expressions that match one of these forms. See:
