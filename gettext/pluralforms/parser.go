@@ -104,10 +104,10 @@ func (p *parser) parsePrimary() (node, error) {
 	t := p.stream.pop()
 	if isUnaryOp(t) {
 		n, err := p.parseExpression(precedence[t.typ])
-		if err != nil {
-			return nil, err
+		if err == nil {
+			return newUnaryOpNode(t, n), nil
 		}
-		return newUnaryOpNode(t, n), nil
+		return nil, err
 	} else if t.typ == tokenLeftParen {
 		n, err := p.parseExpression(0)
 		if err != nil {
@@ -118,11 +118,7 @@ func (p *parser) parsePrimary() (node, error) {
 		}
 		return n, nil
 	} else if isValue(t) {
-		n, err := newValueNode(t)
-		if err != nil {
-			return nil, err
-		}
-		return n, nil
+		return newValueNode(t)
 	}
 	return nil, fmt.Errorf("Unexpected token %q", t)
 }
