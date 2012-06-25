@@ -33,6 +33,7 @@ type ContextFunc func(string) bool
 func NewCatalog() *Catalog {
 	return &Catalog{
 		PluralFunc: pluralforms.DefaultPluralFunc,
+		info:       make(map[string]string),
 		messages:   make(map[string]string),
 		mPlurals:   make(map[string][]string),
 		tPlurals:   make(map[string][]string),
@@ -42,12 +43,11 @@ func NewCatalog() *Catalog {
 // Catalog stores gettext translations.
 //
 // Inspired by Python's gettext.GNUTranslations.
-//
-// TODO: Gettextf(msg, replacements...) to use with fmt.Sprintf?
 type Catalog struct {
 	Fallback    *Catalog               // used when a translation is not found
 	ContextFunc ContextFunc            // used to select context to load
 	PluralFunc  pluralforms.PluralFunc // used to select the plural form index
+	info        map[string]string      // metadata from file header
 	messages    map[string]string      // original messages
 	mPlurals    map[string][]string    // message plurals
 	tPlurals    map[string][]string    // translation plurals
@@ -92,8 +92,6 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 //     http://www.gnu.org/software/gettext/manual/gettext.html#MO-Files
 //
 // TODO: check if the format version is supported
-//
-// TODO: parse file header; specially Content-Type and Plural-Forms values.
 func (c *Catalog) ReadMO(r Reader) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
@@ -157,7 +155,8 @@ func (c *Catalog) ReadMO(r Reader) error {
 		tTableIdx += 8
 		mStr, tStr := string(m), string(t)
 		if mStr == "" {
-			// TODO: this is the file header. Parse it.
+			// This is the file header. Parse it.
+			c.parseMOHeader(tStr)
 			continue
 		}
 		// Check for context.
@@ -185,4 +184,39 @@ func (c *Catalog) ReadMO(r Reader) error {
 		}
 	}
 	return nil
+}
+
+// parseMOHeader parses the catalog metadata following GNU .mo conventions.
+//
+// Ported from Python's gettext.GNUTranslations.
+func (c *Catalog) parseMOHeader(str string) {
+	var lastk string
+	for _, item := range strings.Split(str, "\n") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if i := strings.Index(item, ":"); i != -1 {
+			k := strings.ToLower(strings.TrimSpace(item[:i]))
+			v := strings.TrimSpace(item[i+1:])
+			c.info[k] = v
+			lastk = k
+			switch k {
+			// TODO: extract charset from content-type?
+			case "plural-forms":
+			L1:
+				for _, part := range strings.Split(v, ";") {
+					kv := strings.SplitN(part, "=", 2)
+					if len(kv) == 2 && strings.TrimSpace(kv[0]) == "plural" {
+						if fn, err := pluralforms.Parse(kv[1]); err == nil {
+							c.PluralFunc = fn
+						}
+						break L1
+					}
+				}
+			}
+		} else if lastk != "" {
+			c.info[lastk] += "\n" + item
+		}
+	}
 }
