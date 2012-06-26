@@ -94,7 +94,7 @@ func (p *parser) parseExpression(prec int) (node, error) {
 	}
 	p.stream.push(t)
 	if prec == 0 && t.typ == tokenIf {
-		return p.parseIf(n)
+		return p.parseTernary(n)
 	}
 	return n, nil
 }
@@ -123,8 +123,8 @@ func (p *parser) parsePrimary() (node, error) {
 	return nil, fmt.Errorf("Unexpected token %q", t)
 }
 
-// parseIf parses and returns a ternary operator node.
-func (p *parser) parseIf(n node) (node, error) {
+// parseTernary parses and returns a ternary operator node.
+func (p *parser) parseTernary(n node) (node, error) {
 	var t token
 	for {
 		t = p.stream.pop()
@@ -324,10 +324,10 @@ type mulNode struct {
 }
 
 func (n *mulNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return x * y
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return x * y
+		}
 	}
 	return invalidExpression
 }
@@ -344,10 +344,10 @@ type divNode struct {
 }
 
 func (n *divNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return x / y
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return x / y
+		}
 	}
 	return invalidExpression
 }
@@ -364,10 +364,10 @@ type modNode struct {
 }
 
 func (n *modNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return x % y
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return x % y
+		}
 	}
 	return invalidExpression
 }
@@ -384,10 +384,10 @@ type addNode struct {
 }
 
 func (n *addNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return x + y
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return x + y
+		}
 	}
 	return invalidExpression
 }
@@ -404,10 +404,10 @@ type subNode struct {
 }
 
 func (n *subNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return x - y
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return x - y
+		}
 	}
 	return invalidExpression
 }
@@ -474,10 +474,10 @@ type gtNode struct {
 }
 
 func (n *gtNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return boolNode(x > y)
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return boolNode(x > y)
+		}
 	}
 	return invalidExpression
 }
@@ -494,10 +494,10 @@ type gteNode struct {
 }
 
 func (n *gteNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return boolNode(x >= y)
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return boolNode(x >= y)
+		}
 	}
 	return invalidExpression
 }
@@ -514,10 +514,10 @@ type ltNode struct {
 }
 
 func (n *ltNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return boolNode(x < y)
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return boolNode(x < y)
+		}
 	}
 	return invalidExpression
 }
@@ -534,10 +534,10 @@ type lteNode struct {
 }
 
 func (n *lteNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(intNode)
-	y, ok2 := n.n2.Eval(ctx).(intNode)
-	if ok1 && ok2 {
-		return boolNode(x <= y)
+	if x, ok := n.n1.Eval(ctx).(intNode); ok {
+		if y, ok := n.n2.Eval(ctx).(intNode); ok {
+			return boolNode(x <= y)
+		}
 	}
 	return invalidExpression
 }
@@ -554,10 +554,10 @@ type orNode struct {
 }
 
 func (n *orNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(boolNode)
-	y, ok2 := n.n2.Eval(ctx).(boolNode)
-	if ok1 && ok2 {
-		return boolNode(x || y)
+	if x, ok := n.n1.Eval(ctx).(boolNode); ok {
+		if y, ok := n.n2.Eval(ctx).(boolNode); ok {
+			return boolNode(x || y)
+		}
 	}
 	return invalidExpression
 }
@@ -574,10 +574,10 @@ type andNode struct {
 }
 
 func (n *andNode) Eval(ctx int) node {
-	x, ok1 := n.n1.Eval(ctx).(boolNode)
-	y, ok2 := n.n2.Eval(ctx).(boolNode)
-	if ok1 && ok2 {
-		return boolNode(x && y)
+	if x, ok := n.n1.Eval(ctx).(boolNode); ok {
+		if y, ok := n.n2.Eval(ctx).(boolNode); ok {
+			return boolNode(x && y)
+		}
 	}
 	return invalidExpression
 }
