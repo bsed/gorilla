@@ -160,9 +160,8 @@ func (c *Catalog) ReadMO(r Reader) error {
 			continue
 		}
 		// Check for context.
-		ctx := ""
 		if cIdx := strings.Index(mStr, "\x04"); cIdx != -1 {
-			ctx = mStr[:cIdx]
+			ctx := mStr[:cIdx]
 			mStr = mStr[cIdx+1:]
 			if c.ContextFunc != nil && !c.ContextFunc(ctx) {
 				// Context is not valid.
