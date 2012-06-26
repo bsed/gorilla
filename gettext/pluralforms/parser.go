@@ -49,33 +49,28 @@ type parser struct {
 
 // expect consumes the next token if it matches the given type, or returns
 // an error.
-func (p *parser) expect(t tokenType) error {
+func (p *parser) expect(t tokenType) {
 	next := p.stream.pop()
-	if next.typ == t {
-		return nil
+	if next.typ != t {
+		panic(fmt.Errorf("Expected token %q, got %q", t, next.typ))
 	}
-	p.stream.push(next)
-	return fmt.Errorf("Expected token %q, got %q", t, next.typ)
 }
 
 // parse consumes the token stream and returns a parse tree.
-func (p *parser) parse() (node, error) {
-	n, err := p.parseExpression(0)
-	if err != nil {
-		return nil, err
-	}
-	if err := p.expect(tokenEOF); err != nil {
-		return nil, err
-	}
-	return n, nil
+func (p *parser) parse() (n node, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	n = p.parseExpression(0)
+	p.expect(tokenEOF)
+	return n, err
 }
 
 // parseExpression parses and returns an expression node.
-func (p *parser) parseExpression(prec int) (node, error) {
-	n, err := p.parsePrimary()
-	if err != nil {
-		return nil, err
-	}
+func (p *parser) parseExpression(prec int) node {
+	n := p.parsePrimary()
 	var t token
 	for {
 		t = p.stream.pop()
@@ -86,66 +81,44 @@ func (p *parser) parseExpression(prec int) (node, error) {
 		if !rightAssociativity[t.typ] {
 			q += 1
 		}
-		n1, err := p.parseExpression(q)
-		if err != nil {
-			return nil, err
-		}
-		n = newBinaryOpNode(t, n, n1)
+		n = newBinaryOpNode(t, n, p.parseExpression(q))
 	}
 	p.stream.push(t)
 	if prec == 0 && t.typ == tokenIf {
 		return p.parseTernary(n)
 	}
-	return n, nil
+	return n
 }
 
 // parsePrimary parses and returns a primary node.
-func (p *parser) parsePrimary() (node, error) {
+func (p *parser) parsePrimary() node {
 	t := p.stream.pop()
 	if isUnaryOp(t) {
-		n, err := p.parseExpression(precedence[t.typ])
-		if err == nil {
-			return newUnaryOpNode(t, n), nil
-		}
-		return nil, err
+		return newUnaryOpNode(t, p.parseExpression(precedence[t.typ]))
 	} else if t.typ == tokenLeftParen {
-		n, err := p.parseExpression(0)
-		if err != nil {
-			return nil, err
-		}
-		if err := p.expect(tokenRightParen); err != nil {
-			return nil, err
-		}
-		return n, nil
+		n := p.parseExpression(0)
+		p.expect(tokenRightParen)
+		return n
 	} else if isValue(t) {
-		return newValueNode(t), nil
+		return newValueNode(t)
 	}
-	return nil, fmt.Errorf("Unexpected token %q", t)
+	panic(fmt.Errorf("Unexpected token %q", t))
 }
 
 // parseTernary parses and returns a ternary operator node.
-func (p *parser) parseTernary(n node) (node, error) {
+func (p *parser) parseTernary(n node) node {
 	var t token
 	for {
-		t = p.stream.pop()
-		if t.typ != tokenIf {
+		if t = p.stream.pop(); t.typ != tokenIf {
 			break
 		}
-		n1, err := p.parseExpression(0)
-		if err != nil {
-			return nil, err
-		}
-		if err := p.expect(tokenElse); err != nil {
-			return nil, err
-		}
-		n2, err := p.parseExpression(0)
-		if err != nil {
-			return nil, err
-		}
+		n1 := p.parseExpression(0)
+		p.expect(tokenElse)
+		n2 := p.parseExpression(0)
 		n = &ifNode{n, n1, n2}
 	}
 	p.stream.push(t)
-	return n, nil
+	return n
 }
 
 // ----------------------------------------------------------------------------
