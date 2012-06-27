@@ -38,11 +38,10 @@ type ContextFunc func(string) bool
 func NewCatalog() *Catalog {
 	return &Catalog{
 		PluralFunc: pluralforms.DefaultPluralFunc,
-		info:       make(map[string]string),
-		messages:   make(map[string]string),
-		mPlurals:   make(map[string][]string),
-		tPlurals:   make(map[string][]string),
-		tOrders:    make(map[string][][]int),
+		Info:       make(map[string]string),
+		src:        make(map[string][]string),
+		dst:        make(map[string][]string),
+		pos:        make(map[string][][]int),
 	}
 }
 
@@ -51,17 +50,16 @@ type Catalog struct {
 	Fallback    *Catalog               // used when a translation is not found
 	ContextFunc ContextFunc            // used to select context to load
 	PluralFunc  pluralforms.PluralFunc // used to select the plural form index
-	info        map[string]string      // metadata from file header
-	messages    map[string]string      // original messages
-	mPlurals    map[string][]string    // message plurals
-	tPlurals    map[string][]string    // translation plurals
-	tOrders     map[string][][]int     // translation expansion orders
+	Info        map[string]string      // metadata from file header
+	src         map[string][]string    // original messages
+	dst         map[string][]string    // translation messages
+	pos         map[string][][]int     // translation expansion orders
 }
 
 // Gettext returns a translation for the given message.
 func (c *Catalog) Gettext(msg string) string {
-	if trans, ok := c.messages[msg]; ok {
-		return trans
+	if dst, ok := c.dst[msg]; ok {
+		return dst[0]
 	}
 	if c.Fallback != nil {
 		return c.Fallback.Gettext(msg)
@@ -72,8 +70,8 @@ func (c *Catalog) Gettext(msg string) string {
 // Gettextf returns a translation for the given message,
 // formatted using fmt.Sprintf().
 func (c *Catalog) Gettextf(msg string, a ...interface{}) string {
-	if trans, ok := c.messages[msg]; ok {
-		return sprintf(trans, c.tOrders[msg][0], a...)
+	if dst, ok := c.dst[msg]; ok {
+		return sprintf(dst[0], c.pos[msg][0], a...)
 	} else if c.Fallback != nil {
 		return c.Fallback.Gettextf(msg, a...)
 	}
@@ -86,9 +84,9 @@ func (c *Catalog) Gettextf(msg string, a ...interface{}) string {
 // msg1 is used to lookup for a translation, and msg2 is used as the plural
 // form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
-	if plurals, ok := c.tPlurals[msg1]; ok && c.PluralFunc != nil {
-		if idx := c.PluralFunc(n); idx >= 0 && idx < len(plurals) {
-			return plurals[idx]
+	if dst, ok := c.dst[msg1]; ok && c.PluralFunc != nil {
+		if idx := c.PluralFunc(n); idx >= 0 && idx < len(dst) {
+			return dst[idx]
 		}
 	}
 	if c.Fallback != nil {
@@ -103,9 +101,9 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 // Ngettextf returns a plural translation for the given message,
 // formatted using fmt.Sprintf().
 func (c *Catalog) Ngettextf(msg1, msg2 string, n int, a ...interface{}) string {
-	if plurals, ok := c.tPlurals[msg1]; ok && c.PluralFunc != nil {
-		if idx := c.PluralFunc(n); idx >= 0 && idx < len(plurals) {
-			return sprintf(plurals[idx], c.tOrders[msg1][idx], a...)
+	if dst, ok := c.dst[msg1]; ok && c.PluralFunc != nil {
+		if idx := c.PluralFunc(n); idx >= 0 && idx < len(dst) {
+			return sprintf(dst[idx], c.pos[msg1][idx], a...)
 		}
 	}
 	if c.Fallback != nil {
@@ -213,25 +211,17 @@ func (c *Catalog) ReadMO(r Reader) error {
 				continue
 			}
 		}
-		// Check for plurals.
-		if pIdx := strings.Index(mStr, "\x00"); pIdx != -1 {
-			// Store only the first original string and translation in the
-			// messages map, and all versions in the two other maps.
-			mPlurals := strings.Split(mStr, "\x00")
-			tPlurals := strings.Split(tStr, "\x00")
-			mStr = mPlurals[0]
-			c.messages[mStr] = tPlurals[0]
-			c.mPlurals[mStr] = mPlurals
-			for _, tPlural := range tPlurals {
-				format, orders := parseFmt(tPlural)
-				c.tPlurals[mStr] = append(c.tPlurals[mStr], format)
-				c.tOrders[mStr] = append(c.tOrders[mStr], orders)
-			}
-		} else {
-			format, orders := parseFmt(tStr)
-			c.messages[mStr] = format
-			c.tOrders[mStr] = append(c.tOrders[mStr], orders)
+		// Store messages, plurals and orderings.
+		src := strings.Split(mStr, "\x00")
+		dst := strings.Split(tStr, "\x00")
+		pos := make([][]int, len(dst))
+		for k, v := range dst {
+			dst[k], pos[k] = parseFmt(v)
 		}
+		key := src[0]
+		c.src[key] = src
+		c.dst[key] = dst
+		c.pos[key] = pos
 	}
 	return nil
 }
@@ -249,7 +239,7 @@ func (c *Catalog) readMOHeader(str string) {
 		if i := strings.Index(item, ":"); i != -1 {
 			k := strings.ToLower(strings.TrimSpace(item[:i]))
 			v := strings.TrimSpace(item[i+1:])
-			c.info[k] = v
+			c.Info[k] = v
 			lastk = k
 			switch k {
 			// TODO: extract charset from content-type?
@@ -266,7 +256,7 @@ func (c *Catalog) readMOHeader(str string) {
 				}
 			}
 		} else if lastk != "" {
-			c.info[lastk] += "\n" + item
+			c.Info[lastk] += "\n" + item
 		}
 	}
 }
@@ -292,7 +282,7 @@ func parseFmt(format string) (string, []int) {
 			// Ignore escaped sequence.
 			buf.WriteString(format[i:i2])
 		} else {
-			buf.WriteString(format[i:i1+1])
+			buf.WriteString(format[i : i1+1])
 			pos, _ := strconv.ParseInt(format[i1+1:i2-1], 10, 0)
 			idx = append(idx, int(pos)-1)
 		}

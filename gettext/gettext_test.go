@@ -38,7 +38,7 @@ func decode(value []byte) ([]byte, error) {
 	return decoded[:b], nil
 }
 
-func TestGettext(t *testing.T) {
+func TestCatalog(t *testing.T) {
 	b, err := decode([]byte(gnuMoData))
 	if err != nil {
 		t.Fatal(err)
