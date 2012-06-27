@@ -5,11 +5,16 @@
 package gettext
 
 import (
-	"code.google.com/p/gorilla/gettext/pluralforms"
+	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
+
+	"code.google.com/p/gorilla/gettext/pluralforms"
 )
 
 const (
@@ -37,12 +42,11 @@ func NewCatalog() *Catalog {
 		messages:   make(map[string]string),
 		mPlurals:   make(map[string][]string),
 		tPlurals:   make(map[string][]string),
+		tOrders:    make(map[string][][]int),
 	}
 }
 
 // Catalog stores gettext translations.
-//
-// Inspired by Python's gettext.GNUTranslations.
 type Catalog struct {
 	Fallback    *Catalog               // used when a translation is not found
 	ContextFunc ContextFunc            // used to select context to load
@@ -51,6 +55,7 @@ type Catalog struct {
 	messages    map[string]string      // original messages
 	mPlurals    map[string][]string    // message plurals
 	tPlurals    map[string][]string    // translation plurals
+	tOrders     map[string][][]int     // translation expansion orders
 }
 
 // Gettext returns a translation for the given message.
@@ -62,6 +67,17 @@ func (c *Catalog) Gettext(msg string) string {
 		return c.Fallback.Gettext(msg)
 	}
 	return msg
+}
+
+// Gettextf returns a translation for the given message,
+// formatted using fmt.Sprintf().
+func (c *Catalog) Gettextf(msg string, a ...interface{}) string {
+	if trans, ok := c.messages[msg]; ok {
+		return sprintf(trans, c.tOrders[msg][0], a...)
+	} else if c.Fallback != nil {
+		return c.Fallback.Gettextf(msg, a...)
+	}
+	return fmt.Sprintf(msg, a...)
 }
 
 // Ngettext returns a plural translation for a message according to the
@@ -84,6 +100,23 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 	return msg2
 }
 
+// Ngettextf returns a plural translation for the given message,
+// formatted using fmt.Sprintf().
+func (c *Catalog) Ngettextf(msg1, msg2 string, n int, a ...interface{}) string {
+	if plurals, ok := c.tPlurals[msg1]; ok && c.PluralFunc != nil {
+		if idx := c.PluralFunc(n); idx >= 0 && idx < len(plurals) {
+			return sprintf(plurals[idx], c.tOrders[msg1][idx], a...)
+		}
+	}
+	if c.Fallback != nil {
+		return c.Fallback.Ngettextf(msg1, msg2, n, a...)
+	}
+	if n == 1 {
+		return fmt.Sprintf(msg1, a...)
+	}
+	return fmt.Sprintf(msg2, a...)
+}
+
 // ReadMO reads a GNU MO file and writes its messages and translations
 // to the catalog.
 //
@@ -91,7 +124,19 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 //
 //     http://www.gnu.org/software/gettext/manual/gettext.html#MO-Files
 //
+// Inspired by Python's gettext.GNUTranslations.
+//
 // TODO: check if the format version is supported
+//
+// MO format revisions (to be confirmed):
+// Major revision is 0 or 1. Minor revision is also 0 or 1.
+//
+// - Major revision 1: supports "I" flag for outdigits in string replacements,
+//   e.g., translating "%d" to "%Id". The result is that ASCII digits are
+//   replaced with the "outdigits" defined in the LC_CTYPE locale category.
+//
+// - Minor revision 1: supports reordering ability for string replacements,
+//   e.g., using "%2$d" to indicate the position of the replacement.
 func (c *Catalog) ReadMO(r Reader) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
@@ -156,7 +201,7 @@ func (c *Catalog) ReadMO(r Reader) error {
 		mStr, tStr := string(m), string(t)
 		if mStr == "" {
 			// This is the file header. Parse it.
-			c.parseMOHeader(tStr)
+			c.readMOHeader(tStr)
 			continue
 		}
 		// Check for context.
@@ -177,18 +222,24 @@ func (c *Catalog) ReadMO(r Reader) error {
 			mStr = mPlurals[0]
 			c.messages[mStr] = tPlurals[0]
 			c.mPlurals[mStr] = mPlurals
-			c.tPlurals[mStr] = tPlurals
+			for _, tPlural := range tPlurals {
+				format, orders := parseFmt(tPlural)
+				c.tPlurals[mStr] = append(c.tPlurals[mStr], format)
+				c.tOrders[mStr] = append(c.tOrders[mStr], orders)
+			}
 		} else {
-			c.messages[mStr] = tStr
+			format, orders := parseFmt(tStr)
+			c.messages[mStr] = format
+			c.tOrders[mStr] = append(c.tOrders[mStr], orders)
 		}
 	}
 	return nil
 }
 
-// parseMOHeader parses the catalog metadata following GNU .mo conventions.
+// readMOHeader parses the catalog metadata following GNU .mo conventions.
 //
 // Ported from Python's gettext.GNUTranslations.
-func (c *Catalog) parseMOHeader(str string) {
+func (c *Catalog) readMOHeader(str string) {
 	var lastk string
 	for _, item := range strings.Split(str, "\n") {
 		item = strings.TrimSpace(item)
@@ -218,4 +269,52 @@ func (c *Catalog) parseMOHeader(str string) {
 			c.info[lastk] += "\n" + item
 		}
 	}
+}
+
+// ----------------------------------------------------------------------------
+
+var fmtRegexp = regexp.MustCompile(`%\d+\$`)
+
+// parseFmt converts a string that relies on reordering ability to a standard
+// format, e.g., the string "%2$d bytes on %1$s." becomes "%d bytes on %s.".
+// The returned indices are used to format the string using sprintf().
+func parseFmt(format string) (string, []int) {
+	matches := fmtRegexp.FindAllStringIndex(format, -1)
+	if len(matches) == 0 {
+		return format, nil
+	}
+	buf := new(bytes.Buffer)
+	idx := make([]int, 0)
+	var i int
+	for _, v := range matches {
+		i1, i2 := v[0], v[1]
+		if i1 > 0 && format[i1-1] == '%' {
+			// Ignore escaped sequence.
+			buf.WriteString(format[i:i2])
+		} else {
+			buf.WriteString(format[i:i1+1])
+			pos, _ := strconv.ParseInt(format[i1+1:i2-1], 10, 0)
+			idx = append(idx, int(pos)-1)
+		}
+		i = i2
+	}
+	buf.WriteString(format[i:])
+	return buf.String(), idx
+}
+
+// sprintf applies fmt.Sprintf() on a string that relies on reordering
+// ability, e.g., for the string "%2$d bytes free on %1$s.", the order of
+// arguments must be inverted.
+func sprintf(format string, order []int, a ...interface{}) string {
+	if len(order) == 0 {
+		return fmt.Sprintf(format, a...)
+	}
+	b := make([]interface{}, len(order))
+	l := len(a)
+	for k, v := range order {
+		if v < l {
+			b[k] = a[v]
+		}
+	}
+	return fmt.Sprintf(format, b...)
 }
