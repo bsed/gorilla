@@ -52,7 +52,7 @@ type parser struct {
 func (p *parser) expect(t tokenType) {
 	next := p.stream.pop()
 	if next.typ != t {
-		panic(fmt.Errorf("Expected token %q, got %q", t, next.typ))
+		panic(fmt.Sprintf("Expected token %q, got %q", t, next.typ))
 	}
 }
 
@@ -60,7 +60,7 @@ func (p *parser) expect(t tokenType) {
 func (p *parser) parse() (n node, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = r.(error)
+			err = fmt.Errorf("%v", r)
 		}
 	}()
 	n = p.parseExpression(0)
@@ -102,7 +102,7 @@ func (p *parser) parsePrimary() node {
 	} else if isValue(t) {
 		return newValueNode(t)
 	}
-	panic(fmt.Errorf("Unexpected token %q", t))
+	panic(fmt.Sprintf("Unexpected token %q", t))
 }
 
 // parseTernary parses and returns a ternary operator node.
