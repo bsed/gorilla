@@ -10,9 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"code.google.com/p/gorilla/gettext/pluralforms"
 )
@@ -41,7 +41,7 @@ func NewCatalog() *Catalog {
 		Info:       make(map[string]string),
 		src:        make(map[string][]string),
 		dst:        make(map[string][]string),
-		pos:        make(map[string][][]int),
+		ord:        make(map[string][][]int),
 	}
 }
 
@@ -53,7 +53,7 @@ type Catalog struct {
 	Info        map[string]string      // metadata from file header
 	src         map[string][]string    // original messages
 	dst         map[string][]string    // translation messages
-	pos         map[string][][]int     // translation expansion orders
+	ord         map[string][][]int     // translation expansion orders
 }
 
 // Gettext returns a translation for the given message.
@@ -71,7 +71,7 @@ func (c *Catalog) Gettext(msg string) string {
 // formatted using fmt.Sprintf().
 func (c *Catalog) Gettextf(msg string, a ...interface{}) string {
 	if dst, ok := c.dst[msg]; ok {
-		return sprintf(dst[0], c.pos[msg][0], a...)
+		return sprintf(dst[0], c.ord[msg][0], a...)
 	} else if c.Fallback != nil {
 		return c.Fallback.Gettextf(msg, a...)
 	}
@@ -103,7 +103,7 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 func (c *Catalog) Ngettextf(msg1, msg2 string, n int, a ...interface{}) string {
 	if dst, ok := c.dst[msg1]; ok && c.PluralFunc != nil {
 		if idx := c.PluralFunc(n); idx >= 0 && idx < len(dst) {
-			return sprintf(dst[idx], c.pos[msg1][idx], a...)
+			return sprintf(dst[idx], c.ord[msg1][idx], a...)
 		}
 	}
 	if c.Fallback != nil {
@@ -123,18 +123,6 @@ func (c *Catalog) Ngettextf(msg1, msg2 string, n int, a ...interface{}) string {
 //     http://www.gnu.org/software/gettext/manual/gettext.html#MO-Files
 //
 // Inspired by Python's gettext.GNUTranslations.
-//
-// TODO: check if the format version is supported
-//
-// MO format revisions (to be confirmed):
-// Major revision is 0 or 1. Minor revision is also 0 or 1.
-//
-// - Major revision 1: supports "I" flag for outdigits in string replacements,
-//   e.g., translating "%d" to "%Id". The result is that ASCII digits are
-//   replaced with the "outdigits" defined in the LC_CTYPE locale category.
-//
-// - Minor revision 1: supports reordering ability for string replacements,
-//   e.g., using "%2$d" to indicate the position of the replacement.
 func (c *Catalog) ReadMO(r Reader) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
@@ -149,20 +137,32 @@ func (c *Catalog) ReadMO(r Reader) error {
 	} else {
 		return errors.New("Unable to identify the file byte order")
 	}
-	// Next six words:
-	// - major+minor format version numbers (ignored)
+	// Next two words:
+	// - major format version number
+	// - minor format version number
+	v := make([]uint16, 2)
+	for i, _ := range v {
+		if err := binary.Read(r, order, &v[i]); err != nil {
+			return err
+		}
+	}
+	if v[0] > 1 || v[1] > 1 {
+		return fmt.Errorf("Major and minor MO revision numbers must be " +
+			"0 or 1, got %d and %d", v[0], v[1])
+	}
+	// Next five words:
 	// - number of messages
 	// - index of messages table
 	// - index of translations table
 	// - size of hashing table (ignored)
 	// - offset of hashing table (ignored)
-	w := make([]uint32, 6)
+	w := make([]uint32, 5)
 	for i, _ := range w {
 		if err := binary.Read(r, order, &w[i]); err != nil {
 			return err
 		}
 	}
-	count, mTableIdx, tTableIdx := w[1], w[2], w[3]
+	count, mTableIdx, tTableIdx := w[0], w[1], w[2]
 	// Build a translations table of strings and translations.
 	// Plurals are stored separately with the first message as key.
 	var mLen, mIdx, tLen, tIdx uint32
@@ -214,14 +214,14 @@ func (c *Catalog) ReadMO(r Reader) error {
 		// Store messages, plurals and orderings.
 		src := strings.Split(mStr, "\x00")
 		dst := strings.Split(tStr, "\x00")
-		pos := make([][]int, len(dst))
-		for k, v := range dst {
-			dst[k], pos[k] = parseFmt(v)
-		}
+		ord := make([][]int, len(dst))
 		key := src[0]
+		for k, v := range dst {
+			dst[k], ord[k] = parseFmt(v, key)
+		}
 		c.src[key] = src
 		c.dst[key] = dst
-		c.pos[key] = pos
+		c.ord[key] = ord
 	}
 	return nil
 }
@@ -263,32 +263,48 @@ func (c *Catalog) readMOHeader(str string) {
 
 // ----------------------------------------------------------------------------
 
-var fmtRegexp = regexp.MustCompile(`%\d+\$`)
-
 // parseFmt converts a string that relies on reordering ability to a standard
 // format, e.g., the string "%2$d bytes on %1$s." becomes "%d bytes on %s.".
-// The returned indices are used to format the string using sprintf().
-func parseFmt(format string) (string, []int) {
-	matches := fmtRegexp.FindAllStringIndex(format, -1)
-	if len(matches) == 0 {
-		return format, nil
-	}
+// The returned indices are used to format the resulting string using
+// sprintf().
+func parseFmt(dst, src string) (string, []int) {
+	var idx []int
+	end := len(dst)
 	buf := new(bytes.Buffer)
-	idx := make([]int, 0)
-	var i int
-	for _, v := range matches {
-		i1, i2 := v[0], v[1]
-		if i1 > 0 && format[i1-1] == '%' {
-			// Ignore escaped sequence.
-			buf.WriteString(format[i:i2])
-		} else {
-			buf.WriteString(format[i : i1+1])
-			pos, _ := strconv.ParseInt(format[i1+1:i2-1], 10, 0)
-			idx = append(idx, int(pos)-1)
+	for i := 0; i < end; {
+		lasti := i
+		for i < end && dst[i] != '%' {
+			i++
 		}
-		i = i2
+		if i > lasti {
+			buf.WriteString(dst[lasti:i])
+		}
+		if i >= end {
+			break
+		}
+		i++
+		if i < end && dst[i] == '%' {
+			// escaped percent
+			buf.WriteString("%%")
+			i++
+		} else {
+			buf.WriteByte('%')
+			lasti = i
+			for i < end && unicode.IsDigit(rune(dst[i])) {
+				i++
+			}
+			if i > lasti {
+				if i < end && dst[i] == '$' {
+					// extract number, skip dollar sign
+					pos, _ := strconv.ParseInt(dst[lasti:i], 10, 0)
+					idx = append(idx, int(pos))
+					i++
+				} else {
+					buf.WriteString(dst[lasti:i])
+				}
+			}
+		}
 	}
-	buf.WriteString(format[i:])
 	return buf.String(), idx
 }
 
