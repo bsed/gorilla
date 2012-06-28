@@ -18,16 +18,23 @@ import (
 )
 
 const (
-	magicBigEndian    = 0xde120495
-	magicLittleEndian = 0x950412de
+	magicBigEndian    uint32 = 0xde120495
+	magicLittleEndian uint32 = 0x950412de
 )
 
-// Reader wraps the interfaces used to read compiled catalogs.
+// Reader wraps the interfaces used to read MO and PO files.
 //
 // Typically catalogs are provided as os.File.
 type Reader interface {
 	io.Reader
 	io.ReaderAt
+	io.Seeker
+}
+
+// Writer wraps the interfaces used to write MO and PO files.
+type Writer interface {
+	io.Writer
+	io.WriterAt
 	io.Seeker
 }
 
@@ -39,8 +46,8 @@ func NewCatalog() *Catalog {
 	return &Catalog{
 		PluralFunc: pluralforms.DefaultPluralFunc,
 		Info:       make(map[string]string),
-		src:        make(map[string][]string),
-		dst:        make(map[string][]string),
+		msg:        make(map[string][]string),
+		trn:        make(map[string][]string),
 		ord:        make(map[string][][]int),
 	}
 }
@@ -51,15 +58,17 @@ type Catalog struct {
 	ContextFunc ContextFunc            // used to select context to load
 	PluralFunc  pluralforms.PluralFunc // used to select the plural form index
 	Info        map[string]string      // metadata from file header
-	src         map[string][]string    // original messages
-	dst         map[string][]string    // translation messages
-	ord         map[string][][]int     // translation expansion orders
+	msg         map[string][]string    // messages
+	trn         map[string][]string    // translations
+	ord         map[string][][]int     // translation expansion ordering
+	msgOrig     [][]byte               // original messages, unprocessed
+	trnOrig     [][]byte               // original translations, unprocessed
 }
 
 // Gettext returns a translation for the given message.
 func (c *Catalog) Gettext(msg string) string {
-	if dst, ok := c.dst[msg]; ok {
-		return dst[0]
+	if trn, ok := c.trn[msg]; ok {
+		return trn[0]
 	}
 	if c.Fallback != nil {
 		return c.Fallback.Gettext(msg)
@@ -70,8 +79,8 @@ func (c *Catalog) Gettext(msg string) string {
 // Gettextf returns a translation for the given message,
 // formatted using fmt.Sprintf().
 func (c *Catalog) Gettextf(msg string, a ...interface{}) string {
-	if dst, ok := c.dst[msg]; ok {
-		return sprintf(dst[0], c.ord[msg][0], a...)
+	if trn, ok := c.trn[msg]; ok {
+		return sprintf(trn[0], c.ord[msg][0], a...)
 	} else if c.Fallback != nil {
 		return c.Fallback.Gettextf(msg, a...)
 	}
@@ -84,9 +93,9 @@ func (c *Catalog) Gettextf(msg string, a ...interface{}) string {
 // msg1 is used to lookup for a translation, and msg2 is used as the plural
 // form fallback if a translation is not found.
 func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
-	if dst, ok := c.dst[msg1]; ok && c.PluralFunc != nil {
-		if idx := c.PluralFunc(n); idx >= 0 && idx < len(dst) {
-			return dst[idx]
+	if trn, ok := c.trn[msg1]; ok && c.PluralFunc != nil {
+		if idx := c.PluralFunc(n); idx >= 0 && idx < len(trn) {
+			return trn[idx]
 		}
 	}
 	if c.Fallback != nil {
@@ -101,9 +110,9 @@ func (c *Catalog) Ngettext(msg1, msg2 string, n int) string {
 // Ngettextf returns a plural translation for the given message,
 // formatted using fmt.Sprintf().
 func (c *Catalog) Ngettextf(msg1, msg2 string, n int, a ...interface{}) string {
-	if dst, ok := c.dst[msg1]; ok && c.PluralFunc != nil {
-		if idx := c.PluralFunc(n); idx >= 0 && idx < len(dst) {
-			return sprintf(dst[idx], c.ord[msg1][idx], a...)
+	if trn, ok := c.trn[msg1]; ok && c.PluralFunc != nil {
+		if idx := c.PluralFunc(n); idx >= 0 && idx < len(trn) {
+			return sprintf(trn[idx], c.ord[msg1][idx], a...)
 		}
 	}
 	if c.Fallback != nil {
@@ -114,6 +123,8 @@ func (c *Catalog) Ngettextf(msg1, msg2 string, n int, a ...interface{}) string {
 	}
 	return fmt.Sprintf(msg2, a...)
 }
+
+// MO -------------------------------------------------------------------------
 
 // ReadMO reads a GNU MO file and writes its messages and translations
 // to the catalog.
@@ -138,8 +149,8 @@ func (c *Catalog) ReadMO(r Reader) error {
 		return errors.New("Unable to identify the file byte order")
 	}
 	// Next two words:
-	// - major format version number
-	// - minor format version number
+	// - major format revision number
+	// - minor format revision number
 	v := make([]uint16, 2)
 	for i, _ := range v {
 		if err := binary.Read(r, order, &v[i]); err != nil {
@@ -147,7 +158,7 @@ func (c *Catalog) ReadMO(r Reader) error {
 		}
 	}
 	if v[0] > 1 || v[1] > 1 {
-		return fmt.Errorf("Major and minor MO revision numbers must be " +
+		return fmt.Errorf("Major and minor MO revision numbers must be "+
 			"0 or 1, got %d and %d", v[0], v[1])
 	}
 	// Next five words:
@@ -166,8 +177,10 @@ func (c *Catalog) ReadMO(r Reader) error {
 	// Build a translations table of strings and translations.
 	// Plurals are stored separately with the first message as key.
 	var mLen, mIdx, tLen, tIdx uint32
+	c.msgOrig = make([][]byte, int(count))
+	c.trnOrig = make([][]byte, int(count))
 	for i := 0; i < int(count); i++ {
-		// Get original message length and position.
+		// Get message length and position.
 		r.Seek(int64(mTableIdx), 0)
 		if err := binary.Read(r, order, &mLen); err != nil {
 			return err
@@ -175,7 +188,7 @@ func (c *Catalog) ReadMO(r Reader) error {
 		if err := binary.Read(r, order, &mIdx); err != nil {
 			return err
 		}
-		// Get original message.
+		// Get message.
 		m := make([]byte, mLen)
 		if _, err := r.ReadAt(m, int64(mIdx)); err != nil {
 			return err
@@ -193,9 +206,10 @@ func (c *Catalog) ReadMO(r Reader) error {
 		if _, err := r.ReadAt(t, int64(tIdx)); err != nil {
 			return err
 		}
-		// Move cursor to next string.
+		// Move cursor to next message.
 		mTableIdx += 8
 		tTableIdx += 8
+		c.msgOrig[i], c.trnOrig[i] = m, t
 		mStr, tStr := string(m), string(t)
 		if mStr == "" {
 			// This is the file header. Parse it.
@@ -212,15 +226,15 @@ func (c *Catalog) ReadMO(r Reader) error {
 			}
 		}
 		// Store messages, plurals and orderings.
-		src := strings.Split(mStr, "\x00")
-		dst := strings.Split(tStr, "\x00")
-		ord := make([][]int, len(dst))
-		key := src[0]
-		for k, v := range dst {
-			dst[k], ord[k] = parseFmt(v, key)
+		msg := strings.Split(mStr, "\x00")
+		trn := strings.Split(tStr, "\x00")
+		ord := make([][]int, len(trn))
+		key := msg[0]
+		for k, v := range trn {
+			trn[k], ord[k] = parseFmt(v, key)
 		}
-		c.src[key] = src
-		c.dst[key] = dst
+		c.msg[key] = msg
+		c.trn[key] = trn
 		c.ord[key] = ord
 	}
 	return nil
@@ -261,46 +275,112 @@ func (c *Catalog) readMOHeader(str string) {
 	}
 }
 
+// WriteMO writes a compiled catalog to the given writer.
+func (c *Catalog) WriteMO(w Writer) error {
+	order := binary.LittleEndian
+	// Calculate and store initial values.
+	count := len(c.msgOrig)
+	mTableIdx := 28
+	tTableIdx := mTableIdx + ((count - 1) * 8) + 8
+	hIdx := tTableIdx + ((count - 1) * 8) + 8
+	idx := []interface{}{
+		magicLittleEndian, // byte 0:  magic number
+		uint16(1),         // byte 4:  major revision number
+		uint16(1),         // byte 6:  minor revision number
+		uint32(count),     // byte 8:  number of messages
+		uint32(mTableIdx), // byte 12: index of messages table (M0)
+		uint32(tTableIdx), // byte 16: index of translations table (T0)
+		uint32(0),         // byte 20: size of hashing table (HS)
+		uint32(0),         // byte 24: offset of hashing table (H0)
+	}
+	for _, v := range idx {
+		if err := binary.Write(w, order, v); err != nil {
+			return err
+		}
+	}
+	// Write messages.
+	mIdx := uint32(hIdx)
+	for _, msg := range c.msgOrig {
+		mLen := uint32(len(msg))
+		// Write message length and position.
+		w.Seek(int64(mTableIdx), 0)
+		if err := binary.Write(w, order, mLen); err != nil {
+			return err
+		}
+		if err := binary.Write(w, order, mIdx); err != nil {
+			return err
+		}
+		// Write message, terminating with a NUL byte.
+		if _, err := w.WriteAt(append(msg, '\x00'), int64(mIdx)); err != nil {
+			return err
+		}
+		// Move cursor to next message.
+		mTableIdx += 8
+		mIdx += mLen + 1
+	}
+	// Write translations.
+	tIdx := uint32(mIdx)
+	for _, trn := range c.trnOrig {
+		tLen := uint32(len(trn))
+		// Write translation length and position.
+		w.Seek(int64(tTableIdx), 0)
+		if err := binary.Write(w, order, tLen); err != nil {
+			return err
+		}
+		if err := binary.Write(w, order, tIdx); err != nil {
+			return err
+		}
+		// Write translation, terminating with a NUL byte.
+		if _, err := w.WriteAt(append(trn, '\x00'), int64(tIdx)); err != nil {
+			return err
+		}
+		// Move cursor to next translation.
+		tTableIdx += 8
+		tIdx += tLen + 1
+	}
+	return nil
+}
+
 // ----------------------------------------------------------------------------
 
 // parseFmt converts a string that relies on reordering ability to a standard
 // format, e.g., the string "%2$d bytes on %1$s." becomes "%d bytes on %s.".
 // The returned indices are used to format the resulting string using
 // sprintf().
-func parseFmt(dst, src string) (string, []int) {
+func parseFmt(trn, msg string) (string, []int) {
 	var idx []int
-	end := len(dst)
+	end := len(trn)
 	buf := new(bytes.Buffer)
 	for i := 0; i < end; {
 		lasti := i
-		for i < end && dst[i] != '%' {
+		for i < end && trn[i] != '%' {
 			i++
 		}
 		if i > lasti {
-			buf.WriteString(dst[lasti:i])
+			buf.WriteString(trn[lasti:i])
 		}
 		if i >= end {
 			break
 		}
 		i++
-		if i < end && dst[i] == '%' {
+		if i < end && trn[i] == '%' {
 			// escaped percent
 			buf.WriteString("%%")
 			i++
 		} else {
 			buf.WriteByte('%')
 			lasti = i
-			for i < end && unicode.IsDigit(rune(dst[i])) {
+			for i < end && unicode.IsDigit(rune(trn[i])) {
 				i++
 			}
 			if i > lasti {
-				if i < end && dst[i] == '$' {
+				if i < end && trn[i] == '$' {
 					// extract number, skip dollar sign
-					pos, _ := strconv.ParseInt(dst[lasti:i], 10, 0)
+					pos, _ := strconv.ParseInt(trn[lasti:i], 10, 0)
 					idx = append(idx, int(pos))
 					i++
 				} else {
-					buf.WriteString(dst[lasti:i])
+					buf.WriteString(trn[lasti:i])
 				}
 			}
 		}
