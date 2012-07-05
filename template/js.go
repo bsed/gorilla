@@ -13,17 +13,21 @@ var builtins = map[string]interface{}{
 }
 
 // ToJs compiles a text/template to JavaScript. Bwahahaha.
+//
+// TODO: interface for registering functions: all Go funcs need a JavaScript
+// counterpart.
 func ToJs(name, template, namespace string) (js string, err error) {
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
+		//if r := recover(); r != nil {
+		//	err = fmt.Errorf("%v", r)
+		//}
 	}()
 	treeSet, err := parse.Parse(name, template, "{{", "}}", builtins)
 	if err != nil {
 		return "", err
 	}
-	return new(jsCompiler).compile(treeSet, namespace), nil
+	c := &jsCompiler{escape: true}
+	return c.compile(treeSet, namespace), nil
 }
 
 // ----------------------------------------------------------------------------
@@ -33,64 +37,12 @@ func ToJs(name, template, namespace string) (js string, err error) {
 // Adapted from com.google.template.soy.jssrc.internal.JsCodeBuilder,
 // from the Closure Templates library. Copyright 2008 Google Inc.
 type jsCompiler struct {
-	b                *bytes.Buffer
-	indent           string
-	outputVars       []string
-	outputVarsInited []bool
-	delayed          []string
-}
-
-// outputVar returns the current output variable name.
-func (c *jsCompiler) outputVar() string {
-	if len(c.outputVars) > 0 {
-		return c.outputVars[len(c.outputVars)-1]
-	}
-	panic("output variable name is not set")
-}
-
-// outputVarInited returns whether the current output variable is initialized.
-func (c *jsCompiler) outputVarInited() bool {
-	if len(c.outputVarsInited) > 0 {
-		return c.outputVarsInited[len(c.outputVarsInited)-1]
-	}
-	panic("output variable initialization flag is not set")
-}
-
-// pushOutputVar sets a new current output variable name.
-func (c *jsCompiler) pushOutputVar(name string) {
-	c.outputVars = append(c.outputVars, name)
-	c.outputVarsInited = append(c.outputVarsInited, false)
-}
-
-// popOutputVar removes the current output variable name. The previous output
-// variable becomes the current.
-func (c *jsCompiler) popOutputVar() {
-	if len(c.outputVars) > 0 {
-		c.outputVars = c.outputVars[:len(c.outputVars)-1]
-		c.outputVarsInited = c.outputVarsInited[:len(c.outputVarsInited)-1]
-	}
-}
-
-// initOutputVar appends a full line/statement for initializing the current
-// output variable.
-func (c *jsCompiler) initOutputVar() {
-	if c.outputVarInited() {
-		// Nothing to do since it's already initialized.
-		return
-	}
-	c.writeLine("var ", c.outputVar(), " = new soy.StringBuilder();")
-	c.setOutputVarInited()
-}
-
-// setOutputVarInited sets that the current output variable has already been
-// initialized. This causes initOutputVar and addToOutputVar to not add
-// initialization code even on the first use of the variable.
-func (c *jsCompiler) setOutputVarInited() {
-	if len(c.outputVarsInited) > 0 {
-		c.outputVarsInited[len(c.outputVarsInited)-1] = true
-	} else {
-		panic("output variable is not set")
-	}
+	b         *bytes.Buffer
+	indent    string
+	delayed   []string
+	escape    bool
+	varId     int
+	namespace string
 }
 
 // increaseIndent increases the current indent by two spaces.
@@ -126,34 +78,49 @@ func (c *jsCompiler) writeLine(parts ...string) *jsCompiler {
 	return c
 }
 
-// writeOutputVarName appends the name of the current output variable.
-func (c *jsCompiler) writeOutputVarName() *jsCompiler {
-	c.b.WriteString(c.outputVar())
-	return c
-}
-
-// addToOutputVar appends a line/statement with the given concatenation of the
+// addToOutput appends a line/statement with the given concatenation of the
 // given JS expressions saved to the current output variable.
-func (c *jsCompiler) addToOutputVar(exprs ...string) {
-	args := strings.Join(exprs, ", ")
-	if c.outputVarInited() {
-		// output.append(AAA, BBB);
-		c.writeLine(c.outputVar(), ".append(", args, ");")
-	} else {
-		// var output = new soy.StringBuilder(AAA, BBB);
-		c.writeLine("var ", c.outputVar(), " = new soy.StringBuilder(",
-			args, ");")
-		c.setOutputVarInited()
-	}
+func (c *jsCompiler) addToOutput(exprs ...string) {
+	c.writeLine("out.append(", strings.Join(exprs, ", "), ");")
 }
 
-// addDelayedToOutputVar appends delayed expressions to the current output
+func (c *jsCompiler) newVariableName() string {
+	c.varId++
+	return fmt.Sprintf("v%d", c.varId)
+}
+
+func (c *jsCompiler) writeNewVariable(value string) string {
+	name := c.newVariableName()
+	c.writeLine(fmt.Sprintf("var %s = %s;", name, value))
+	return name
+}
+
+// addDelayed appeds content to be added to the output variable, later.
+func (c *jsCompiler) addDelayed(s string) {
+	c.delayed = append(c.delayed, s)
+}
+
+// addDelayedToOutput appends delayed expressions to the current output
 // variable.
-func (c *jsCompiler) addDelayedToOutputVar() {
+func (c *jsCompiler) addDelayedToOutput() {
 	if len(c.delayed) > 0 {
-		c.addToOutputVar(c.delayed...)
+		c.addToOutput(c.delayed...)
 		c.delayed = c.delayed[:0]
 	}
+}
+
+// getFunctionName returns a registered function name, including namespace.
+func (c *jsCompiler) getFunctionName(ident string) string {
+	// TODO: really return function namespace + name.
+	return ident
+}
+
+func (c *jsCompiler) escapeHTML(s string) string {
+	// TODO: turn off escaping depending on settings? conditional escaping?
+	if c.escape {
+		return fmt.Sprintf("soy.$$escapeHtml(%s)", s)
+	}
+	return s
 }
 
 // WIP
@@ -162,146 +129,186 @@ func (c *jsCompiler) compile(treeSet map[string]*parse.Tree, namespace string) s
 	// Set a header.
 	c.writeLine("// Code generated by gorilla/template.")
 	c.writeLine("// Please don't edit this file by hand.")
-	c.writeLine()
 	// Declare namespaces.
-	ns := ""
 	namespace = strings.Trim(namespace, ".")
-	for _, name := range strings.Split(namespace, ".") {
-		if name != "" {
-			if ns != "" {
-				ns += "."
-			}
-			ns += name
-			c.writeLine(fmt.Sprintf(
-				"if (typeof %s == 'undefined') { var %s = {}; }", ns, ns))
-		}
-	}
-	if namespace != "" {
+	if namespace == "" {
+		namespace = "var "
+		c.namespace = ""
+	} else {
 		c.writeLine()
+		ns := ""
+		for _, name := range strings.Split(namespace, ".") {
+			if name != "" {
+				if ns != "" {
+					ns += "."
+				}
+				ns += name
+				c.writeLine(fmt.Sprintf(
+					"if (typeof %s == 'undefined') { var %s = {}; }", ns, ns))
+			}
+		}
 		namespace += "."
+		c.namespace = namespace
 	}
 	// Set a function for each template tree.
 	for name, tree := range treeSet {
-		c.pushOutputVar("output")
+		c.varId = 0
+		c.writeLine()
 		c.writeLine(fmt.Sprintf("%s%s = function(opt_data, opt_sb) {",
 			namespace, name))
 		c.increaseIndent()
-		c.writeLine("var output = opt_sb || new soy.StringBuilder();")
-		c.setOutputVarInited()
+		c.writeLine("var out = opt_sb || new soy.StringBuilder();")
 		for _, node := range tree.Root.Nodes {
-			c.visit(node)
+			c.writeNode(node, "opt_data", "")
 		}
-		c.addDelayedToOutputVar()
-		c.writeLine("return opt_sb ? '' : output.toString();")
+		c.addDelayedToOutput()
+		c.writeLine("return opt_sb ? '' : out.toString();")
 		c.decreaseIndent()
 		c.writeLine("};")
-		c.popOutputVar()
 	}
 	return c.b.String()
 }
 
-func (c *jsCompiler) visit(node parse.Node) {
-	if node == nil {
-		return
-	}
+func (c *jsCompiler) writeNode(node parse.Node, dot, final string) {
 	switch n := node.(type) {
 	case *parse.ActionNode:
-		c.visitActionNode(n)
-	case *parse.BoolNode:
-		c.visitBoolNode(n)
-	case *parse.CommandNode:
-		c.visitCommandNode(n)
-	case *parse.DotNode:
-		c.visitDotNode(n)
-	case *parse.FieldNode:
-		c.visitFieldNode(n)
-	case *parse.IdentifierNode:
-		c.visitIdentifierNode(n)
+		final = c.readNode(n, dot, final)
+		if len(n.Pipe.Decl) == 0 {
+			c.addDelayed(final)
+		} else {
+			c.addDelayedToOutput()
+			for _, decl := range n.Pipe.Decl {
+				c.writeLine(fmt.Sprintf("var %s = %s;", decl.Ident[0], final))
+			}
+		}
+		return
 	case *parse.IfNode:
-		c.visitIfNode(n)
+		c.writeIfOrWith(n, dot, final, parse.NodeIf, n.Pipe, n.List,
+			n.ElseList)
+		return
 	case *parse.ListNode:
-		c.visitListNode(n)
-	case *parse.NumberNode:
-		c.visitNumberNode(n)
-	case *parse.PipeNode:
-		c.visitPipeNode(n)
+		if n == nil || len(n.Nodes) == 0 {
+			return
+		}
+		for _, v := range n.Nodes {
+			c.writeNode(v, dot, final)
+		}
+		c.addDelayedToOutput()
+		return
 	case *parse.RangeNode:
-		c.visitRangeNode(n)
-	case *parse.StringNode:
-		c.visitStringNode(n)
+		c.addDelayedToOutput()
+		c.escape = false
+		newDot := c.writeNewVariable(c.readNode(n.Pipe, dot, final))
+		c.writeLine(fmt.Sprintf("if (%s.length > 0) {", newDot))
+		c.increaseIndent()
+		c.writeLine(fmt.Sprintf("for (var i = 0; i < %s.length; i++) {", newDot))
+		c.escape = true
+		c.increaseIndent()
+		// TODO: hm, must test this.
+		newDot = c.writeNewVariable(fmt.Sprintf("%s[i]", newDot))
+		c.writeNode(n.List, newDot, final)
+		c.decreaseIndent()
+		c.writeLine("}")
+		c.decreaseIndent()
+		if n.ElseList != nil && len(n.ElseList.Nodes) > 0 {
+			c.writeLine("} else {")
+			c.increaseIndent()
+			c.writeNode(n.ElseList, dot, final)
+			c.decreaseIndent()
+		}
+		c.writeLine("}")
+		return
 	case *parse.TemplateNode:
-		c.visitTemplateNode(n)
+		c.addDelayedToOutput()
+		if dot = c.readNode(n.Pipe, dot, final); dot == "" {
+			dot = "null"
+		}
+		c.writeLine(fmt.Sprintf("%s%s(%s, out);", c.namespace, n.Name, dot))
+		return
 	case *parse.TextNode:
-		c.visitTextNode(n)
-	case *parse.VariableNode:
-		c.visitVariableNode(n)
+		if s := strings.TrimSpace(string(n.Text)); s != "" {
+			c.addDelayed("'" + s + "'")
+		}
+		return
 	case *parse.WithNode:
-		c.visitWithNode(n)
+		c.writeIfOrWith(n, dot, final, parse.NodeWith, n.Pipe, n.List,
+			n.ElseList)
+		return
 	default:
-		panic(fmt.Errorf("unexpected node type %T", n))
+		panic(fmt.Errorf("writeNode: unexpected node type %T", n))
 	}
+	panic("unreachable")
 }
 
-func (c *jsCompiler) visitActionNode(n *parse.ActionNode) {
-	// ...
+func (c *jsCompiler) writeIfOrWith(node parse.Node, dot, final string,
+	typ parse.NodeType, pipe *parse.PipeNode, list, elseList *parse.ListNode) {
+	c.addDelayedToOutput()
+	c.escape = false
+	newDot := c.writeNewVariable(c.readNode(pipe, dot, final))
+	c.escape = true
+	c.writeLine(fmt.Sprintf("if (%s) {", newDot))
+	c.increaseIndent()
+	if typ == parse.NodeWith {
+		c.writeNode(list, newDot, final)
+	} else {
+		c.writeNode(list, dot, final)
+	}
+	c.decreaseIndent()
+	if elseList != nil && len(elseList.Nodes) > 0 {
+		c.writeLine("} else {")
+		c.increaseIndent()
+		c.writeNode(elseList, dot, final)
+		c.decreaseIndent()
+	}
+	c.writeLine("}")
 }
 
-func (c *jsCompiler) visitBoolNode(n *parse.BoolNode) {
-	// ...
+func (c *jsCompiler) readNode(node parse.Node, dot, final string) string {
+	switch n := node.(type) {
+	case *parse.ActionNode:
+		return c.readNode(n.Pipe, dot, final)
+	case *parse.CommandNode:
+		return c.readCommandNode(n, dot, final)
+	case *parse.DotNode:
+		return dot
+	case *parse.FieldNode:
+		// TODO: wrap by an JS evaluator (e.g., to read map keys)
+		f := fmt.Sprintf("%s.%s", dot, strings.Join(n.Ident, "."))
+		return c.escapeHTML(f)
+	case *parse.PipeNode:
+		if n == nil || n.Cmds == nil {
+			return ""
+		}
+		for _, cmd := range n.Cmds {
+			final = c.readNode(cmd, dot, final)
+		}
+		return final
+	case *parse.StringNode:
+		return n.Quoted
+	default:
+		panic(fmt.Errorf("readNode: unexpected node type %T", n))
+	}
+	panic("unreachable")
 }
 
-func (c *jsCompiler) visitCommandNode(n *parse.CommandNode) {
-	// ...
+func (c *jsCompiler) readCommandNode(node *parse.CommandNode, dot, final string) string {
+	firstWord := node.Args[0]
+	switch n := firstWord.(type) {
+	case *parse.IdentifierNode:
+		return c.readFunction(n.Ident, node.Args[1:], dot, final)
+	default:
+		return c.readNode(n, dot, final)
+	}
+	panic("unreachable")
 }
 
-func (c *jsCompiler) visitDotNode(n *parse.DotNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitFieldNode(n *parse.FieldNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitIdentifierNode(n *parse.IdentifierNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitIfNode(n *parse.IfNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitListNode(n *parse.ListNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitNumberNode(n *parse.NumberNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitPipeNode(n *parse.PipeNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitRangeNode(n *parse.RangeNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitStringNode(n *parse.StringNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitTemplateNode(n *parse.TemplateNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitTextNode(n *parse.TextNode) {
-	c.delayed = append(c.delayed, "'" + string(n.Text) + "'")
-}
-
-func (c *jsCompiler) visitVariableNode(n *parse.VariableNode) {
-	// ...
-}
-
-func (c *jsCompiler) visitWithNode(n *parse.WithNode) {
-	// ...
+func (c *jsCompiler) readFunction(name string, args []parse.Node, dot, final string) string {
+	a := make([]string, len(args))
+	for k, v := range args {
+		a[k] = c.readNode(v, dot, final)
+	}
+	if final != "" {
+		a = append(a, final)
+	}
+	return fmt.Sprintf("%s(%s)", c.getFunctionName(name), strings.Join(a, ", "))
 }
