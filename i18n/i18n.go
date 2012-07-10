@@ -4,14 +4,14 @@
 
 package i18n
 
-// Translator types can return translations for messages and plurals.
+// Translator types return translations for messages and plurals.
 type Translator interface {
-	// Message returns a translation for the given message key.
+	// Get returns a translation for the given key.
 	// Extra arguments can be passed to format the translation
 	// using fmt.Sprintf().
-	Message(key string, a ...interface{}) string
-	// Plural returns a plural translation for the given message key and count.
+	Get(key string, a ...interface{}) string
+	// GetPlural returns a plural translation for the given key and count.
 	// Extra arguments can be passed to format the translation
 	// using fmt.Sprintf().
-	Plural(key string, count int, a ...interface{}) string
+	GetPlural(key string, count int, a ...interface{}) string
 }

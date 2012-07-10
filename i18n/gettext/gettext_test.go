@@ -67,20 +67,20 @@ func TestReadMO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := NewTranslations()
+	c := NewCatalog()
 	if err := ReadMO(c, bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
 
 	// gettext
-	equalString(c.Message("albatross"), "albatross")
-	equalString(c.Message("mullusk"), "bacon")
-	equalString(c.Message("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
-	equalString(c.Message("nudge nudge"), "wink wink")
-	equalString(c.Message("There is %s file"), "Hay %s fichero")
+	equalString(c.Get("albatross"), "albatross")
+	equalString(c.Get("mullusk"), "bacon")
+	equalString(c.Get("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
+	equalString(c.Get("nudge nudge"), "wink wink")
+	equalString(c.Get("There is %s file"), "Hay %s fichero")
 	// ngettext
-	equalString(c.Plural("There is %s file", 1), "Hay %s fichero")
-	equalString(c.Plural("There is %s file", 2), "Hay %s ficheros")
+	equalString(c.GetPlural("There is %s file", 1), "Hay %s fichero")
+	equalString(c.GetPlural("There is %s file", 2), "Hay %s ficheros")
 }
 
 func TestWriteMO(t *testing.T) {
@@ -94,7 +94,7 @@ func TestWriteMO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := NewTranslations()
+	c := NewCatalog()
 	if err := ReadMO(c, bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
@@ -108,18 +108,18 @@ func TestWriteMO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c2 := NewTranslations()
+	c2 := NewCatalog()
 	if err := ReadMO(c2, f2); err != nil {
 		t.Fatal(err)
 	}
 
 	// gettext
-	equalString(c2.Message("albatross"), "albatross")
-	equalString(c2.Message("mullusk"), "bacon")
-	equalString(c2.Message("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
-	equalString(c2.Message("nudge nudge"), "wink wink")
-	equalString(c2.Message("There is %s file"), "Hay %s fichero")
+	equalString(c2.Get("albatross"), "albatross")
+	equalString(c2.Get("mullusk"), "bacon")
+	equalString(c2.Get("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
+	equalString(c2.Get("nudge nudge"), "wink wink")
+	equalString(c2.Get("There is %s file"), "Hay %s fichero")
 	// ngettext
-	equalString(c2.Plural("There is %s file", 1), "Hay %s fichero")
-	equalString(c2.Plural("There is %s file", 2), "Hay %s ficheros")
+	equalString(c2.GetPlural("There is %s file", 1), "Hay %s fichero")
+	equalString(c2.GetPlural("There is %s file", 2), "Hay %s ficheros")
 }

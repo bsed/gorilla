@@ -2,32 +2,33 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package requestdata
+package context
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
+	"time"
 )
-
-// Original implementation by Brad Fitzpatrick:
-// http://groups.google.com/group/golang-nuts/msg/e2d679d303aa5d53
 
 var (
 	mutex sync.Mutex
 	data  = make(map[*http.Request]map[interface{}]interface{})
 )
 
-// Set stores the value for a given key in a given request.
+// Set stores a value for a given key in a given request.
 func Set(r *http.Request, key, val interface{}) {
 	mutex.Lock()
+	defer mutex.Unlock()
 	if data[r] == nil {
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+		r.Header["X-Context-Timestamp"] = []string{timestamp}
 		data[r] = make(map[interface{}]interface{})
 	}
 	data[r][key] = val
-	mutex.Unlock()
 }
 
-// Get returns the value stored for a given key in a given request.
+// Get returns a value stored for a given key in a given request.
 func Get(r *http.Request, key interface{}) interface{} {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -37,13 +38,13 @@ func Get(r *http.Request, key interface{}) interface{} {
 	return nil
 }
 
-// Delete removes the value stored for a given key in a given request.
+// Delete removes a value stored for a given key in a given request.
 func Delete(r *http.Request, key interface{}) {
 	mutex.Lock()
+	defer mutex.Unlock()
 	if data[r] != nil {
 		delete(data[r], key)
 	}
-	mutex.Unlock()
 }
 
 // Clear removes all values stored for a given request.
@@ -52,17 +53,38 @@ func Delete(r *http.Request, key interface{}) {
 // variables at the end of a request lifetime. See ClearHandler().
 func Clear(r *http.Request) {
 	mutex.Lock()
+	defer mutex.Unlock()
 	delete(data, r)
-	mutex.Unlock()
 }
 
-// ClearAll removes all values stored for all requests.
+// Purgue removes request data stored for longer than maxAge, in seconds.
+// It returns the amount of requests removed.
 //
-// This is not normally used but it is here for completeness.
-func ClearAll() {
+// If maxAge <= 0, all request data is removed.
+//
+// This is only used for sanity check: in case context cleaning was not
+// properly set some request data can be kept forever, consuming an increasing
+// amount of memory. In case this is detected, Purgue() must be called
+// periodically until the problem is fixed.
+func Purgue(maxAge int) int {
 	mutex.Lock()
-	data = make(map[*http.Request]map[interface{}]interface{})
-	mutex.Unlock()
+	defer mutex.Unlock()
+	count := 0
+	if maxAge <= 0 {
+		count = len(data)
+		data = make(map[*http.Request]map[interface{}]interface{})
+	} else {
+		min := time.Now().Unix() - int64(maxAge)
+		for r, _ := range data {
+			timestamp := r.Header.Get("X-Context-Timestamp")
+			secs, err := strconv.ParseInt(timestamp, 10, 64)
+			if err != nil || secs < min {
+				delete(data, r)
+				count++
+			}
+		}
+	}
+	return count
 }
 
 // ClearHandler wraps an http.Handler and clears request values at the end

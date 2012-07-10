@@ -18,8 +18,8 @@ const (
 	magicLittleEndian uint32 = 0x950412de
 )
 
-// ReadMO loads a catalog from a GNU MO file.
-func ReadMO(t *Translations, r Reader) error {
+// ReadMO loads translations from a GNU MO file.
+func ReadMO(c *Catalog, r Reader) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
 	var magic uint32
@@ -62,8 +62,8 @@ func ReadMO(t *Translations, r Reader) error {
 	// Build a translations table of strings and translations.
 	// Plurals are stored separately with the first message as key.
 	var mLen, mIdx, tLen, tIdx uint32
-	t.msgOrig = make([][]byte, int(count))
-	t.trnOrig = make([][]byte, int(count))
+	c.msgOrig = make([][]byte, int(count))
+	c.trnOrig = make([][]byte, int(count))
 	for i := 0; i < int(count); i++ {
 		// Get message length and position.
 		r.Seek(int64(mTableIdx), 0)
@@ -94,16 +94,16 @@ func ReadMO(t *Translations, r Reader) error {
 		// Move cursor to next message.
 		mTableIdx += 8
 		tTableIdx += 8
-		t.msgOrig[i], t.trnOrig[i] = mb, tb
+		c.msgOrig[i], c.trnOrig[i] = mb, tb
 		mStr, tStr := string(mb), string(tb)
 		if mStr == "" {
 			// This is the file header. Parse it.
-			readMOHeader(t, tStr)
+			readMOHeader(c, tStr)
 			continue
 		}
 		// Check for context.
 		if cIdx := strings.Index(mStr, "\x04"); cIdx != -1 {
-			if t.ContextFunc != nil && !t.ContextFunc(mStr[:cIdx]) {
+			if c.ContextFunc != nil && !c.ContextFunc(mStr[:cIdx]) {
 				// Context is not valid.
 				continue
 			}
@@ -117,17 +117,17 @@ func ReadMO(t *Translations, r Reader) error {
 		for k, v := range trn {
 			trn[k], ord[k] = parseFmt(v, key)
 		}
-		t.msg[key] = msg
-		t.trn[key] = trn
-		t.ord[key] = ord
+		c.msg[key] = msg
+		c.trn[key] = trn
+		c.ord[key] = ord
 	}
 	return nil
 }
 
-// readMOHeader parses the catalog metadata following GNU .mo conventions.
+// readMOHeader parses the translations metadata following GNU .mo conventions.
 //
 // Ported from Python's gettext.GNUTranslations.
-func readMOHeader(t *Translations, str string) {
+func readMOHeader(c *Catalog, str string) {
 	var lastk string
 	for _, item := range strings.Split(str, "\n") {
 		item = strings.TrimSpace(item)
@@ -137,7 +137,7 @@ func readMOHeader(t *Translations, str string) {
 		if i := strings.Index(item, ":"); i != -1 {
 			k := strings.ToLower(strings.TrimSpace(item[:i]))
 			v := strings.TrimSpace(item[i+1:])
-			t.Info[k] = v
+			c.Info[k] = v
 			lastk = k
 			switch k {
 			// TODO: extract charset from content-type?
@@ -147,23 +147,23 @@ func readMOHeader(t *Translations, str string) {
 					kv := strings.SplitN(part, "=", 2)
 					if len(kv) == 2 && strings.TrimSpace(kv[0]) == "plural" {
 						if fn, err := pluralforms.Parse(kv[1]); err == nil {
-							t.PluralFunc = fn
+							c.PluralFunc = fn
 						}
 						break L1
 					}
 				}
 			}
 		} else if lastk != "" {
-			t.Info[lastk] += "\n" + item
+			c.Info[lastk] += "\n" + item
 		}
 	}
 }
 
-// WriteMO writes a compiled catalog to the given writer.
-func WriteMO(t *Translations, w Writer) error {
+// WriteMO writes compiled translations to the given writer.
+func WriteMO(c *Catalog, w Writer) error {
 	order := binary.LittleEndian
 	// Calculate and store initial values.
-	count := len(t.msgOrig)
+	count := len(c.msgOrig)
 	mTableIdx := 28
 	tTableIdx := mTableIdx + ((count - 1) * 8) + 8
 	hIdx := tTableIdx + ((count - 1) * 8) + 8
@@ -184,7 +184,7 @@ func WriteMO(t *Translations, w Writer) error {
 	}
 	// Write messages.
 	mIdx := uint32(hIdx)
-	for _, msg := range t.msgOrig {
+	for _, msg := range c.msgOrig {
 		mLen := uint32(len(msg))
 		// Write message length and position.
 		w.Seek(int64(mTableIdx), 0)
@@ -204,7 +204,7 @@ func WriteMO(t *Translations, w Writer) error {
 	}
 	// Write translations.
 	tIdx := uint32(mIdx)
-	for _, trn := range t.trnOrig {
+	for _, trn := range c.trnOrig {
 		tLen := uint32(len(trn))
 		// Write translation length and position.
 		w.Seek(int64(tTableIdx), 0)
