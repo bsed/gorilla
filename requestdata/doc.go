@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/requestdata stores values shared during a request lifetime.
+Package gorilla/context stores values shared during a request lifetime.
 
 For example, a router can set variables extracted from the URL and later
 application handlers can access those values. There are several others
@@ -18,6 +18,10 @@ type is interface{} so a key can be of any type that supports equality.
 Here we define a key using a custom int type to avoid name collisions:
 
 	package foo
+
+	import (
+		"code.google.com/p/gorilla/context"
+	)
 
 	type key int
 
@@ -71,4 +75,4 @@ variables at the end of a request lifetime.
 The Router from the package gorilla/mux calls Clear(), so if you are using it
 you don't need to clear variables manually.
 */
-package requestdata
+package context

@@ -15,9 +15,9 @@ import (
 // ContextFunc is used to select the context stored for message disambiguation.
 type ContextFunc func(string) bool
 
-// NewTranslations returns a new Translations, initializing internal fields.
-func NewTranslations() *Translations {
-	return &Translations{
+// NewCatalog returns a new Catalog, initializing internal fields.
+func NewCatalog() *Catalog {
+	return &Catalog{
 		PluralFunc: pluralforms.DefaultPluralFunc,
 		Info:       make(map[string]string),
 		msg:        make(map[string][]string),
@@ -26,8 +26,8 @@ func NewTranslations() *Translations {
 	}
 }
 
-// Translations stores gettext translations.
-type Translations struct {
+// Catalog stores gettext translations.
+type Catalog struct {
 	Fallback    i18n.Translator        // used when a translation is not found
 	ContextFunc ContextFunc            // used to select context to load
 	PluralFunc  pluralforms.PluralFunc // used to select the plural form index
@@ -39,44 +39,44 @@ type Translations struct {
 	trnOrig     [][]byte               // original translations, unprocessed
 }
 
-// Message returns a translation for the given message key.
+// Get returns a translation for the given key.
 //
 // Extra arguments can be passed to format the translation using fmt.Sprintf().
-func (c *Translations) Message(key string, vars ...interface{}) string {
+func (c *Catalog) Get(key string, a ...interface{}) string {
 	if trn, ok := c.trn[key]; ok {
-		if vars == nil {
+		if a == nil {
 			return trn[0]
 		}
-		return sprintf(trn[0], c.ord[key][0], vars...)
+		return sprintf(trn[0], c.ord[key][0], a...)
 	}
 	if c.Fallback != nil {
-		return c.Fallback.Message(key, vars...)
+		return c.Fallback.Get(key, a...)
 	}
-	if vars == nil {
+	if a == nil {
 		return key
 	}
-	return fmt.Sprintf(key, vars...)
+	return fmt.Sprintf(key, a...)
 }
 
-// Plural returns a plural translation for the given message key and count.
+// GetPlural returns a plural translation for the given key and count.
 //
 // Extra arguments can be passed to format the translation using fmt.Sprintf().
-func (c *Translations) Plural(key string, count int, vars ...interface{}) string {
+func (c *Catalog) GetPlural(key string, count int, a ...interface{}) string {
 	if trn, ok := c.trn[key]; ok && c.PluralFunc != nil {
 		if idx := c.PluralFunc(count); idx >= 0 && idx < len(trn) {
-			if vars == nil {
+			if a == nil {
 				return trn[idx]
 			}
-			return sprintf(trn[idx], c.ord[key][idx], vars...)
+			return sprintf(trn[idx], c.ord[key][idx], a...)
 		}
 	}
 	if c.Fallback != nil {
-		return c.Fallback.Plural(key, count, vars...)
+		return c.Fallback.GetPlural(key, count, a...)
 	}
-	if vars == nil {
+	if a == nil {
 		return key
 	}
-	return fmt.Sprintf(key, vars...)
+	return fmt.Sprintf(key, a...)
 }
 
 // ----------------------------------------------------------------------------
