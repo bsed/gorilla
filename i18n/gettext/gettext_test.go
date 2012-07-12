@@ -184,11 +184,18 @@ func TestContext(t *testing.T) {
 
 	c := NewCatalog()
 	c.Add(&SimpleMessage{Src: "food", Dst: "comida"})
-	c.Add(&SimpleMessage{Src: "food", Dst: "merenda", Ctx: "kids"})
-	c.Add(&SimpleMessage{Src: "food", Dst: "rango", Ctx: "slang"})
-	c.Add(&SimpleMessage{Src: "music", Dst: "melodia", Ctx: "kids"})
-	c.Add(&SimpleMessage{Src: "music", Dst: "sonzera", Ctx: "slang"})
-	testCatalog(c)
+	m := &SimpleMessage{Src: "food", Dst: "merenda"}
+	m.SetContext("kids")
+	c.Add(m)
+	m = &SimpleMessage{Src: "food", Dst: "rango"}
+	m.SetContext("slang")
+	c.Add(m)
+	m = &SimpleMessage{Src: "music", Dst: "melodia"}
+	m.SetContext("kids")
+	c.Add(m)
+	m = &SimpleMessage{Src: "music", Dst: "sonzera"}
+	m.SetContext("slang")
+	c.Add(m)
 
 	f1 := newFile("testWriteMo", t)
 	if err := WriteMo(c, f1); err != nil {

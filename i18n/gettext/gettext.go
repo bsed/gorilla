@@ -6,7 +6,6 @@ package gettext
 
 import (
 	"fmt"
-	"io"
 
 	"code.google.com/p/gorilla/i18n/gettext/pluralforms"
 )
@@ -31,13 +30,13 @@ type Catalog struct {
 
 // Add adds a message to the catalog.
 func (c *Catalog) Add(msg Message) {
-	if ctx := msg.Context(); ctx == "" {
+	if name := msg.Context(); name == nil {
 		c.Messages[msg.Key()] = msg
 	} else {
-		if _, ok := c.Contexts[ctx]; !ok {
-			c.Contexts[ctx] = make(map[string]Message)
+		if _, ok := c.Contexts[*name]; !ok {
+			c.Contexts[*name] = make(map[string]Message)
 		}
-		c.Contexts[ctx][msg.Key()] = msg
+		c.Contexts[*name][msg.Key()] = msg
 	}
 }
 
@@ -116,19 +115,93 @@ type Message interface {
 	GetPlural(index int) string
 	// Format formats the message. Each message can use a specific formatter.
 	Format(s string, a ...interface{}) string
-	// Context returns the context of the message, if any.
-	Context() string
 	// Clone returns a copy of the message.
 	Clone() Message
+	// Context returns the message context. Empty strings are valid contexts,
+	// so no context can only be nil.
+	Context() *string
+}
+
+// ----------------------------------------------------------------------------
+
+type MessageInfo struct {
+	Ctx            *string
+	UserComments   []string
+	SourceComments []string
+	References     []string
+	Flags          []string
+	PrevSingular   string
+	PrevPlural     string
+	PrevCtx        *string
+}
+
+func (m *MessageInfo) Clone() *MessageInfo {
+	clone := &MessageInfo{
+		PrevSingular: m.PrevSingular,
+		PrevPlural:   m.PrevPlural,
+		PrevCtx:      m.PrevCtx,
+	}
+	if m.Ctx != nil {
+		clone.Ctx = &(*m.Ctx)
+	}
+	if m.UserComments != nil {
+		clone.UserComments = make([]string, len(m.UserComments))
+		copy(clone.UserComments, m.UserComments)
+	}
+	if m.SourceComments != nil {
+		clone.SourceComments = make([]string, len(m.SourceComments))
+		copy(clone.SourceComments, m.SourceComments)
+	}
+	if m.References != nil {
+		clone.References = make([]string, len(m.References))
+		copy(clone.References, m.References)
+	}
+	if m.Flags != nil {
+		clone.Flags = make([]string, len(m.Flags))
+		copy(clone.Flags, m.Flags)
+	}
+	return clone
+}
+
+// ----------------------------------------------------------------------------
+
+type BaseMessage struct {
+	info *MessageInfo
+}
+
+func (m *BaseMessage) Get() string {
+	return ""
+}
+
+func (m *BaseMessage) GetPlural(idx int) string {
+	return ""
+}
+
+func (m *BaseMessage) Context() *string {
+	if m.info != nil {
+		return m.info.Ctx
+	}
+	return nil
+}
+
+func (m *BaseMessage) SetContext(name string) {
+	m.Info().Ctx = &name
+}
+
+func (m *BaseMessage) Info() *MessageInfo {
+	if m.info == nil {
+		m.info = &MessageInfo{}
+	}
+	return m.info
 }
 
 // ----------------------------------------------------------------------------
 
 // SimpleMessage is a message without plural forms.
 type SimpleMessage struct {
+	BaseMessage
 	Src string
 	Dst string
-	Ctx string
 }
 
 func (m *SimpleMessage) Key() string {
@@ -139,44 +212,35 @@ func (m *SimpleMessage) Get() string {
 	return m.Dst
 }
 
-func (m *SimpleMessage) GetPlural(idx int) string {
-	return ""
-}
-
 func (m *SimpleMessage) Format(s string, a ...interface{}) string {
 	// TODO: use message formatter
 	return fmt.Sprintf(s, a...)
 }
 
-func (m *SimpleMessage) Context() string {
-	return m.Ctx
-}
-
 func (m *SimpleMessage) Clone() Message {
-	return &SimpleMessage{
-		Src: m.Src,
-		Dst: m.Dst,
-		Ctx: m.Ctx,
+	clone := &SimpleMessage{
+		Src:  m.Src,
+		Dst:  m.Dst,
 	}
+	if m.info != nil {
+		clone.info = m.info.Clone()
+	}
+	return clone
 }
 
 // ----------------------------------------------------------------------------
 
 // PluralMessage is a message with plural forms.
 type PluralMessage struct {
+	BaseMessage
 	Src []string
 	Dst []string
-	Ctx string
 }
 
 func (m *PluralMessage) Key() string {
 	if len(m.Src) > 0 {
 		return m.Src[0]
 	}
-	return ""
-}
-
-func (m *PluralMessage) Get() string {
 	return ""
 }
 
@@ -192,32 +256,17 @@ func (m *PluralMessage) Format(s string, a ...interface{}) string {
 	return fmt.Sprintf(s, a...)
 }
 
-func (m *PluralMessage) Context() string {
-	return m.Ctx
-}
-
 func (m *PluralMessage) Clone() Message {
 	src := make([]string, len(m.Src))
 	copy(src, m.Src)
 	dst := make([]string, len(m.Dst))
 	copy(dst, m.Dst)
-	return &PluralMessage{
+	clone := &PluralMessage{
 		Src: src,
 		Dst: dst,
-		Ctx: m.Ctx,
 	}
-}
-
-// ----------------------------------------------------------------------------
-
-// Reader wraps the interfaces used to read MO and PO files.
-type Reader interface {
-	io.Reader
-	io.Seeker
-}
-
-// Writer wraps the interfaces used to write MO and PO files.
-type Writer interface {
-	io.Writer
-	io.Seeker
+	if m.info != nil {
+		clone.info = m.info.Clone()
+	}
+	return clone
 }

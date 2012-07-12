@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -21,7 +22,7 @@ const (
 )
 
 // ReadMo fills a catalog with translations from a GNU MO file.
-func ReadMo(c *Catalog, r Reader) error {
+func ReadMo(c *Catalog, r io.ReadSeeker) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
 	var magic uint32
@@ -109,19 +110,24 @@ func ReadMo(c *Catalog, r Reader) error {
 			mStr = mStr[ctxIdx+1:]
 		}
 
-		var msg Message
 		if keyIdx := strings.Index(mStr, "\x00"); keyIdx == -1 {
 			// Singular.
-			msg = &SimpleMessage{Src: mStr, Dst: tStr, Ctx: ctx}
+			msg := &SimpleMessage{Src: mStr, Dst: tStr}
+			if ctx != "" {
+				msg.SetContext(ctx)
+			}
+			c.Add(msg)
 		} else {
 			// Plural.
-			msg = &PluralMessage{
+			msg := &PluralMessage{
 				Src: strings.Split(mStr, "\x00"),
 				Dst: strings.Split(tStr, "\x00"),
-				Ctx: ctx,
 			}
+			if ctx != "" {
+				msg.SetContext(ctx)
+			}
+			c.Add(msg)
 		}
-		c.Add(msg)
 	}
 	return nil
 }
@@ -209,6 +215,7 @@ func newMoMessages(c *Catalog) (count int, idxs []uint32, msgs []byte) {
 			}
 		}
 	}
+	// Merge everything.
 	for i := 0; i < len(m.dstList); i += 2 {
 		// Increment offset for translations.
 		m.dstList[i+1] += m.srcIdx
@@ -219,10 +226,10 @@ func newMoMessages(c *Catalog) (count int, idxs []uint32, msgs []byte) {
 }
 
 func (m *moMessages) append(msg Message) {
-	src := msg.Context()
+	src := ""
 	dst := ""
-	if src != "" {
-		src += "\x04"
+	if ctx := msg.Context(); ctx != nil {
+		src += *ctx + "\x04"
 	}
 	switch t := msg.(type) {
 	case *SimpleMessage:
@@ -242,7 +249,7 @@ func (m *moMessages) append(msg Message) {
 }
 
 // WriteMo writes a compiled catalog to the given writer.
-func WriteMo(c *Catalog, w Writer) error {
+func WriteMo(c *Catalog, w io.WriteSeeker) error {
 	order := binary.LittleEndian
 	count, idxs, msgs := newMoMessages(c)
 	mTableIdx := 28
@@ -263,7 +270,7 @@ func WriteMo(c *Catalog, w Writer) error {
 	if err := binary.Write(w, order, idxs); err != nil {
 		return err
 	}
-	// At byte 28 + (count * 8) + (count * 8)
+	// At byte 28 + (count*8) + (count*8)
 	if err := binary.Write(w, order, msgs); err != nil {
 		return err
 	}
