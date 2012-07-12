@@ -4,14 +4,19 @@
 
 package i18n
 
-// Translator types return translations for messages and plurals.
-type Translator interface {
+// Catalog types return translations for messages and plurals.
+type Catalog interface {
 	// Get returns a translation for the given key.
-	// Extra arguments can be passed to format the translation
-	// using fmt.Sprintf().
+	// Extra arguments or optional, used to format the translation.
 	Get(key string, a ...interface{}) string
-	// GetPlural returns a plural translation for the given key and count.
-	// Extra arguments can be passed to format the translation
-	// using fmt.Sprintf().
-	GetPlural(key string, count int, a ...interface{}) string
+	// GetPlural returns a plural translation for the given key and num.
+	// Extra arguments or optional, used to format the translation.
+	//
+	// Note: while ngettext accepts two string arguments, other systems
+	// normally just accept a key. To follow ngettext strictly,
+	// gettext-based catalogs must wrap a call to GetPlural.
+	GetPlural(key string, num int, a ...interface{}) string
+	// PluralIndex returns the plural index for a given number.
+	// This evaluates gettext's Plural-Forms or CLDR's Language Plural Rules.
+	PluralIndex(num int) int
 }

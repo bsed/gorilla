@@ -5,9 +5,11 @@
 package gettext
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"code.google.com/p/gorilla/i18n/gettext/pluralforms"
@@ -18,8 +20,8 @@ const (
 	magicLittleEndian uint32 = 0x950412de
 )
 
-// ReadMO loads translations from a GNU MO file.
-func ReadMO(c *Catalog, r Reader) error {
+// ReadMo fills a catalog with translations from a GNU MO file.
+func ReadMo(c *Catalog, r Reader) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
 	var magic uint32
@@ -58,15 +60,13 @@ func ReadMO(c *Catalog, r Reader) error {
 			return err
 		}
 	}
-	count, mTableIdx, tTableIdx := idx[0], idx[1], idx[2]
+	count, mTableIdx, tTableIdx := int(idx[0]), int64(idx[1]), int64(idx[2])
 	// Build a translations table of strings and translations.
 	// Plurals are stored separately with the first message as key.
 	var mLen, mIdx, tLen, tIdx uint32
-	c.msgOrig = make([][]byte, int(count))
-	c.trnOrig = make([][]byte, int(count))
-	for i := 0; i < int(count); i++ {
+	for i := 0; i < count; i++ {
 		// Get message length and position.
-		r.Seek(int64(mTableIdx), 0)
+		r.Seek(mTableIdx, 0)
 		if err := binary.Read(r, order, &mLen); err != nil {
 			return err
 		}
@@ -75,11 +75,12 @@ func ReadMO(c *Catalog, r Reader) error {
 		}
 		// Get message.
 		mb := make([]byte, mLen)
-		if _, err := r.ReadAt(mb, int64(mIdx)); err != nil {
+		r.Seek(int64(mIdx), 0)
+		if err := binary.Read(r, order, mb); err != nil {
 			return err
 		}
 		// Get translation length and position.
-		r.Seek(int64(tTableIdx), 0)
+		r.Seek(tTableIdx, 0)
 		if err := binary.Read(r, order, &tLen); err != nil {
 			return err
 		}
@@ -88,46 +89,47 @@ func ReadMO(c *Catalog, r Reader) error {
 		}
 		// Get translation.
 		tb := make([]byte, tLen)
-		if _, err := r.ReadAt(tb, int64(tIdx)); err != nil {
+		r.Seek(int64(tIdx), 0)
+		if err := binary.Read(r, order, tb); err != nil {
 			return err
 		}
 		// Move cursor to next message.
 		mTableIdx += 8
 		tTableIdx += 8
-		c.msgOrig[i], c.trnOrig[i] = mb, tb
-		mStr, tStr := string(mb), string(tb)
-		if mStr == "" {
-			// This is the file header. Parse it.
-			readMOHeader(c, tStr)
+		// Is this is the file header?
+		if len(mb) == 0 {
+			readMoHeader(c, string(tb))
 			continue
 		}
 		// Check for context.
-		if cIdx := strings.Index(mStr, "\x04"); cIdx != -1 {
-			if c.ContextFunc != nil && !c.ContextFunc(mStr[:cIdx]) {
-				// Context is not valid.
-				continue
+		mStr, tStr := string(mb), string(tb)
+		var ctx string
+		if ctxIdx := strings.Index(mStr, "\x04"); ctxIdx != -1 {
+			ctx = mStr[:ctxIdx]
+			mStr = mStr[ctxIdx+1:]
+		}
+
+		var msg Message
+		if keyIdx := strings.Index(mStr, "\x00"); keyIdx == -1 {
+			// Singular.
+			msg = &SimpleMessage{Src: mStr, Dst: tStr, Ctx: ctx}
+		} else {
+			// Plural.
+			msg = &PluralMessage{
+				Src: strings.Split(mStr, "\x00"),
+				Dst: strings.Split(tStr, "\x00"),
+				Ctx: ctx,
 			}
-			mStr = mStr[cIdx+1:]
 		}
-		// Store messages, plurals and orderings.
-		msg := strings.Split(mStr, "\x00")
-		trn := strings.Split(tStr, "\x00")
-		ord := make([][]int, len(trn))
-		key := msg[0]
-		for k, v := range trn {
-			trn[k], ord[k] = parseFmt(v, key)
-		}
-		c.msg[key] = msg
-		c.trn[key] = trn
-		c.ord[key] = ord
+		c.Add(msg)
 	}
 	return nil
 }
 
-// readMOHeader parses the translations metadata following GNU .mo conventions.
+// readMoHeader parses the translations metadata following GNU .mo conventions.
 //
 // Ported from Python's gettext.GNUTranslations.
-func readMOHeader(c *Catalog, str string) {
+func readMoHeader(c *Catalog, str string) {
 	var lastk string
 	for _, item := range strings.Split(str, "\n") {
 		item = strings.TrimSpace(item)
@@ -137,10 +139,10 @@ func readMOHeader(c *Catalog, str string) {
 		if i := strings.Index(item, ":"); i != -1 {
 			k := strings.ToLower(strings.TrimSpace(item[:i]))
 			v := strings.TrimSpace(item[i+1:])
-			c.Info[k] = v
+			c.Header[k] = v
 			lastk = k
 			switch k {
-			// TODO: extract charset from content-type?
+			// TODO: extract and apply charset from content-type?
 			case "plural-forms":
 			L1:
 				for _, part := range strings.Split(v, ";") {
@@ -154,73 +156,116 @@ func readMOHeader(c *Catalog, str string) {
 				}
 			}
 		} else if lastk != "" {
-			c.Info[lastk] += "\n" + item
+			c.Header[lastk] += "\n" + item
 		}
 	}
 }
 
-// WriteMO writes compiled translations to the given writer.
-func WriteMO(c *Catalog, w Writer) error {
+// ----------------------------------------------------------------------------
+
+type moMessages struct {
+	src     *bytes.Buffer
+	dst     *bytes.Buffer
+	srcIdx  uint32
+	dstIdx  uint32
+	srcList []uint32
+	dstList []uint32
+}
+
+// newMoMessages returns pre-computed values for WriteMo.
+func newMoMessages(c *Catalog) (count int, idxs []uint32, msgs []byte) {
+	// Count messages, sort keys.
+	keyMap := make(map[string]bool)
+	for k, _ := range c.Messages {
+		keyMap[k] = true
+		count++
+	}
+	for _, v := range c.Contexts {
+		for k, _ := range v {
+			keyMap[k] = true
+			count++
+		}
+	}
+	keys := make([]string, len(keyMap))
+	i := 0
+	for k, _ := range keyMap {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	// Write all messages.
+	m := &moMessages{
+		src:    new(bytes.Buffer),
+		dst:    new(bytes.Buffer),
+		srcIdx: uint32(28 + count*16),
+	}
+	for _, k := range keys {
+		if msg, ok := c.Messages[k]; ok {
+			m.append(msg)
+		}
+		for _, ctx := range c.Contexts {
+			if msg, ok := ctx[k]; ok {
+				m.append(msg)
+			}
+		}
+	}
+	for i := 0; i < len(m.dstList); i += 2 {
+		// Increment offset for translations.
+		m.dstList[i+1] += m.srcIdx
+	}
+	m.src.Write(m.dst.Bytes())
+	idxs = append(m.srcList, m.dstList...)
+	return count, idxs, m.src.Bytes()
+}
+
+func (m *moMessages) append(msg Message) {
+	src := msg.Context()
+	dst := ""
+	if src != "" {
+		src += "\x04"
+	}
+	switch t := msg.(type) {
+	case *SimpleMessage:
+		src += t.Src
+		dst = t.Dst
+	case *PluralMessage:
+		src += strings.Join(t.Src, "\x00")
+		dst = strings.Join(t.Dst, "\x00")
+	}
+	m.src.WriteString(src + "\x00")
+	m.dst.WriteString(dst + "\x00")
+	sLen, dLen := uint32(len(src)), uint32(len(dst))
+	m.srcList = append(m.srcList, sLen, m.srcIdx)
+	m.dstList = append(m.dstList, dLen, m.dstIdx)
+	m.srcIdx += sLen + 1
+	m.dstIdx += dLen + 1
+}
+
+// WriteMo writes a compiled catalog to the given writer.
+func WriteMo(c *Catalog, w Writer) error {
 	order := binary.LittleEndian
-	// Calculate and store initial values.
-	count := len(c.msgOrig)
+	count, idxs, msgs := newMoMessages(c)
 	mTableIdx := 28
-	tTableIdx := mTableIdx + ((count - 1) * 8) + 8
-	hIdx := tTableIdx + ((count - 1) * 8) + 8
-	idx := []interface{}{
+	tTableIdx := mTableIdx + count*8
+	table := []uint32{
 		magicLittleEndian, // byte 0:  magic number
-		uint16(1),         // byte 4:  major revision number
-		uint16(1),         // byte 6:  minor revision number
+		uint32(0),         // byte 4:  major+minor revision number
 		uint32(count),     // byte 8:  number of messages
 		uint32(mTableIdx), // byte 12: index of messages table
 		uint32(tTableIdx), // byte 16: index of translations table
 		uint32(0),         // byte 20: size of hashing table
 		uint32(0),         // byte 24: offset of hashing table
 	}
-	for _, v := range idx {
-		if err := binary.Write(w, order, v); err != nil {
-			return err
-		}
+	if err := binary.Write(w, order, table); err != nil {
+		return err
 	}
-	// Write messages.
-	mIdx := uint32(hIdx)
-	for _, msg := range c.msgOrig {
-		mLen := uint32(len(msg))
-		// Write message length and position.
-		w.Seek(int64(mTableIdx), 0)
-		if err := binary.Write(w, order, mLen); err != nil {
-			return err
-		}
-		if err := binary.Write(w, order, mIdx); err != nil {
-			return err
-		}
-		// Write message, terminating with a NUL byte.
-		if _, err := w.WriteAt(append(msg, '\x00'), int64(mIdx)); err != nil {
-			return err
-		}
-		// Move cursor to next message.
-		mTableIdx += 8
-		mIdx += mLen + 1
+	// At byte 28
+	if err := binary.Write(w, order, idxs); err != nil {
+		return err
 	}
-	// Write translations.
-	tIdx := uint32(mIdx)
-	for _, trn := range c.trnOrig {
-		tLen := uint32(len(trn))
-		// Write translation length and position.
-		w.Seek(int64(tTableIdx), 0)
-		if err := binary.Write(w, order, tLen); err != nil {
-			return err
-		}
-		if err := binary.Write(w, order, tIdx); err != nil {
-			return err
-		}
-		// Write translation, terminating with a NUL byte.
-		if _, err := w.WriteAt(append(trn, '\x00'), int64(tIdx)); err != nil {
-			return err
-		}
-		// Move cursor to next translation.
-		tTableIdx += 8
-		tIdx += tLen + 1
+	// At byte 28 + (count * 8) + (count * 8)
+	if err := binary.Write(w, order, msgs); err != nil {
+		return err
 	}
 	return nil
 }
