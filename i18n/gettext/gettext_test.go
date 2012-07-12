@@ -56,10 +56,10 @@ eXIgY2ViaXZxcmYgdmFncmVhbmd2YmFueXZtbmd2YmEgbmFxIHlicG55dm1uZ3ZiYQpmaGNjYmVn
 IHNiZSBsYmhlIENsZ3ViYSBjZWJ0ZW56ZiBvbCBjZWJpdnF2YXQgbmEgdmFncmVzbnByIGdiIGd1
 ciBUQUgKdHJnZ3JrZyB6cmZmbnRyIHBuZ255YnQgeXZvZW5lbC4AYmFjb24Ad2luayB3aW5rAA==`
 
-func TestReadMO(t *testing.T) {
+func TestReadMo(t *testing.T) {
 	equalString := func(s1, s2 string) {
 		if s1 != s2 {
-			t.Errorf("Expected %q, got %q.", s1, s2)
+			t.Errorf("Expected %q, got %q.", s2, s1)
 		}
 	}
 
@@ -68,25 +68,62 @@ func TestReadMO(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := NewCatalog()
-	if err := ReadMO(c, bytes.NewReader(b)); err != nil {
+	if err := ReadMo(c, bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
 
 	// gettext
-	equalString(c.Get("albatross"), "albatross")
+	equalString(c.Get("albatross"), "")
 	equalString(c.Get("mullusk"), "bacon")
 	equalString(c.Get("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
 	equalString(c.Get("nudge nudge"), "wink wink")
-	equalString(c.Get("There is %s file"), "Hay %s fichero")
 	// ngettext
 	equalString(c.GetPlural("There is %s file", 1), "Hay %s fichero")
 	equalString(c.GetPlural("There is %s file", 2), "Hay %s ficheros")
 }
 
-func TestWriteMO(t *testing.T) {
+func TestWriteMo(t *testing.T) {
 	equalString := func(s1, s2 string) {
 		if s1 != s2 {
-			t.Errorf("Expected %q, got %q.", s1, s2)
+			t.Errorf("Expected %q, got %q.", s2, s1)
+		}
+	}
+
+	c := NewCatalog()
+	c.Add(&SimpleMessage{Src: "foo", Dst: "bar"})
+	c.Add(&SimpleMessage{Src: "baz", Dst: "ding"})
+	c.Add(&PluralMessage{
+		Src: []string{"bubble", "bubbles"},
+		Dst: []string{"bolha", "bolhas"},
+	})
+
+	f1 := newFile("testWriteMo", t)
+	if err := WriteMo(c, f1); err != nil {
+		t.Fatal(err)
+	}
+	f1.Close()
+
+	f2, err := os.Open(f1.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2 := NewCatalog()
+	if err := ReadMo(c2, f2); err != nil {
+		t.Fatal(err)
+	}
+	f2.Close()
+
+	// gettext
+	equalString(c2.Get("foo"), "bar")
+	equalString(c2.Get("baz"), "ding")
+	// ngettext
+	equalString(c2.GetPlural("bubble", 2), "bolhas")
+}
+
+func TestWriteMo2(t *testing.T) {
+	equalString := func(s1, s2 string) {
+		if s1 != s2 {
+			t.Errorf("Expected %q, got %q.", s2, s1)
 		}
 	}
 
@@ -95,31 +132,78 @@ func TestWriteMO(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := NewCatalog()
-	if err := ReadMO(c, bytes.NewReader(b)); err != nil {
+	if err := ReadMo(c, bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
 
-	f1 := newFile("testWriteMO", t)
-	defer f1.Close()
-	WriteMO(c, f1)
+	f1 := newFile("testWriteMo", t)
+	if err := WriteMo(c, f1); err != nil {
+		t.Fatal(err)
+	}
+	f1.Close()
 
 	f2, err := os.Open(f1.Name())
-	defer f2.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	c2 := NewCatalog()
-	if err := ReadMO(c2, f2); err != nil {
+	if err := ReadMo(c2, f2); err != nil {
 		t.Fatal(err)
 	}
+	f2.Close()
 
 	// gettext
-	equalString(c2.Get("albatross"), "albatross")
-	equalString(c2.Get("mullusk"), "bacon")
-	equalString(c2.Get("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
-	equalString(c2.Get("nudge nudge"), "wink wink")
-	equalString(c2.Get("There is %s file"), "Hay %s fichero")
+	equalString(c.Get("albatross"), "")
+	equalString(c.Get("mullusk"), "bacon")
+	equalString(c.Get("Raymond Luxury Yach-t"), "Throatwobbler Mangrove")
+	equalString(c.Get("nudge nudge"), "wink wink")
 	// ngettext
-	equalString(c2.GetPlural("There is %s file", 1), "Hay %s fichero")
-	equalString(c2.GetPlural("There is %s file", 2), "Hay %s ficheros")
+	equalString(c.GetPlural("There is %s file", 1), "Hay %s fichero")
+	equalString(c.GetPlural("There is %s file", 2), "Hay %s ficheros")
+}
+
+func TestContext(t *testing.T) {
+	equalString := func(s1, s2 string) {
+		if s1 != s2 {
+			t.Errorf("Expected %q, got %q.", s2, s1)
+		}
+	}
+
+	testCatalog := func(c *Catalog) {
+		equalString(c.Get("food"), "comida")
+		equalString(c.Get("music"), "")
+
+		c2 := c.Context("kids")
+		equalString(c2.Get("food"), "merenda")
+		equalString(c2.Get("music"), "melodia")
+
+		c3 := c.Context("slang")
+		equalString(c3.Get("food"), "rango")
+		equalString(c3.Get("music"), "sonzera")
+	}
+
+	c := NewCatalog()
+	c.Add(&SimpleMessage{Src: "food", Dst: "comida"})
+	c.Add(&SimpleMessage{Src: "food", Dst: "merenda", Ctx: "kids"})
+	c.Add(&SimpleMessage{Src: "food", Dst: "rango", Ctx: "slang"})
+	c.Add(&SimpleMessage{Src: "music", Dst: "melodia", Ctx: "kids"})
+	c.Add(&SimpleMessage{Src: "music", Dst: "sonzera", Ctx: "slang"})
+	testCatalog(c)
+
+	f1 := newFile("testWriteMo", t)
+	if err := WriteMo(c, f1); err != nil {
+		t.Fatal(err)
+	}
+	f1.Close()
+
+	f2, err := os.Open(f1.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2 := NewCatalog()
+	if err := ReadMo(c2, f2); err != nil {
+		t.Fatal(err)
+	}
+	f2.Close()
+	testCatalog(c2)
 }
