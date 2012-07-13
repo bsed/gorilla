@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"code.google.com/p/gorilla/i18n/gettext/pluralforms"
+	"code.google.com/p/gorilla/gettext/pluralforms"
 )
 
 const (
@@ -111,25 +111,23 @@ func ReadMo(c *Catalog, r io.ReadSeeker) error {
 			mStr = mStr[ctxIdx+1:]
 			hasCtx = true
 		}
-
+		// Add the message.
 		if keyIdx := strings.Index(mStr, "\x00"); keyIdx == -1 {
 			// Singular.
-			msg := &SimpleMessage{
+			c.Add(&SimpleMessage{
 				Src:    mStr,
 				Dst:    tStr,
 				Ctx:    ctx,
 				HasCtx: hasCtx,
-			}
-			c.Add(msg)
+			})
 		} else {
 			// Plural.
-			msg := &PluralMessage{
+			c.Add(&PluralMessage{
 				Src:    strings.Split(mStr, "\x00"),
 				Dst:    strings.Split(tStr, "\x00"),
 				Ctx:    ctx,
 				HasCtx: hasCtx,
-			}
-			c.Add(msg)
+			})
 		}
 	}
 	return nil
