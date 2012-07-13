@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"code.google.com/p/gorilla/i18n/gettext/pluralforms"
+	"code.google.com/p/gorilla/gettext/pluralforms"
 )
 
 var ErrMissingContext = errors.New("The message doesn't have a context.")
@@ -85,7 +85,7 @@ func (c *Catalog) Get(key string, a ...interface{}) string {
 	return ""
 }
 
-// GetPlural returns a plural translation for the given key and num,
+// GetPlural returns a plural translation for the given key and number,
 // or an empty string if the key is not found.
 //
 // Extra arguments or optional, used to format the translation.
