@@ -51,6 +51,8 @@ func (c *Catalog) Add(msg Message) {
 func (c *Catalog) Clone() *Catalog {
 	clone := NewCatalog()
 	clone.PluralFunc = c.PluralFunc
+	clone.ctx = c.ctx
+	clone.hasCtx = c.hasCtx
 	for k, v := range c.Messages {
 		clone.Messages[k] = v.Clone()
 	}
