@@ -7,6 +7,7 @@ package gettext
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"code.google.com/p/gorilla/gettext/pluralforms"
 )
@@ -104,6 +105,46 @@ func (c *Catalog) GetPlural(key string, num int, a ...interface{}) string {
 // This evaluates a Plural-Forms expression.
 func (c *Catalog) PluralIndex(num int) int {
 	return c.PluralFunc(num)
+}
+
+// sortedMessages returns a list of sorted string keys for a catalog, and
+// a map with the messages for those keys.
+func sortedMessages(c *Catalog) (keys []string, keyMap map[string][]Message) {
+	keyMap = make(map[string][]Message)
+	for k, v := range c.Messages {
+		keyMap[k.Src] = append(keyMap[k.Src], v)
+	}
+	// No context first, then the ones with context, sorted.
+	for k, v := range keyMap {
+		if len(v) == 1 {
+			continue
+		}
+		var newV []Message
+		ctxMap := make(map[string][]Message)
+		for _, msg := range v {
+			if ctx, err := msg.Context(); err != nil {
+				newV = append(newV, msg)
+			} else {
+				ctxMap[ctx] = append(ctxMap[ctx], msg)
+			}
+		}
+		for _, ctx := range sortedMessageKeys(ctxMap) {
+			newV = append(newV, ctxMap[ctx]...)
+		}
+		keyMap[k] = newV
+	}
+	return sortedMessageKeys(keyMap), keyMap
+}
+
+func sortedMessageKeys(m map[string][]Message) []string {
+	keys := make([]string, len(m))
+	i := 0
+	for k, _ := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // ----------------------------------------------------------------------------

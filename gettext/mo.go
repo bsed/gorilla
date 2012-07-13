@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"code.google.com/p/gorilla/gettext/pluralforms"
@@ -181,24 +180,12 @@ type moMessages struct {
 
 // newMoMessages returns pre-computed values for WriteMo.
 func newMoMessages(c *Catalog) (idxs []uint32, msgs []byte) {
-	// Count messages, sort keys.
-	keyMap := make(map[string][]Message)
-	for k, v := range c.Messages {
-		keyMap[k.Src] = append(keyMap[k.Src], v)
-	}
-	keys := make([]string, len(keyMap))
-	i := 0
-	for k, _ := range keyMap {
-		keys[i] = k
-		i++
-	}
-	sort.Strings(keys)
-	// Write all messages.
 	m := &moMessages{
 		src:    new(bytes.Buffer),
 		dst:    new(bytes.Buffer),
 		srcIdx: uint32(28 + len(c.Messages)*16),
 	}
+	keys, keyMap := sortedMessages(c)
 	for _, k := range keys {
 		for _, msg := range keyMap[k] {
 			m.append(msg)
