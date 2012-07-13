@@ -105,26 +105,29 @@ func ReadMo(c *Catalog, r io.ReadSeeker) error {
 		// Check for context.
 		mStr, tStr := string(mb), string(tb)
 		var ctx string
+		var hasCtx bool
 		if ctxIdx := strings.Index(mStr, "\x04"); ctxIdx != -1 {
 			ctx = mStr[:ctxIdx]
 			mStr = mStr[ctxIdx+1:]
+			hasCtx = true
 		}
 
 		if keyIdx := strings.Index(mStr, "\x00"); keyIdx == -1 {
 			// Singular.
-			msg := &SimpleMessage{Src: mStr, Dst: tStr}
-			if ctx != "" {
-				msg.SetContext(ctx)
+			msg := &SimpleMessage{
+				Src:    mStr,
+				Dst:    tStr,
+				Ctx:    ctx,
+				HasCtx: hasCtx,
 			}
 			c.Add(msg)
 		} else {
 			// Plural.
 			msg := &PluralMessage{
-				Src: strings.Split(mStr, "\x00"),
-				Dst: strings.Split(tStr, "\x00"),
-			}
-			if ctx != "" {
-				msg.SetContext(ctx)
+				Src:    strings.Split(mStr, "\x00"),
+				Dst:    strings.Split(tStr, "\x00"),
+				Ctx:    ctx,
+				HasCtx: hasCtx,
 			}
 			c.Add(msg)
 		}
@@ -179,18 +182,11 @@ type moMessages struct {
 }
 
 // newMoMessages returns pre-computed values for WriteMo.
-func newMoMessages(c *Catalog) (count int, idxs []uint32, msgs []byte) {
+func newMoMessages(c *Catalog) (idxs []uint32, msgs []byte) {
 	// Count messages, sort keys.
-	keyMap := make(map[string]bool)
-	for k, _ := range c.Messages {
-		keyMap[k] = true
-		count++
-	}
-	for _, v := range c.Contexts {
-		for k, _ := range v {
-			keyMap[k] = true
-			count++
-		}
+	keyMap := make(map[string][]Message)
+	for k, v := range c.Messages {
+		keyMap[k.Src] = append(keyMap[k.Src], v)
 	}
 	keys := make([]string, len(keyMap))
 	i := 0
@@ -203,16 +199,11 @@ func newMoMessages(c *Catalog) (count int, idxs []uint32, msgs []byte) {
 	m := &moMessages{
 		src:    new(bytes.Buffer),
 		dst:    new(bytes.Buffer),
-		srcIdx: uint32(28 + count*16),
+		srcIdx: uint32(28 + len(c.Messages)*16),
 	}
 	for _, k := range keys {
-		if msg, ok := c.Messages[k]; ok {
+		for _, msg := range keyMap[k] {
 			m.append(msg)
-		}
-		for _, ctx := range c.Contexts {
-			if msg, ok := ctx[k]; ok {
-				m.append(msg)
-			}
 		}
 	}
 	// Merge everything.
@@ -222,14 +213,14 @@ func newMoMessages(c *Catalog) (count int, idxs []uint32, msgs []byte) {
 	}
 	m.src.Write(m.dst.Bytes())
 	idxs = append(m.srcList, m.dstList...)
-	return count, idxs, m.src.Bytes()
+	return idxs, m.src.Bytes()
 }
 
 func (m *moMessages) append(msg Message) {
 	src := ""
 	dst := ""
-	if ctx := msg.Context(); ctx != nil {
-		src += *ctx + "\x04"
+	if ctx, err := msg.Context(); err == nil {
+		src += ctx + "\x04"
 	}
 	switch t := msg.(type) {
 	case *SimpleMessage:
@@ -251,7 +242,8 @@ func (m *moMessages) append(msg Message) {
 // WriteMo writes a compiled catalog to the given writer.
 func WriteMo(c *Catalog, w io.WriteSeeker) error {
 	order := binary.LittleEndian
-	count, idxs, msgs := newMoMessages(c)
+	count := len(c.Messages)
+	idxs, msgs := newMoMessages(c)
 	mTableIdx := 28
 	tTableIdx := mTableIdx + count*8
 	table := []uint32{
