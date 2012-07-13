@@ -173,28 +173,24 @@ func TestContext(t *testing.T) {
 		equalString(c.Get("food"), "comida")
 		equalString(c.Get("music"), "")
 
-		c2 := c.Context("kids")
-		equalString(c2.Get("food"), "merenda")
-		equalString(c2.Get("music"), "melodia")
+		c.SetContext("kids")
+		equalString(c.Get("food"), "merenda")
+		equalString(c.Get("music"), "melodia")
 
-		c3 := c.Context("slang")
-		equalString(c3.Get("food"), "rango")
-		equalString(c3.Get("music"), "sonzera")
+		c.SetContext("slang")
+		equalString(c.Get("food"), "rango")
+		equalString(c.Get("music"), "sonzera")
 	}
 
 	c := NewCatalog()
 	c.Add(&SimpleMessage{Src: "food", Dst: "comida"})
-	m := &SimpleMessage{Src: "food", Dst: "merenda"}
-	m.SetContext("kids")
+	m := &SimpleMessage{Src: "food", Dst: "merenda", Ctx: "kids", HasCtx: true}
 	c.Add(m)
-	m = &SimpleMessage{Src: "food", Dst: "rango"}
-	m.SetContext("slang")
+	m = &SimpleMessage{Src: "food", Dst: "rango", Ctx: "slang", HasCtx: true}
 	c.Add(m)
-	m = &SimpleMessage{Src: "music", Dst: "melodia"}
-	m.SetContext("kids")
+	m = &SimpleMessage{Src: "music", Dst: "melodia", Ctx: "kids", HasCtx: true}
 	c.Add(m)
-	m = &SimpleMessage{Src: "music", Dst: "sonzera"}
-	m.SetContext("slang")
+	m = &SimpleMessage{Src: "music", Dst: "sonzera", Ctx: "slang", HasCtx: true}
 	c.Add(m)
 
 	f1 := newFile("testWriteMo", t)
