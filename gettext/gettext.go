@@ -124,6 +124,7 @@ func sortedMessages(c *Catalog) []Message {
 	return msgs
 }
 
+// sortedMessageKeys returns a slice of sorted keys for a map of messages.
 func sortedMessageKeys(m map[string][]Message) []string {
 	keys := make([]string, len(m))
 	i := 0
@@ -158,6 +159,8 @@ type Message interface {
 
 // ----------------------------------------------------------------------------
 
+// MessageInfo stores meta-data found in GNU PO files, such as translator
+// comments and references to the source of the translatable strings.
 type MessageInfo struct {
 	UserComments   []string // translator comments. prefix: #
 	SourceComments []string // extracted comments.  prefix: #.
@@ -169,6 +172,7 @@ type MessageInfo struct {
 	HasPrevCtx     bool
 }
 
+// Clone returns a copy of the meta-data.
 func (m *MessageInfo) Clone() *MessageInfo {
 	clone := &MessageInfo{
 		PrevSingular: m.PrevSingular,
@@ -198,6 +202,8 @@ func (m *MessageInfo) Clone() *MessageInfo {
 // ----------------------------------------------------------------------------
 
 // SimpleMessage is a message without plural forms.
+//
+// See the Message interface for a description of the methods.
 type SimpleMessage struct {
 	Src    string
 	Dst    string
@@ -256,6 +262,8 @@ func (m *SimpleMessage) Info() *MessageInfo {
 // ----------------------------------------------------------------------------
 
 // PluralMessage is a message with plural forms.
+//
+// See the Message interface for a description of the methods.
 type PluralMessage struct {
 	Src    []string
 	Dst    []string
