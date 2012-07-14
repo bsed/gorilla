@@ -63,12 +63,14 @@ func TestReadMo(t *testing.T) {
 		}
 	}
 
+	mr := new(MoReader)
+
 	b, err := decode([]byte(gnuMoData))
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := NewCatalog()
-	if err := ReadMo(c, bytes.NewReader(b)); err != nil {
+	if err := mr.Read(c, bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,6 +91,9 @@ func TestWriteMo(t *testing.T) {
 		}
 	}
 
+	mr := new(MoReader)
+	mw := new(MoWriter)
+
 	c := NewCatalog()
 	c.Add(&SimpleMessage{Src: "foo", Dst: "bar"})
 	c.Add(&SimpleMessage{Src: "baz", Dst: "ding"})
@@ -98,7 +103,7 @@ func TestWriteMo(t *testing.T) {
 	})
 
 	f1 := newFile("testWriteMo", t)
-	if err := WriteMo(c, f1); err != nil {
+	if err := mw.Write(c, f1); err != nil {
 		t.Fatal(err)
 	}
 	f1.Close()
@@ -108,7 +113,7 @@ func TestWriteMo(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := NewCatalog()
-	if err := ReadMo(c2, f2); err != nil {
+	if err := mr.Read(c2, f2); err != nil {
 		t.Fatal(err)
 	}
 	f2.Close()
@@ -127,17 +132,20 @@ func TestWriteMo2(t *testing.T) {
 		}
 	}
 
+	mr := new(MoReader)
+	mw := new(MoWriter)
+
 	b, err := decode([]byte(gnuMoData))
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := NewCatalog()
-	if err := ReadMo(c, bytes.NewReader(b)); err != nil {
+	if err := mr.Read(c, bytes.NewReader(b)); err != nil {
 		t.Fatal(err)
 	}
 
 	f1 := newFile("testWriteMo", t)
-	if err := WriteMo(c, f1); err != nil {
+	if err := mw.Write(c, f1); err != nil {
 		t.Fatal(err)
 	}
 	f1.Close()
@@ -147,7 +155,7 @@ func TestWriteMo2(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := NewCatalog()
-	if err := ReadMo(c2, f2); err != nil {
+	if err := mr.Read(c2, f2); err != nil {
 		t.Fatal(err)
 	}
 	f2.Close()
@@ -168,6 +176,9 @@ func TestContext(t *testing.T) {
 			t.Errorf("Expected %q, got %q.", s2, s1)
 		}
 	}
+
+	mr := new(MoReader)
+	mw := new(MoWriter)
 
 	testCatalog := func(c *Catalog) {
 		equalString(c.Get("food"), "comida")
@@ -194,7 +205,7 @@ func TestContext(t *testing.T) {
 	c.Add(m)
 
 	f1 := newFile("testWriteMo", t)
-	if err := WriteMo(c, f1); err != nil {
+	if err := mw.Write(c, f1); err != nil {
 		t.Fatal(err)
 	}
 	f1.Close()
@@ -204,7 +215,7 @@ func TestContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := NewCatalog()
-	if err := ReadMo(c2, f2); err != nil {
+	if err := mr.Read(c2, f2); err != nil {
 		t.Fatal(err)
 	}
 	f2.Close()

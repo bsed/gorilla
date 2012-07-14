@@ -20,8 +20,15 @@ const (
 	magicLittleEndian uint32 = 0x950412de
 )
 
-// ReadMo fills a catalog with translations from a GNU MO file.
-func ReadMo(c *Catalog, r io.ReadSeeker) error {
+// MoReader loads catalogs from GNU MO files.
+//
+// Currently only UTF-8 encoding is supported. An encoding translator
+// may be added in the future.
+type MoReader struct {
+}
+
+// Read loads a catalog from the given reader.
+func (mr *MoReader) Read(c *Catalog, r io.ReadSeeker) error {
 	// First word identifies the byte order.
 	var order binary.ByteOrder
 	var magic uint32
@@ -129,106 +136,63 @@ func ReadMo(c *Catalog, r io.ReadSeeker) error {
 			})
 		}
 	}
+	if header, ok := c.Header["plural-forms"]; ok {
+		fn, err := mr.getPluralFunc(header)
+		if err != nil {
+			return err
+		}
+		c.PluralFunc = fn
+	}
 	return nil
 }
 
+func (mr *MoReader) getPluralFunc(header string) (pluralforms.PluralFunc, error) {
+	for _, part := range strings.Split(header, ";") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) == 2 && strings.TrimSpace(kv[0]) == "plural" {
+			if fn, err := pluralforms.Parse(kv[1]); err == nil {
+				return fn, nil
+			} else {
+				return nil, err
+			}
+		}
+	}
+	return nil, fmt.Errorf("Malformed Plural-Forms header: %q", header)
+}
+
 // readMoHeader parses the translations metadata following GNU .mo conventions.
-//
-// Ported from Python's gettext.GNUTranslations.
-func readMoHeader(c *Catalog, str string) {
+func readMoHeader(c *Catalog, header string) {
 	var lastk string
-	for _, item := range strings.Split(str, "\n") {
-		item = strings.TrimSpace(item)
-		if item == "" {
+	for _, line := range strings.Split(header, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
-		if i := strings.Index(item, ":"); i != -1 {
-			k := strings.ToLower(strings.TrimSpace(item[:i]))
-			v := strings.TrimSpace(item[i+1:])
+		if i := strings.Index(line, ":"); i != -1 {
+			k := strings.ToLower(strings.TrimSpace(line[:i]))
+			v := strings.TrimSpace(line[i+1:])
 			c.Header[k] = v
 			lastk = k
-			switch k {
-			// TODO: extract and apply charset from content-type?
-			case "plural-forms":
-			L1:
-				for _, part := range strings.Split(v, ";") {
-					kv := strings.SplitN(part, "=", 2)
-					if len(kv) == 2 && strings.TrimSpace(kv[0]) == "plural" {
-						if fn, err := pluralforms.Parse(kv[1]); err == nil {
-							c.PluralFunc = fn
-						}
-						break L1
-					}
-				}
-			}
 		} else if lastk != "" {
-			c.Header[lastk] += "\n" + item
+			c.Header[lastk] += "\n" + line
 		}
 	}
 }
 
 // ----------------------------------------------------------------------------
 
-type moMessages struct {
-	src     *bytes.Buffer
-	dst     *bytes.Buffer
-	srcIdx  uint32
-	dstIdx  uint32
-	srcList []uint32
-	dstList []uint32
+// MoWriter compiles catalogs to GNU MO files.
+//
+// Currently only UTF-8 encoding is supported. An encoding translator
+// may be added in the future.
+type MoWriter struct {
 }
 
-// newMoMessages returns pre-computed values for WriteMo.
-func newMoMessages(c *Catalog) (idxs []uint32, msgs []byte) {
-	m := &moMessages{
-		src:    new(bytes.Buffer),
-		dst:    new(bytes.Buffer),
-		srcIdx: uint32(28 + len(c.Messages)*16),
-	}
-	keys, keyMap := sortedMessages(c)
-	for _, k := range keys {
-		for _, msg := range keyMap[k] {
-			m.append(msg)
-		}
-	}
-	// Merge everything.
-	for i := 0; i < len(m.dstList); i += 2 {
-		// Increment offset for translations.
-		m.dstList[i+1] += m.srcIdx
-	}
-	m.src.Write(m.dst.Bytes())
-	idxs = append(m.srcList, m.dstList...)
-	return idxs, m.src.Bytes()
-}
-
-func (m *moMessages) append(msg Message) {
-	src := ""
-	dst := ""
-	if ctx, err := msg.Context(); err == nil {
-		src += ctx + "\x04"
-	}
-	switch t := msg.(type) {
-	case *SimpleMessage:
-		src += t.Src
-		dst = t.Dst
-	case *PluralMessage:
-		src += strings.Join(t.Src, "\x00")
-		dst = strings.Join(t.Dst, "\x00")
-	}
-	m.src.WriteString(src + "\x00")
-	m.dst.WriteString(dst + "\x00")
-	sLen, dLen := uint32(len(src)), uint32(len(dst))
-	m.srcList = append(m.srcList, sLen, m.srcIdx)
-	m.dstList = append(m.dstList, dLen, m.dstIdx)
-	m.srcIdx += sLen + 1
-	m.dstIdx += dLen + 1
-}
-
-// WriteMo writes a compiled catalog to the given writer.
-func WriteMo(c *Catalog, w io.WriteSeeker) error {
+// Write compiles a catalog to the given writer.
+func (mw *MoWriter) Write(c *Catalog, w io.WriteSeeker) error {
 	order := binary.LittleEndian
-	count := len(c.Messages)
-	idxs, msgs := newMoMessages(c)
+	count := len(c.Messages) + 1 // +1 for the header
+	idxs, msgs := newMoMessageWriter(c)
 	mTableIdx := 28
 	tTableIdx := mTableIdx + count*8
 	table := []uint32{
@@ -252,4 +216,69 @@ func WriteMo(c *Catalog, w io.WriteSeeker) error {
 		return err
 	}
 	return nil
+}
+
+// moMessageWriter pre-computes values for MoWriter.Write.
+type moMessageWriter struct {
+	src     *bytes.Buffer
+	dst     *bytes.Buffer
+	srcIdx  uint32
+	dstIdx  uint32
+	srcList []uint32
+	dstList []uint32
+}
+
+func newMoMessageWriter(c *Catalog) (idxs []uint32, msgs []byte) {
+	count := len(c.Messages) + 1 // +1 for the header
+	m := &moMessageWriter{
+		src:    new(bytes.Buffer),
+		dst:    new(bytes.Buffer),
+		srcIdx: uint32(28 + count*16),
+	}
+	m.append(m.getHeader(c))
+	for _, msg := range sortedMessages(c) {
+		m.append(msg)
+	}
+	// Merge everything.
+	for i := 0; i < len(m.dstList); i += 2 {
+		// Increment offset for translations.
+		m.dstList[i+1] += m.srcIdx
+	}
+	m.src.Write(m.dst.Bytes())
+	idxs = append(m.srcList, m.dstList...)
+	return idxs, m.src.Bytes()
+}
+
+func (m *moMessageWriter) getHeader(c *Catalog) Message {
+	b := new(bytes.Buffer)
+	for k, v := range c.Header {
+		b.WriteString(k + ": " + v)
+	}
+	return &SimpleMessage{
+		Src: "",
+		Dst: b.String(),
+	}
+}
+
+func (m *moMessageWriter) append(msg Message) {
+	src := ""
+	dst := ""
+	if ctx, err := msg.Context(); err == nil {
+		src = ctx + "\x04"
+	}
+	switch t := msg.(type) {
+	case *SimpleMessage:
+		src += t.Src
+		dst = t.Dst
+	case *PluralMessage:
+		src += strings.Join(t.Src, "\x00")
+		dst = strings.Join(t.Dst, "\x00")
+	}
+	m.src.WriteString(src + "\x00")
+	m.dst.WriteString(dst + "\x00")
+	sLen, dLen := uint32(len(src)), uint32(len(dst))
+	m.srcList = append(m.srcList, sLen, m.srcIdx)
+	m.dstList = append(m.dstList, dLen, m.dstIdx)
+	m.srcIdx += sLen + 1
+	m.dstIdx += dLen + 1
 }

@@ -93,47 +93,35 @@ func (c *Catalog) Get(key string, a ...interface{}) string {
 func (c *Catalog) GetPlural(key string, num int, a ...interface{}) string {
 	if msg, ok := c.Messages[Key{Src: key, Ctx: c.ctx, HasCtx: c.hasCtx}]; ok {
 		if a == nil {
-			return msg.GetPlural(c.PluralIndex(num))
+			return msg.GetPlural(c.PluralFunc(num))
 		}
-		return msg.Format(msg.GetPlural(c.PluralIndex(num)), a...)
+		return msg.Format(msg.GetPlural(c.PluralFunc(num)), a...)
 	}
 	return ""
 }
 
-// PluralIndex returns the plural index for a given number.
-//
-// This evaluates a Plural-Forms expression.
-func (c *Catalog) PluralIndex(num int) int {
-	return c.PluralFunc(num)
-}
-
-// sortedMessages returns a list of sorted string keys for a catalog, and
-// a map with the messages for those keys.
-func sortedMessages(c *Catalog) (keys []string, keyMap map[string][]Message) {
-	keyMap = make(map[string][]Message)
+// sortedMessages returns a slice of messages sorted by key for a catalog.
+func sortedMessages(c *Catalog) []Message {
+	var msgs []Message
+	keyMap := make(map[string][]Message)
 	for k, v := range c.Messages {
 		keyMap[k.Src] = append(keyMap[k.Src], v)
 	}
-	// No context first, then the ones with context, sorted.
-	for k, v := range keyMap {
-		if len(v) == 1 {
-			continue
-		}
-		var newV []Message
+	for _, v := range sortedMessageKeys(keyMap) {
+		// No context first, then the ones with context, sorted.
 		ctxMap := make(map[string][]Message)
-		for _, msg := range v {
+		for _, msg := range keyMap[v] {
 			if ctx, err := msg.Context(); err != nil {
-				newV = append(newV, msg)
+				msgs = append(msgs, msg)
 			} else {
 				ctxMap[ctx] = append(ctxMap[ctx], msg)
 			}
 		}
 		for _, ctx := range sortedMessageKeys(ctxMap) {
-			newV = append(newV, ctxMap[ctx]...)
+			msgs = append(msgs, ctxMap[ctx]...)
 		}
-		keyMap[k] = newV
 	}
-	return sortedMessageKeys(keyMap), keyMap
+	return msgs
 }
 
 func sortedMessageKeys(m map[string][]Message) []string {
@@ -171,14 +159,14 @@ type Message interface {
 // ----------------------------------------------------------------------------
 
 type MessageInfo struct {
-	PrevSingular   string
-	PrevPlural     string
-	PrevCtx        string
+	UserComments   []string // translator comments. prefix: #
+	SourceComments []string // extracted comments.  prefix: #.
+	References     []string // reference file/line. prefix: #:
+	Flags          []string // flags.               prefix: #,
+	PrevSingular   string   //                      prefix: #|
+	PrevPlural     string   //                      prefix: #|
+	PrevCtx        string   //                      prefix: #|
 	HasPrevCtx     bool
-	UserComments   []string
-	SourceComments []string
-	References     []string
-	Flags          []string
 }
 
 func (m *MessageInfo) Clone() *MessageInfo {
