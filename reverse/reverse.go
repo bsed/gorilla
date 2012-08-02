@@ -39,6 +39,10 @@ type Regexp struct {
 // Compile compiles the regular expression pattern and creates a template
 // to revert it.
 func Compile(pattern string) (*Regexp, error) {
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
 	re, err := syntax.Parse(pattern, syntax.Perl)
 	if err != nil {
 		return nil, err
@@ -46,7 +50,7 @@ func Compile(pattern string) (*Regexp, error) {
 	tpl := &template{buffer: new(bytes.Buffer)}
 	tpl.write(re)
 	return &Regexp{
-		compiled: regexp.MustCompile(pattern),
+		compiled: compiled,
 		template: tpl.buffer.String(),
 		groups:   tpl.groups,
 		indices:  tpl.indices,
