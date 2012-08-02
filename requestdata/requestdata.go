@@ -6,7 +6,6 @@ package context
 
 import (
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -14,6 +13,7 @@ import (
 var (
 	mutex sync.Mutex
 	data  = make(map[*http.Request]map[interface{}]interface{})
+	datat = make(map[*http.Request]int64)
 )
 
 // Set stores a value for a given key in a given request.
@@ -21,9 +21,8 @@ func Set(r *http.Request, key, val interface{}) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if data[r] == nil {
-		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-		r.Header["X-Context-Timestamp"] = []string{timestamp}
 		data[r] = make(map[interface{}]interface{})
+		datat[r] = time.Now().Unix()
 	}
 	data[r][key] = val
 }
@@ -55,6 +54,7 @@ func Clear(r *http.Request) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	delete(data, r)
+	delete(datat, r)
 }
 
 // Purgue removes request data stored for longer than maxAge, in seconds.
@@ -73,13 +73,13 @@ func Purgue(maxAge int) int {
 	if maxAge <= 0 {
 		count = len(data)
 		data = make(map[*http.Request]map[interface{}]interface{})
+		datat = make(map[*http.Request]int64)
 	} else {
 		min := time.Now().Unix() - int64(maxAge)
 		for r, _ := range data {
-			timestamp := r.Header.Get("X-Context-Timestamp")
-			secs, err := strconv.ParseInt(timestamp, 10, 64)
-			if err != nil || secs < min {
+			if datat[r] < min {
 				delete(data, r)
+				delete(datat, r)
 				count++
 			}
 		}
