@@ -82,7 +82,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		handler = r.NotFoundHandler
 	}
-	defer context.DefaultContext.Clear(req)
+	defer context.Clear(req)
 	handler.ServeHTTP(w, req)
 }
 
@@ -226,7 +226,7 @@ const (
 
 // Vars returns the route variables for the current request, if any.
 func Vars(r *http.Request) map[string]string {
-	if rv := context.DefaultContext.Get(r, varsKey); rv != nil {
+	if rv := context.Get(r, varsKey); rv != nil {
 		return rv.(map[string]string)
 	}
 	return nil
@@ -234,18 +234,18 @@ func Vars(r *http.Request) map[string]string {
 
 // CurrentRoute returns the matched route for the current request, if any.
 func CurrentRoute(r *http.Request) *Route {
-	if rv := context.DefaultContext.Get(r, routeKey); rv != nil {
+	if rv := context.Get(r, routeKey); rv != nil {
 		return rv.(*Route)
 	}
 	return nil
 }
 
 func setVars(r *http.Request, val interface{}) {
-	context.DefaultContext.Set(r, varsKey, val)
+	context.Set(r, varsKey, val)
 }
 
 func setCurrentRoute(r *http.Request, val interface{}) {
-	context.DefaultContext.Set(r, routeKey, val)
+	context.Set(r, routeKey, val)
 }
 
 // ----------------------------------------------------------------------------
