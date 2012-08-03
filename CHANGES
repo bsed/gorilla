@@ -9,11 +9,22 @@ latest version and a specific version can be pulled using its tag.
 Changes that are not backward compatible are highligthed below
 using an exclamation mark between brackets, as in "[!]".
 
-Development version
+gorilla r2012.08.03
 -------------------
-- sessions: FilesystemStore no longer skips saving empty sessions.
-- Added package http/auth, to parse "Authorization" headers.
-- Added package http/parser, with utilities to parse HTTP headers.
+- sessions:
+  - [Fix] FilesystemStore no longer skips saving empty sessions.
+- Added package reverse, to reverse URL route regexps.
+- Package cleanup to remove external dependencies and experimental
+  packages. These were moved to code.google.com/p/sadbox:
+  - appengine
+  - color
+  - css
+  - gettext
+  - http
+  - i18n
+  - requestdata
+  - sessions/mongodb
+  - template
 
 gorilla r2012.05.04
 -------------------
