@@ -54,7 +54,8 @@ type Server struct {
 // RegisterCodec adds a new codec to the server.
 //
 // Codecs are defined to process a given serialization scheme, e.g., JSON or
-// XML. A codec is chosen based on the "Content-Type" header from the request.
+// XML. A codec is chosen based on the "Content-Type" header from the request,
+// excluding the charset definition.
 func (s *Server) RegisterCodec(codec Codec, contentType string) {
 	s.codecs[strings.ToLower(contentType)] = codec
 }
