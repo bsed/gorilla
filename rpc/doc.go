@@ -35,7 +35,7 @@ This server handles requests to the "/rpc" path using a JSON codec.
 A codec is tied to a content type. In the example above, the JSON codec is
 registered to serve requests with "application/json" as the value for the
 "Content-Type" header. If the header includes a charset definition, it is
-ignored; only the media-type part is take into account.
+ignored; only the media-type part is taken into account.
 
 A service can be registered using a name. If the name is empty, like in the
 example above, it will be inferred from the service type.
