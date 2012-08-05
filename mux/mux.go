@@ -272,13 +272,11 @@ func cleanPath(p string) string {
 
 // uniqueVars returns an error if two slices contain duplicated strings.
 func uniqueVars(s1, s2 []string) error {
-	vars := make(map[string]bool, len(s1))
-	for _, s := range s1 {
-		vars[s] = true
-	}
-	for _, s := range s2 {
-		if vars[s] {
-			return fmt.Errorf("mux: duplicated route variable %q", s)
+	for _, v1 := range s1 {
+		for _, v2 := range s2 {
+			if v1 == v2 {
+				return fmt.Errorf("mux: duplicated route variable %q", v2)
+			}
 		}
 	}
 	return nil
