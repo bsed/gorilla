@@ -13,21 +13,6 @@ import (
 
 // Regexp stores a regular expression that can be "reverted" or "built":
 // outermost capturing groups become placeholders to be filled by variables.
-//
-// For example, given a Regexp with the pattern `1(\d+)3`, we can call
-// re.Revert([]string{"2"}, nil) to get a resulting string "123".
-// This also works for named capturing groups: we can revert `1(?P<two>\d+)3`
-// calling re.Revert(nil, map[string]string{"two": "2"}).
-//
-// There are a few limitations that can't be changed:
-//
-// 1. Nested capturing groups are ignored; only the outermost groups become
-// a placeholder. So in `1(\d+([a-z]+))3` there is only one placeholder
-// although there are two capturing groups: re.Revert([]string{"2", "a"}, nil)
-// results in "123" and not "12a3".
-//
-// 2. Literals inside capturing groups are ignored; the whole group becomes
-// a placeholder.
 type Regexp struct {
 	compiled *regexp.Regexp // compiled regular expression
 	template string         // reverse template
@@ -36,7 +21,7 @@ type Regexp struct {
 	indices  []int          // indices of the outermost groups
 }
 
-// Compile compiles the regular expression pattern and creates a template
+// Compile compiles a regular expression pattern and creates a template
 // to revert it.
 func Compile(pattern string) (*Regexp, error) {
 	compiled, err := regexp.Compile(pattern)
@@ -57,13 +42,14 @@ func Compile(pattern string) (*Regexp, error) {
 	}, nil
 }
 
-// Regexp returns the compiled regular expression to be used for matching.
-func (r *Regexp) Regexp() *regexp.Regexp {
+// Compiled returns the compiled regular expression to be used for matching.
+func (r *Regexp) Compiled() *regexp.Regexp {
 	return r.compiled
 }
 
 // Groups returns an ordered list of the outermost capturing groups found in
-// the regexp, and the indices of these groups.
+// the regexp, and the indices of these groups. Not all indices may be present
+// because nested capturing groups are ignored.
 //
 // Positional groups are listed as an empty string and named groups use
 // the group name.
