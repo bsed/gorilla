@@ -62,16 +62,16 @@ func clear(r *http.Request) {
 	delete(datat, r)
 }
 
-// Purgue removes request data stored for longer than maxAge, in seconds.
+// Purge removes request data stored for longer than maxAge, in seconds.
 // It returns the amount of requests removed.
 //
 // If maxAge <= 0, all request data is removed.
 //
 // This is only used for sanity check: in case context cleaning was not
 // properly set some request data can be kept forever, consuming an increasing
-// amount of memory. In case this is detected, Purgue() must be called
+// amount of memory. In case this is detected, Purge() must be called
 // periodically until the problem is fixed.
-func Purgue(maxAge int) int {
+func Purge(maxAge int) int {
 	mutex.Lock()
 	defer mutex.Unlock()
 	count := 0
