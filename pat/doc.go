@@ -62,6 +62,6 @@ Then you can get it using the name and generate a URL:
 Check the mux documentation for more details about URL building and extra
 matchers:
 
-	http://gorilla-web.appspot.com/pkg/gorilla/mux/
+	http://gorilla-web.appspot.com/pkg/mux/
 */
 package pat

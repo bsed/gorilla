@@ -53,6 +53,6 @@ Response format is:
 
 Check the gorilla/rpc documentation for more details:
 
-	http://gorilla-web.appspot.com/pkg/gorilla/rpc
+	http://gorilla-web.appspot.com/pkg/rpc
 */
 package json
