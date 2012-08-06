@@ -15,6 +15,7 @@ gorilla r2012.08.03b
   standalone functions, and no more context struct. By consequence,
   DefaultContext no longer exists. Updating is trivial: replace
   all occurrences of "context.DefaultContext" by simply "context".
+- [!] reverse: renamed Regexp.Regexp to Regexp.Compiled.
 
 gorilla r2012.08.03
 -------------------

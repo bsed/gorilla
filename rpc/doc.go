@@ -76,6 +76,6 @@ All other methods are ignored.
 
 Gorilla has packages with common RPC codecs. Check out their documentation:
 
-	JSON: http://gorilla-web.appspot.com/pkg/gorilla/rpc/json
+	JSON: http://gorilla-web.appspot.com/pkg/rpc/json
 */
 package rpc
