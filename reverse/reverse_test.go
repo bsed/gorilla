@@ -5,88 +5,118 @@
 package reverse
 
 import (
+	"net/url"
 	"testing"
 )
 
+func copyValues(values url.Values) url.Values {
+	rv := url.Values{}
+	for k, v := range values {
+		rv[k] = make([]string, len(v))
+		copy(rv[k], v)
+	}
+	return rv
+}
+
 type reverseTest struct {
-	pattern       string
-	validArgs     []string
-	validKwds     map[string]string
-	validResult   string
-	invalidArgs   []string
-	invalidKwds   map[string]string
-	invalidResult string
+	pattern string
+	values  url.Values
+	result  string
+	valid   bool
 }
 
 var reverseTests = []reverseTest{
-	reverseTest{
-		pattern:       `^1(\d+)3$`,
-		validArgs:     []string{"2"},
-		validKwds:     nil,
-		validResult:   "123",
-		invalidArgs:   []string{"a"},
-		invalidKwds:   nil,
-		invalidResult: "1a3",
+	{
+		pattern: `^1(\d+)3$`,
+		values:  url.Values{"": []string{"2"}},
+		result:  "123",
+		valid:   true,
 	},
-	reverseTest{
-		pattern:       `^4(?P<foo>\d+)6$`,
-		validArgs:     nil,
-		validKwds:     map[string]string{"foo": "5"},
-		validResult:   "456",
-		invalidArgs:   nil,
-		invalidKwds:   map[string]string{"foo": "b"},
-		invalidResult: "4b6",
+	{
+		pattern: `^1(\d+)3$`,
+		values:  url.Values{"": []string{"a"}},
+		result:  "1a3",
+		valid:   false,
 	},
-	reverseTest{
-		pattern:       `^7(?P<foo>\d+)(\d+)0$`,
-		validArgs:     []string{"9"},
-		validKwds:     map[string]string{"foo": "8"},
-		validResult:   "7890",
-		invalidArgs:   []string{"d"},
-		invalidKwds:   map[string]string{"foo": "c"},
-		invalidResult: "7cd0",
+	{
+		pattern: `^4(?P<foo>\d+)6$`,
+		values:  url.Values{"foo": []string{"5"}},
+		result:  "456",
+		valid:   true,
 	},
-	reverseTest{
-		pattern:       `(?P<foo>\d+)`,
-		validArgs:     []string{"1"},
-		validKwds:     nil,
-		validResult:   "1",
-		invalidArgs:   []string{"a"},
-		invalidKwds:   nil,
-		invalidResult: "a",
+	{
+		pattern: `^4(?P<foo>\d+)6$`,
+		values:  url.Values{"foo": []string{"b"}},
+		result:  "4b6",
+		valid:   false,
+	},
+	{
+		pattern: `^7(?P<foo>\d)(\d)0$`,
+		values:  url.Values{"": []string{"9"}, "foo": []string{"8"}},
+		result:  "7890",
+		valid:   true,
+	},
+	{
+		pattern: `^7(?P<foo>\d)(\d)0$`,
+		values:  url.Values{"": []string{"d"}, "foo": []string{"c"}},
+		result:  "7cd0",
+		valid:   false,
+	},
+	{
+		pattern: `(?P<foo>\d)(\d)(?P<foo>\d)`,
+		values:  url.Values{"": []string{"2"}, "foo": []string{"1", "3"}},
+		result:  "123",
+		valid:   true,
+	},
+	{
+		pattern: `(?P<foo>\d)(\d)(?P<foo>\d)`,
+		values:  url.Values{"": []string{"b"}, "foo": []string{"a", "c"}},
+		result:  "abc",
+		valid:   false,
 	},
 }
 
 func TestReverseRegexp(t *testing.T) {
 	for _, test := range reverseTests {
-		r, err := Compile(test.pattern)
+		r, err := CompileRegexp(test.pattern)
 		if err != nil {
 			t.Fatal(err)
 		}
-		reverse, err := r.Revert(test.validArgs, test.validKwds)
+		// MatchString()
+		if r.MatchString(test.result) != test.valid {
+			t.Errorf("%q: expected match %q, got %q", test.pattern, test.valid, !test.valid)
+		}
+		// Values()
+		if test.valid {
+			values := r.Values(test.result)
+			reverted, err := r.Revert(copyValues(values))
+			if err != nil {
+				t.Fatalf("%s: pattern: %q, values: %#v, indices: %#v, groups: %#v", err, test.pattern, values, r.indices, r.groups)
+			}
+			if reverted != test.result {
+				t.Errorf("%q: expected reverted %q, got %q for values %v", test.pattern, test.result, reverted, values)
+			}
+		}
+		// Revert()
+		reverted, err := r.Revert(copyValues(test.values))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("%s: pattern: %q, values: %#v, indices: %#v, groups: %#v", err, test.pattern, test.values, r.indices, r.groups)
 		}
-		if reverse != test.validResult {
-			t.Errorf("Expected %q, got %q", test.validResult, reverse)
+		if reverted != test.result {
+			t.Errorf("%q: expected reverted %q, got %q for values %v", test.pattern, test.result, reverted, test.values)
 		}
-
-		reverse, err = r.ValidRevert(test.validArgs, test.validKwds)
-		if err != nil {
-			t.Errorf("Expected valid %q", test.pattern)
-		}
-
-		reverse, err = r.Revert(test.invalidArgs, test.invalidKwds)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if reverse != test.invalidResult {
-			t.Errorf("Expected %q, got %q", test.invalidResult, reverse)
-		}
-
-		reverse, err = r.ValidRevert(test.invalidArgs, test.invalidKwds)
-		if err == nil {
-			t.Errorf("Expected error for %q", test.pattern)
+		// RevertValid()
+		reverted, err = r.RevertValid(copyValues(test.values))
+		if test.valid {
+			if err != nil {
+				t.Errorf("%q: expected success on RevertValid, got %v", test.pattern, err)
+			} else if reverted != test.result {
+				t.Errorf("%q: expected reverted %q, got %q for values %v", test.pattern, test.result, reverted, test.values)
+			}
+		} else {
+			if err == nil {
+				t.Errorf("%q: expected error on RevertValid", test.pattern)
+			}
 		}
 	}
 }
@@ -112,11 +142,12 @@ var groupTests = []groupTest{
 
 func TestGroups(t *testing.T) {
 	for _, test := range groupTests {
-		r, err := Compile(test.pattern)
+		r, err := CompileRegexp(test.pattern)
 		if err != nil {
 			t.Fatal(err)
 		}
-		groups, indices := r.Groups()
+		groups := r.Groups()
+		indices := r.Indices()
 		if !stringSliceEqual(test.groups, groups) {
 			t.Errorf("Expected %v, got %v", test.groups, groups)
 		}
