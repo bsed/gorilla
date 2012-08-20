@@ -7,6 +7,7 @@ package reverse
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"regexp"
 	"regexp/syntax"
 )
@@ -21,9 +22,9 @@ type Regexp struct {
 	indices  []int          // indices of the outermost groups
 }
 
-// Compile compiles a regular expression pattern and creates a template
+// CompileRegexp compiles a regular expression pattern and creates a template
 // to revert it.
-func Compile(pattern string) (*Regexp, error) {
+func CompileRegexp(pattern string) (*Regexp, error) {
 	compiled, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, err
@@ -47,47 +48,72 @@ func (r *Regexp) Compiled() *regexp.Regexp {
 	return r.compiled
 }
 
+// Template returns the reverse template for the regexp, in fmt syntax.
+func (r *Regexp) Template() string {
+	return r.template
+}
+
 // Groups returns an ordered list of the outermost capturing groups found in
-// the regexp, and the indices of these groups. Not all indices may be present
-// because nested capturing groups are ignored.
+// the regexp.
 //
 // Positional groups are listed as an empty string and named groups use
 // the group name.
-func (r *Regexp) Groups() ([]string, []int) {
-	return r.groups, r.indices
+func (r *Regexp) Groups() []string {
+	return r.groups
 }
 
-// Revert builds a string for this regexp using the given values.
+// Indices returns the indices of the outermost capturing groups found in
+// the regexp.
 //
-// The args parameter is used for positional and named capturing groups,
-// and the kwds parameter is optionally used for named groups only;
-// if a name is not provided in kwds, the value is taken from args, in order.
-func (r *Regexp) Revert(args []string, kwds map[string]string) (string, error) {
-	i := 0
-	values := make([]interface{}, len(r.groups))
-	for k, v := range r.groups {
-		if v != "" && kwds != nil {
-			// A named group. Check if it was passed in kwds.
-			if tmp, ok := kwds[v]; ok {
-				values[k] = tmp
-				continue
-			}
-		}
-		if i >= len(args) {
-			return "", fmt.Errorf(
-				"Not enough values to revert the regexp " +
-				"(expected %d variables)", len(r.groups))
-		}
-		values[k] = args[i]
-		i++
-	}
-	return fmt.Sprintf(r.template, values...), nil
+// Not all indices may be present because nested capturing groups are ignored.
+func (r *Regexp) Indices() []int {
+	return r.indices
 }
 
-// ValidRevert is the same as Revert but it also validates the resulting
+// Match returns whether the regexp matches the given string.
+func (r *Regexp) MatchString(s string) bool {
+	return r.compiled.MatchString(s)
+}
+
+// Values matches the regexp and returns the results for positional and
+// named groups. Positional values are stored using an empty string as key.
+// If the string doesn't match it returns nil.
+func (r *Regexp) Values(s string) url.Values {
+	match := r.compiled.FindStringSubmatch(s)
+	if match != nil {
+		values := url.Values{}
+		for k, v := range r.groups {
+			values.Add(v, match[r.indices[k]])
+		}
+		return values
+	}
+	return nil
+}
+
+// Revert builds a string for this regexp using the given values. Positional
+// values use an empty string as key.
+//
+// The values are modified in place, and only the unused ones are left.
+func (r *Regexp) Revert(values url.Values) (string, error) {
+	vars := make([]interface{}, len(r.groups))
+	for k, v := range r.groups {
+		if len(values[v]) == 0 {
+			return "", fmt.Errorf(
+				"Missing key %q to revert the regexp " +
+				"(expected a total of %d variables)", v, len(r.groups))
+		}
+		vars[k] = values[v][0]
+		values[v] = values[v][1:]
+	}
+	return fmt.Sprintf(r.template, vars...), nil
+}
+
+// RevertValid is the same as Revert but it also validates the resulting
 // string matching it against the compiled regexp.
-func (r *Regexp) ValidRevert(args []string, kwds map[string]string) (string, error) {
-	reverse, err := r.Revert(args, kwds)
+//
+// The values are modified in place, and only the unused ones are left.
+func (r *Regexp) RevertValid(values url.Values) (string, error) {
+	reverse, err := r.Revert(values)
 	if err != nil {
 		return "", err
 	}
