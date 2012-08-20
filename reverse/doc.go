@@ -3,12 +3,17 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/reverse produces reversible regular expressions that can be
-used to generate URLs for a regexp-based mux.
+Package gorilla/reverse is a set of utilities to create request routers.
 
-For example, let's start compiling a simple regexp:
+If provides interfaces to match and extract variables from an HTTP request
+and build URLs for registered routes. It also has a variety of matcher
+implementations for all kinds of request attributes, among other utilities.
 
-	regexp, err := reverse.Compile(`/foo/1(\d+)3`)
+For example, the Regexp type produces reversible regular expressions that
+can be used to generate URLs for a regexp-based mux. To demonstrate, let's
+compile a simple regexp:
+
+	regexp, err := reverse.CompileRegexp(`/foo/1(\d+)3`)
 
 Now we can call regexp.Revert() passing variables to fill the capturing groups.
 Because our variable is not named, we use an empty string as key for
@@ -20,7 +25,7 @@ url.Values, like this:
 Non-capturing groups are ignored, but named capturing groups can be filled
 normally. Just set the key in url.Values:
 
-	regexp, err := reverse.Compile(`/foo/1(?P<two>\d+)3`)
+	regexp, err := reverse.CompileRegexp(`/foo/1(?P<two>\d+)3`)
 	if err != nil {
 		panic(err)
 	}
