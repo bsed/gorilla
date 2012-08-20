@@ -27,6 +27,8 @@ func NewGorillaHost(pattern string) (*GorillaHost, error) {
 	return &GorillaHost{*r}, nil
 }
 
+// GorillaHost matches a URL host using Gorilla's special syntax for named
+// groups: `{name:regexp}`.
 type GorillaHost struct {
 	Regexp
 }
@@ -67,6 +69,8 @@ func NewGorillaPath(pattern string, strictSlash bool) (*GorillaPath, error) {
 	return &GorillaPath{*r, pattern, strictSlash}, nil
 }
 
+// GorillaPath matches a URL path using Gorilla's special syntax for named
+// groups: `{name:regexp}`.
 type GorillaPath struct {
 	Regexp
 	pattern     string
@@ -109,6 +113,8 @@ func NewGorillaPathPrefix(pattern string) (*GorillaPathPrefix, error) {
 	return &GorillaPathPrefix{*r}, nil
 }
 
+// GorillaPathPrefix matches a URL path prefix using Gorilla's special syntax
+// for named groups: `{name:regexp}`.
 type GorillaPathPrefix struct {
 	Regexp
 }
