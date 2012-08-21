@@ -6,8 +6,33 @@ package reverse
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 )
+
+func equalStringSlice(s1, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for k, v := range s1 {
+		if s2[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+func equalValues(u1, u2 url.Values) bool {
+	if len(u1) != len(u2) {
+		return false
+	}
+	for k, v := range u1 {
+		if !equalStringSlice(v, u2[k]) {
+			return false
+		}
+	}
+	return true
+}
 
 func testMatcher(t *testing.T, name string, m Matcher, r *http.Request, expect bool) {
 	result := m.Match(r)
@@ -17,6 +42,7 @@ func testMatcher(t *testing.T, name string, m Matcher, r *http.Request, expect b
 }
 
 func TestHost(t *testing.T) {
+	const name = "Host"
 	type test struct {
 		host   string
 		rURL   string
@@ -31,11 +57,12 @@ func TestHost(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testMatcher(t, "Host", NewHost(v.host), r, v.expect)
+		testMatcher(t, name, NewHost(v.host), r, v.expect)
 	}
 }
 
 func TestMethod(t *testing.T) {
+	const name = "Method"
 	type test struct {
 		methods []string
 		rMethod string
@@ -53,11 +80,72 @@ func TestMethod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testMatcher(t, "Method", NewMethod(v.methods), r, v.expect)
+		testMatcher(t, name, NewMethod(v.methods), r, v.expect)
+	}
+}
+
+func TestRegexpHost(t *testing.T) {
+	const name = "RegexpHost"
+	type test struct {
+		host   string
+		rURL   string
+		expect bool
+		values url.Values
+	}
+	tests := []test{
+		{`(?P<subdomain>[a-z]+)\.domain\.com`, "http://sub.domain.com", true, url.Values{"subdomain": {"sub"}}},
+		{`(?P<subdomain>[a-z]+)\.domain\.com`, "http://123.domain.com", false, nil},
+	}
+	for _, v := range tests {
+		r, err := http.NewRequest("GET", v.rURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		matcher, err := NewRegexpHost(v.host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testMatcher(t, name, matcher, r, v.expect)
+		result := Result{}
+		matcher.Extract(&result, r)
+		if v.expect && !equalValues(v.values, result.Values) {
+			t.Errorf("%s: expected %v, got %v", name, v.values, result.Values)
+		}
+	}
+}
+
+func TestRegexpPath(t *testing.T) {
+	const name = "RegexpPath"
+	type test struct {
+		path   string
+		rURL   string
+		expect bool
+		values url.Values
+	}
+	tests := []test{
+		{`/(?P<abc>[a-z]+)/(?P<ghi>[a-z]+)`, "http://domain.com/def/jkl", true, url.Values{"abc": {"def"}, "ghi": {"jkl"}}},
+		{`/(?P<abc>[a-z]+)/(?P<ghi>[a-z]+)`, "http://domain.com/123/456", false, nil},
+	}
+	for _, v := range tests {
+		r, err := http.NewRequest("GET", v.rURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		matcher, err := NewRegexpPath(v.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testMatcher(t, name, matcher, r, v.expect)
+		result := Result{}
+		matcher.Extract(&result, r)
+		if v.expect && !equalValues(v.values, result.Values) {
+			t.Errorf("%s: expected %v, got %v", name, v.values, result.Values)
+		}
 	}
 }
 
 func TestScheme(t *testing.T) {
+	const name = "Scheme"
 	type test struct {
 		schemes []string
 		rURL    string
@@ -73,6 +161,6 @@ func TestScheme(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testMatcher(t, "Scheme", NewScheme(v.schemes), r, v.expect)
+		testMatcher(t, name, NewScheme(v.schemes), r, v.expect)
 	}
 }
