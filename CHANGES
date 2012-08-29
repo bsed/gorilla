@@ -9,13 +9,15 @@ latest version and a specific version can be pulled using its tag.
 Changes that are not backward compatible are highligthed below
 using an exclamation mark between brackets, as in "[!]".
 
-gorilla r2012.08.03b
---------------------
+Development version
+-------------------
 - [!] context: simplified interface with Set, Get and Delete
   standalone functions, and no more context struct. By consequence,
   DefaultContext no longer exists. Updating is trivial: replace
   all occurrences of "context.DefaultContext" by simply "context".
-- [!] reverse: renamed Regexp.Regexp to Regexp.Compiled.
+- [!] reverse: several reorganizations.
+- [Fix] rpc/json: properly set the error to null unless an error
+  is returned.
 
 gorilla r2012.08.03
 -------------------
