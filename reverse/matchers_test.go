@@ -108,8 +108,19 @@ func TestRegexpHost(t *testing.T) {
 		testMatcher(t, name, matcher, r, v.expect)
 		result := Result{}
 		matcher.Extract(&result, r)
-		if v.expect && !equalValues(v.values, result.Values) {
-			t.Errorf("%s: expected %v, got %v", name, v.values, result.Values)
+		if v.expect {
+			if !equalValues(v.values, result.Values) {
+				t.Errorf("%s: expected %v, got %v", name, v.values, result.Values)
+			}
+			u := url.URL{}
+			if err := matcher.Build(&u, result.Values); err != nil {
+				t.Errorf("%s: error building URL", name)
+			} else {
+				u2, _ := url.Parse(v.rURL)
+				if u.Host != u2.Host {
+					t.Errorf("%s: expected %q, got %q", name, u2.Host, u.Host)
+				}
+			}
 		}
 	}
 }
@@ -138,8 +149,19 @@ func TestRegexpPath(t *testing.T) {
 		testMatcher(t, name, matcher, r, v.expect)
 		result := Result{}
 		matcher.Extract(&result, r)
-		if v.expect && !equalValues(v.values, result.Values) {
-			t.Errorf("%s: expected %v, got %v", name, v.values, result.Values)
+		if v.expect {
+			if !equalValues(v.values, result.Values) {
+				t.Errorf("%s: expected %v, got %v", name, v.values, result.Values)
+			}
+			u := url.URL{}
+			if err := matcher.Build(&u, result.Values); err != nil {
+				t.Errorf("%s: error building URL", name)
+			} else {
+				u2, _ := url.Parse(v.rURL)
+				if u.Path != u2.Path {
+					t.Errorf("%s: expected %q, got %q", name, u2.Path, u.Path)
+				}
+			}
 		}
 	}
 }

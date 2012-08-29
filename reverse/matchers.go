@@ -57,7 +57,7 @@ type Header map[string]string
 
 func (m Header) Match(r *http.Request) bool {
 	src := r.Header
-	loop:
+loop:
 	for k, v := range m {
 		if values, ok := src[k]; !ok {
 			return false
@@ -195,7 +195,7 @@ type Query map[string]string
 
 func (m Query) Match(r *http.Request) bool {
 	src := r.URL.Query()
-	loop:
+loop:
 	for k, v := range m {
 		if values, ok := src[k]; !ok {
 			return false
