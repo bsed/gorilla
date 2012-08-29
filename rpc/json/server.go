@@ -109,10 +109,12 @@ func (c *CodecRequest) WriteResponse(w http.ResponseWriter, reply interface{}, m
 	}
 	res := &serverResponse{
 		Result: reply,
-		Error:  methodErr,
+		Error:  &null,
 		Id:     c.request.Id,
 	}
 	if methodErr != nil {
+		// Propagate error message as string.
+		res.Error = methodErr.Error()
 		// Result must be null if there was an error invoking the method.
 		// http://json-rpc.org/wiki/specification#a1.2Response
 		res.Result = &null

@@ -7,6 +7,7 @@ package json
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -62,6 +63,8 @@ func (rw *ResponseRecorder) Flush() {
 
 // ----------------------------------------------------------------------------
 
+var ErrResponseError = errors.New("response error")
+
 type Service1Request struct {
 	A int
 	B int
@@ -79,17 +82,16 @@ func (t *Service1) Multiply(r *http.Request, req *Service1Request, res *Service1
 	return nil
 }
 
-func TestService(t *testing.T) {
-	s := rpc.NewServer()
-	s.RegisterCodec(NewCodec(), "application/json")
-	s.RegisterService(new(Service1), "")
+func (t *Service1) ResponseError(r *http.Request, req *Service1Request, res *Service1Response) error {
+	return ErrResponseError
+}
 
-	if !s.HasMethod("Service1.Multiply") {
-		t.Errorf("Expected to be registered: Service1.Multiply")
-		return
+func execute(t *testing.T, s *rpc.Server, method string, req, res interface{}) error {
+	if !s.HasMethod(method) {
+		t.Fatal("Expected to be registered:", method)
 	}
 
-	buf, _ := EncodeClientRequest("Service1.Multiply", &Service1Request{4, 2})
+	buf, _ := EncodeClientRequest(method, req)
 	body := bytes.NewBuffer(buf)
 	r, _ := http.NewRequest("POST", "http://localhost:8080/", body)
 	r.Header.Set("Content-Type", "application/json")
@@ -97,10 +99,25 @@ func TestService(t *testing.T) {
 	w := NewRecorder()
 	s.ServeHTTP(w, r)
 
-	var res Service1Response
-	DecodeClientResponse(w.Body, &res)
+	return DecodeClientResponse(w.Body, res)
+}
 
+func TestService(t *testing.T) {
+	s := rpc.NewServer()
+	s.RegisterCodec(NewCodec(), "application/json")
+	s.RegisterService(new(Service1), "")
+
+	var res Service1Response
+	if err := execute(t, s, "Service1.Multiply", &Service1Request{4, 2}, &res); err != nil {
+		t.Error("Expected err to be nil, but got:", err)
+	}
 	if res.Result != 8 {
 		t.Errorf("Wrong response: %v.", res.Result)
+	}
+
+	if err := execute(t, s, "Service1.ResponseError", &Service1Request{4, 2}, &res); err == nil {
+		t.Errorf("Expected to get %q, but got nil", ErrResponseError)
+	} else if err.Error() != ErrResponseError.Error() {
+		t.Errorf("Expected to get %q, but got %q", ErrResponseError, err)
 	}
 }
