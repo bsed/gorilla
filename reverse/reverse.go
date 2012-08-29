@@ -18,8 +18,8 @@ type Regexp struct {
 	compiled *regexp.Regexp // compiled regular expression
 	template string         // reverse template
 	groups   []string       // order of positional and named capturing groups;
-							// names for named and empty strings for positional
-	indices  []int          // indices of the outermost groups
+	// names for named and empty strings for positional
+	indices []int // indices of the outermost groups
 }
 
 // CompileRegexp compiles a regular expression pattern and creates a template
@@ -99,8 +99,8 @@ func (r *Regexp) Revert(values url.Values) (string, error) {
 	for k, v := range r.groups {
 		if len(values[v]) == 0 {
 			return "", fmt.Errorf(
-				"Missing key %q to revert the regexp " +
-				"(expected a total of %d variables)", v, len(r.groups))
+				"Missing key %q to revert the regexp "+
+					"(expected a total of %d variables)", v, len(r.groups))
 		}
 		vars[k] = values[v][0]
 		values[v] = values[v][1:]
@@ -126,12 +126,12 @@ func (r *Regexp) RevertValid(values url.Values) (string, error) {
 
 // template builds a reverse template for a regexp.
 type template struct {
-	buffer  *bytes.Buffer
-	groups  []string      // outermost capturing groups: empty string for
-						  // positional or name for named groups
-	indices []int         // indices of outermost capturing groups
-	index   int           // current group index
-	level   int           // current capturing group nesting level
+	buffer *bytes.Buffer
+	groups []string // outermost capturing groups: empty string for
+	// positional or name for named groups
+	indices []int // indices of outermost capturing groups
+	index   int   // current group index
+	level   int   // current capturing group nesting level
 }
 
 // write writes a reverse template to the buffer.
